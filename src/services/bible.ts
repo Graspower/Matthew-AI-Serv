@@ -85,11 +85,6 @@ export async function searchVerses(query: string): Promise<Verse[]> {
       }
   }
   else {
-      return [{
-        book: 'Verse Not',
-        chapter: 0,
-        verse: 0,
-        text: 'No matching verse found',
-      },]; // If the verse does not exist, it displays verse not found
+      return bibleVerses; // If the verse does not exist, return all verses
   }
 }
