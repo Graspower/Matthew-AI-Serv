@@ -1,4 +1,3 @@
-// noinspection ES6ConvertVarToLetConst
 'use server';
 /**
  * @fileOverview A Bible verse search interpretation AI agent.
