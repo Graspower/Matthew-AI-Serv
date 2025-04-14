@@ -137,7 +137,7 @@ export function SearchForm() {
         </Button>
       </form>
 
-      {verses.length > 0 && (
+      {verses.length > 0 ? (
         <div className="mt-6">
           <h2 className="text-2xl font-bold mb-4">Search Results for "{searchTerm}"</h2>
           <div className="grid gap-4">
@@ -153,7 +153,16 @@ export function SearchForm() {
             ))}
           </div>
         </div>
-      )}
+      ) : searchTerm && verses.length === 0 ? (
+        <div className="mt-6">
+          <h2 className="text-2xl font-bold mb-4">Search Results for "{searchTerm}"</h2>
+          <Card>
+            <CardContent>
+              <p>No matching verse found</p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
