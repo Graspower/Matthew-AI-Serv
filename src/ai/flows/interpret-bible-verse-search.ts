@@ -9,7 +9,7 @@
 
 import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
-import {searchVerses, Verse} from '@/services/bible';
+import {Verse} from '@/services/bible';
 
 const InterpretBibleVerseSearchInputSchema = z.object({
   query: z.string().describe('The search query for Bible verses.'),
@@ -61,15 +61,7 @@ const prompt = ai.definePrompt({
 
   Based on the user's query, find Bible verses that are relevant to the query, even if the query does not exactly match the verse text.
 
-  Query: {{{query}}}
-
-  Return the verses in the following format:
-  {{#each verses}}
-  Book: {{this.book}}
-  Chapter: {{this.chapter}}
-  Verse: {{this.verse}}
-  Text: {{this.text}}
-  {{/each}}`,
+  Query: {{{query}}}`,
 });
 
 const interpretBibleVerseSearchFlow = ai.defineFlow<
@@ -82,10 +74,7 @@ const interpretBibleVerseSearchFlow = ai.defineFlow<
     outputSchema: InterpretBibleVerseSearchOutputSchema,
   },
   async input => {
-    // Call the bible service to get relevant verses.
-    const verses: Verse[] = await searchVerses(input.query);
-
-    // Return the verses.
-    return {verses: verses};
+    const {output} = await prompt(input);
+    return output!;
   }
 );
