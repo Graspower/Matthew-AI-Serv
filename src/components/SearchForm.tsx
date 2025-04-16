@@ -1,22 +1,20 @@
 "use client";
 
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
 import {Verse} from "@/services/bible";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {useEffect} from 'react';
-import {useForm} from 'react-hook-form';
-import {Textarea} from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {Label} from "@/components/ui/label";
+import {Switch} from "@/components/ui/switch";
+import {useForm} from "react-hook-form";
 
 export function SearchForm() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,9 +22,34 @@ export function SearchForm() {
   const {toast} = useToast();
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const [voiceSearchText, setVoiceSearchText] = useState('');
+  const [autoSearch, setAutoSearch] = useState(false);
   const {register, handleSubmit, setValue} = useForm();
 
-  //Implement voice search using the Web Speech API
+  // Function to handle the verse search
+  const searchVerses = async (query: string) => {
+    setSearchTerm(query);
+    try {
+      const result = await interpretBibleVerseSearch({query: query});
+      setVerses(result.verses);
+    } catch (error: any) {
+      console.error('Search failed', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to perform search. Please try again.',
+        variant: 'destructive',
+      });
+      setVerses([]);
+    }
+  };
+
+  // UseEffect to trigger search when autoSearch is on and searchTerm changes
+  useEffect(() => {
+    if (autoSearch && searchTerm) {
+      searchVerses(searchTerm);
+    }
+  }, [searchTerm, autoSearch]);
+
+  // Implement voice search using the Web Speech API
   useEffect(() => {
     let recognition: SpeechRecognition | null = null;
 
@@ -50,6 +73,7 @@ export function SearchForm() {
 
           setVoiceSearchText(transcript);
           setValue('query', transcript);
+          setSearchTerm(transcript); // Set searchTerm to trigger auto-search
         };
 
         recognition.onend = () => {
@@ -93,23 +117,19 @@ export function SearchForm() {
   }, [isVoiceSearch, toast, setValue]);
 
   const onSubmit = async (data: any) => {
-    setSearchTerm(data.query);
-    try {
-      const result = await interpretBibleVerseSearch({query: data.query});
-      setVerses(result.verses);
-    } catch (error: any) {
-      console.error('Search failed', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to perform search. Please try again.',
-        variant: 'destructive',
-      });
-      setVerses([]);
-    }
+    searchVerses(data.query);
   };
 
   const toggleVoiceSearch = () => {
     setIsVoiceSearch((prev) => !prev);
+  };
+
+  const toggleAutoSearch = () => {
+    setAutoSearch((prev) => !prev);
+  };
+
+  const handleInputChange = (e: any) => {
+    setSearchTerm(e.target.value); // Update searchTerm as the user types
   };
 
   return (
@@ -121,6 +141,7 @@ export function SearchForm() {
             placeholder="Search for a Bible verse..."
             {...register('query')}
             aria-label="Bible verse search"
+            onChange={handleInputChange} // Call handleInputChange on input change
           />
           <Button
             type="button"
@@ -132,9 +153,19 @@ export function SearchForm() {
             {isVoiceSearch ? 'Stop' : 'Voice'}
           </Button>
         </div>
-        <Button type="submit" className="bg-accent text-background">
-          Search
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="auto-search">Auto Search</Label>
+          <Switch
+            id="auto-search"
+            checked={autoSearch}
+            onCheckedChange={toggleAutoSearch}
+          />
+        </div>
+        {!autoSearch && (
+          <Button type="submit" className="bg-accent text-background">
+            Search
+          </Button>
+        )}
       </form>
 
       {verses.length > 0 ? (
