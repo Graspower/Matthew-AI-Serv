@@ -15,6 +15,7 @@ import {
 import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
+import {Loader2} from "lucide-react";
 
 export function SearchForm() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,9 +25,11 @@ export function SearchForm() {
   const [voiceSearchText, setVoiceSearchText] = useState('');
   const [autoSearch, setAutoSearch] = useState(false);
   const {register, handleSubmit, setValue} = useForm();
+  const [isLoading, setIsLoading] = useState(false); // Add loading state
 
   // Function to handle the verse search
   const searchVerses = async (query: string) => {
+    setIsLoading(true); // Start loading
     setSearchTerm(query);
     try {
       const result = await interpretBibleVerseSearch({query: query});
@@ -39,6 +42,8 @@ export function SearchForm() {
         variant: 'destructive',
       });
       setVerses([]);
+    } finally {
+      setIsLoading(false); // End loading
     }
   };
 
@@ -168,7 +173,11 @@ export function SearchForm() {
         )}
       </form>
 
-      {verses.length > 0 ? (
+      {isLoading ? (
+        <div className="mt-6 flex justify-center">
+          <Loader2 className="animate-spin h-6 w-6" />
+        </div>
+      ) : verses.length > 0 ? (
         <div className="mt-6">
           <h2 className="text-2xl font-bold mb-4">Search Results for "{searchTerm}"</h2>
           <div className="grid gap-4">
@@ -189,7 +198,7 @@ export function SearchForm() {
           <h2 className="text-2xl font-bold mb-4">Search Results for "{searchTerm}"</h2>
           <Card>
             <CardContent>
-              <p>No matching verse found</p>
+              <p>No matching verse found. Search another verse.</p>
             </CardContent>
           </Card>
         </div>
