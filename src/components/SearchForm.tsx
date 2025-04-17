@@ -89,6 +89,7 @@ export function SearchForm() {
 
           backgroundMusic.current = new Audio(musicUrl);
           backgroundMusic.current.loop = true;
+          backgroundMusic.current.volume = 0.2;
 
           backgroundMusic.current.addEventListener('canplaythrough', () => {
             console.log('Background music loaded');
@@ -119,7 +120,15 @@ export function SearchForm() {
       }
     };
 
-    fetchMusic();
+    if (navigator.onLine) {
+      fetchMusic();
+    } else {
+      toast({
+        title: 'Network Error',
+        description: 'No internet connection available. Music cannot be loaded.',
+        variant: 'destructive',
+      });
+    }
 
     return () => {
         if (backgroundMusic.current) {
@@ -134,14 +143,26 @@ export function SearchForm() {
   useEffect(() => {
     if (backgroundMusic.current) {
       if (isMusicEnabled) {
-        backgroundMusic.current.play().catch(error => {
-          console.error("Failed to play background music:", error);
-        });
+        const playPromise = backgroundMusic.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            // Autoplay started!
+          })
+          .catch(error => {
+            console.error("Autoplay was prevented:", error);
+            toast({
+              title: 'Autoplay Error',
+              description: 'Autoplay was prevented. Please interact with the site to enable music.',
+              variant: 'destructive',
+            });
+            // Show a UI element to let the user manually start playback
+          });
+        }
       } else {
         backgroundMusic.current.pause();
       }
     }
-  }, [isMusicEnabled]);
+  }, [isMusicEnabled, toast]);
 
 
   const speakVerse = (text: string, verseIndex: number, verse: Verse) => {
@@ -414,4 +435,5 @@ export function SearchForm() {
     </div>
   );
 }
+
 
