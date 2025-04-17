@@ -52,6 +52,14 @@ export function SearchForm() {
    // Initialize Background Music
    useEffect(() => {
     const fetchMusic = async () => {
+      if (!navigator.onLine) {
+        toast({
+          title: 'Network Error',
+          description: 'No internet connection available. Music cannot be loaded.',
+          variant: 'destructive',
+        });
+        return;
+      }
         try {
             const response = await fetch('https://www.thetabernaclechoir.org/cms/music/gentle-piano-music.json');
             if (!response.ok) {
