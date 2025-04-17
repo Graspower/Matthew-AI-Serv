@@ -55,14 +55,16 @@ export function SearchForm() {
     backgroundMusic.current.loop = true; // Set loop to true for continuous playback
 
     // Event listener for when the audio is loaded and can be played
-    backgroundMusic.current.addEventListener('canplaythrough', () => {
-      console.log('Background music loaded');
-    });
+    if(backgroundMusic.current){
+        backgroundMusic.current.addEventListener('canplaythrough', () => {
+            console.log('Background music loaded');
+        });
 
-    // Event listener for handling errors during audio loading
-    backgroundMusic.current.addEventListener('error', (error) => {
-      console.error('Error loading background music:', error);
-    });
+        // Event listener for handling errors during audio loading
+        backgroundMusic.current.addEventListener('error', (error) => {
+            console.error('Error loading background music:', error);
+        });
+    }
 
     return () => {
       if (backgroundMusic.current) {
