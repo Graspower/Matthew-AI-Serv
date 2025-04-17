@@ -51,31 +51,50 @@ export function SearchForm() {
 
    // Initialize Background Music
    useEffect(() => {
-    backgroundMusic.current = new Audio('/audio/gentle-ambience.mp3'); // Replace with your music file
-    backgroundMusic.current.loop = true; // Set loop to true for continuous playback
+    const fetchMusic = async () => {
+        try {
+            const response = await fetch('https://www.thetabernaclechoir.org/cms/music/gentle-piano-music.json');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            const musicUrl = data.musicUrl;
 
-    // Event listener for when the audio is loaded and can be played
-    if(backgroundMusic.current){
-        backgroundMusic.current.addEventListener('canplaythrough', () => {
-            console.log('Background music loaded');
-        });
+            backgroundMusic.current = new Audio(musicUrl);
+            backgroundMusic.current.loop = true;
 
-        // Event listener for handling errors during audio loading
-        if(backgroundMusic.current){
+            backgroundMusic.current.addEventListener('canplaythrough', () => {
+                console.log('Background music loaded');
+            });
+
             backgroundMusic.current.addEventListener('error', (error) => {
                 console.error('Error loading background music:', error);
+                toast({
+                    title: 'Music Error',
+                    description: 'Failed to load background music. Please check your connection.',
+                    variant: 'destructive',
+                });
+            });
+        } catch (error: any) {
+            console.error('Fetch error:', error);
+            toast({
+                title: 'Music Error',
+                description: 'Failed to fetch background music. Please try again later.',
+                variant: 'destructive',
             });
         }
-    }
+    };
+
+    fetchMusic();
 
     return () => {
-      if (backgroundMusic.current) {
-        backgroundMusic.current.pause();
-        backgroundMusic.current.removeEventListener('canplaythrough', () => {});
-        backgroundMusic.current.removeEventListener('error', () => {});
-      }
+        if (backgroundMusic.current) {
+            backgroundMusic.current.pause();
+            backgroundMusic.current.removeEventListener('canplaythrough', () => {});
+            backgroundMusic.current.removeEventListener('error', () => {});
+        }
     };
-  }, []);
+}, [toast]);
 
   // Play/Pause background music based on isMusicEnabled state
   useEffect(() => {
@@ -361,4 +380,3 @@ export function SearchForm() {
     </div>
   );
 }
-
