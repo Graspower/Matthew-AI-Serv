@@ -52,6 +52,16 @@ export function SearchForm() {
    // Initialize Background Music
    useEffect(() => {
     const fetchMusic = async () => {
+      const PIXABAY_API_KEY = process.env.NEXT_PUBLIC_PIXABAY_API_KEY;
+      if (!PIXABAY_API_KEY) {
+        toast({
+          title: 'API Key Missing',
+          description: 'Please set the Pixabay API key in your environment variables.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (!navigator.onLine) {
         toast({
           title: 'Network Error',
@@ -60,37 +70,53 @@ export function SearchForm() {
         });
         return;
       }
-        try {
-            const response = await fetch('https://www.thetabernaclechoir.org/cms/music/gentle-piano-music.json');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            const musicUrl = data.musicUrl;
 
-            backgroundMusic.current = new Audio(musicUrl);
-            backgroundMusic.current.loop = true;
+      try {
+        const response = await fetch(
+          `https://pixabay.com/api/music?key=${PIXABAY_API_KEY}&q=piano&category=background`
+        );
 
-            backgroundMusic.current.addEventListener('canplaythrough', () => {
-                console.log('Background music loaded');
-            });
-
-            backgroundMusic.current.addEventListener('error', (error) => {
-                console.error('Error loading background music:', error);
-                toast({
-                    title: 'Music Error',
-                    description: 'Failed to load background music. Please check your connection.',
-                    variant: 'destructive',
-                });
-            });
-        } catch (error: any) {
-            console.error('Fetch error:', error);
-            toast({
-                title: 'Music Error',
-                description: 'Failed to fetch background music. Please try again later.',
-                variant: 'destructive',
-            });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const data = await response.json();
+
+        if (data.hits && data.hits.length > 0) {
+          // Select a random music track from the results
+          const randomIndex = Math.floor(Math.random() * data.hits.length);
+          const musicUrl = data.hits[randomIndex].previewURL;
+
+          backgroundMusic.current = new Audio(musicUrl);
+          backgroundMusic.current.loop = true;
+
+          backgroundMusic.current.addEventListener('canplaythrough', () => {
+            console.log('Background music loaded');
+          });
+
+          backgroundMusic.current.addEventListener('error', (error) => {
+            console.error('Error loading background music:', error);
+            toast({
+              title: 'Music Error',
+              description: 'Failed to load background music. Please check your connection.',
+              variant: 'destructive',
+            });
+          });
+        } else {
+          toast({
+            title: 'Music Error',
+            description: 'No music tracks found matching the criteria.',
+            variant: 'destructive',
+          });
+        }
+      } catch (error: any) {
+        console.error('Fetch error:', error);
+        toast({
+          title: 'Music Error',
+          description: 'Failed to fetch background music. Please try again later.',
+          variant: 'destructive',
+        });
+      }
     };
 
     fetchMusic();
@@ -351,7 +377,7 @@ export function SearchForm() {
                           <span
                             key={wordIndex}
                             style={{
-                              backgroundColor: (isJohn316(verse) && highlightedWordIndex === wordIndex) ? 'lightblue' : 'transparent',
+                              backgroundColor: (isJohn316(verse) && highlightedWordIndex === wordIndex) ? 'lightblue' : (highlightedWordIndex === wordIndex ? 'lightblue' : 'transparent'),
                               transition: 'background-color 0.3s',
                             }}
                           >
