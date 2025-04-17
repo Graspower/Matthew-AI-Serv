@@ -258,7 +258,7 @@ export function SearchForm() {
                         <span
                           key={wordIndex}
                           style={{
-                            backgroundColor: highlightedWordIndex === wordIndex ? 'yellow' : 'transparent',
+                            backgroundColor: highlightedWordIndex === wordIndex ? 'gold' : 'transparent',
                             transition: 'background-color 0.3s',
                           }}
                         >
@@ -295,3 +295,4 @@ export function SearchForm() {
     </div>
   );
 }
+
