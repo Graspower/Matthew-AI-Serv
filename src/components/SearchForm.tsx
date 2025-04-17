@@ -202,7 +202,7 @@ export function SearchForm() {
             placeholder="Search for a Bible verse..."
             {...register('query')}
             aria-label="Bible verse search"
-            onChange={handleInputChange} // Call handleInputChange on input change
+            onChange={handleInputChange} // Call handle handleInputChange on input change
           />
           <Button
             type="button"
@@ -295,4 +295,5 @@ export function SearchForm() {
     </div>
   );
 }
+
 
