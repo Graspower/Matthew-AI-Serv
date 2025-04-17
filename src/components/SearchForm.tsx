@@ -1,6 +1,6 @@
 "use client";
 
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useRef} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
 import {Verse} from "@/services/bible";
@@ -26,6 +26,62 @@ export function SearchForm() {
   const [autoSearch, setAutoSearch] = useState(false);
   const {register, handleSubmit, setValue} = useForm();
   const [isLoading, setIsLoading] = useState(false); // Add loading state
+
+  const [isVoiceReaderEnabled, setIsVoiceReaderEnabled] = useState(false);
+  const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const verseTextRefs = useRef<HTMLParagraphElement[]>([]);
+
+  // Initialize SpeechSynthesisUtterance
+  const synth = useRef<SpeechSynthesis | null>(null);
+
+  useEffect(() => {
+    synth.current = window.speechSynthesis;
+    return () => {
+      if (synth.current) {
+        synth.current.cancel();
+      }
+    };
+  }, []);
+
+
+  const speakVerse = (text: string, verseIndex: number) => {
+    if (!synth.current) return;
+
+    // Split the text into words
+    const words = text.split(' ');
+    let currentWordIndex = 0;
+    setHighlightedWordIndex(-1);
+    synth.current.cancel();
+    setIsSpeaking(true);
+
+    const utterThis = new SpeechSynthesisUtterance(text);
+    utterThis.onboundary = (event: SpeechSynthesisEvent) => {
+      if (event.name === 'word') {
+        currentWordIndex = words.slice(0, event.charIndex).join(' ').split(' ').length;
+        setHighlightedWordIndex(currentWordIndex -1);
+        if(currentWordIndex >= words.length){
+          setIsSpeaking(false);
+        }
+      }
+    };
+    utterThis.onend = () => {
+      setHighlightedWordIndex(-1);
+      setIsSpeaking(false);
+    };
+
+    synth.current.speak(utterThis);
+  };
+
+  const toggleVoiceReader = () => {
+    setIsVoiceReaderEnabled((prev) => !prev);
+    if(isSpeaking && synth.current){
+      synth.current.cancel();
+      setIsSpeaking(false);
+      setHighlightedWordIndex(-1);
+    }
+  };
 
   // Function to handle the verse search
   const searchVerses = async (query: string) => {
@@ -172,6 +228,14 @@ export function SearchForm() {
           </Button>
         )}
       </form>
+      <div className="flex items-center space-x-2 mt-4">
+        <Label htmlFor="voice-reader">Voice Reader</Label>
+        <Switch
+          id="voice-reader"
+          checked={isVoiceReaderEnabled}
+          onCheckedChange={toggleVoiceReader}
+        />
+      </div>
 
       {isLoading ? (
         <div className="mt-6 flex justify-center">
@@ -187,7 +251,32 @@ export function SearchForm() {
                   <CardTitle>{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p>{verse.text}</p>
+                  <p ref={(el) => (verseTextRefs.current[index] = el)}
+                     style={{ whiteSpace: 'pre-wrap' }}>
+                    {isVoiceReaderEnabled ? (
+                      verse.text.split(' ').map((word, wordIndex) => (
+                        <span
+                          key={wordIndex}
+                          style={{
+                            backgroundColor: highlightedWordIndex === wordIndex ? 'yellow' : 'transparent',
+                            transition: 'background-color 0.3s',
+                          }}
+                        >
+                          {word}{' '}
+                        </span>
+                      ))
+                    ) : (
+                      verse.text
+                    )}
+                  </p>
+                  {isVoiceReaderEnabled && (
+                    <Button
+                      onClick={() => speakVerse(verse.text, index)}
+                      disabled={isSpeaking}
+                    >
+                      {isSpeaking ? 'Speaking...' : 'Speak'}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
