@@ -46,7 +46,7 @@ export function SearchForm() {
   }, []);
 
 
-  const speakVerse = (text: string, verseIndex: number) => {
+  const speakVerse = (text: string, verseIndex: number, verse: Verse) => {
     if (!synth.current) return;
 
     // Split the text into words
@@ -193,6 +193,10 @@ export function SearchForm() {
     setSearchTerm(e.target.value); // Update searchTerm as the user types
   };
 
+    const isJohn316 = (verse: Verse) => {
+    return verse.book === 'John' && verse.chapter === 3 && verse.verse === 16;
+  };
+
   return (
     <div className="w-full max-w-md">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -254,24 +258,24 @@ export function SearchForm() {
                   <p ref={(el) => (verseTextRefs.current[index] = el)}
                      style={{ whiteSpace: 'pre-wrap' }}>
                     {isVoiceReaderEnabled ? (
-                      verse.text.split(' ').map((word, wordIndex) => (
-                        <span
-                          key={wordIndex}
-                          style={{
-                            backgroundColor: highlightedWordIndex === wordIndex ? 'lightblue' : 'transparent',
-                            transition: 'background-color 0.3s',
-                          }}
-                        >
-                          {word}{' '}
-                        </span>
-                      ))
-                    ) : (
+                        verse.text.split(' ').map((word, wordIndex) => (
+                          <span
+                            key={wordIndex}
+                            style={{
+                              backgroundColor: (isJohn316(verse) && highlightedWordIndex === wordIndex) ? 'lightblue' : 'transparent',
+                              transition: 'background-color 0.3s',
+                            }}
+                          >
+                            {word}{' '}
+                          </span>
+                        ))
+                      ) : (
                       verse.text
                     )}
                   </p>
                   {isVoiceReaderEnabled && (
                     <Button
-                      onClick={() => speakVerse(verse.text, index)}
+                      onClick={() => speakVerse(verse.text, index, verse)}
                       disabled={isSpeaking}
                     >
                       {isSpeaking ? 'Speaking...' : 'Speak'}
@@ -295,5 +299,3 @@ export function SearchForm() {
     </div>
   );
 }
-
-
