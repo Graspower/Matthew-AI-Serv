@@ -61,9 +61,11 @@ export function SearchForm() {
         });
 
         // Event listener for handling errors during audio loading
-        backgroundMusic.current.addEventListener('error', (error) => {
-            console.error('Error loading background music:', error);
-        });
+        if(backgroundMusic.current){
+            backgroundMusic.current.addEventListener('error', (error) => {
+                console.error('Error loading background music:', error);
+            });
+        }
     }
 
     return () => {
@@ -359,3 +361,4 @@ export function SearchForm() {
     </div>
   );
 }
+
