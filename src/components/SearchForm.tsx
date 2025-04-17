@@ -15,7 +15,7 @@ import {
 import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
-import {Loader2} from "lucide-react";
+import {Loader2, Music} from "lucide-react";
 
 export function SearchForm() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,6 +36,10 @@ export function SearchForm() {
   // Initialize SpeechSynthesisUtterance
   const synth = useRef<SpeechSynthesis | null>(null);
 
+  // Background Music State
+  const [isMusicEnabled, setIsMusicEnabled] = useState(false);
+  const backgroundMusic = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
     synth.current = window.speechSynthesis;
     return () => {
@@ -44,6 +48,43 @@ export function SearchForm() {
       }
     };
   }, []);
+
+   // Initialize Background Music
+   useEffect(() => {
+    backgroundMusic.current = new Audio('/audio/gentle-ambience.mp3'); // Replace with your music file
+    backgroundMusic.current.loop = true; // Set loop to true for continuous playback
+
+    // Event listener for when the audio is loaded and can be played
+    backgroundMusic.current.addEventListener('canplaythrough', () => {
+      console.log('Background music loaded');
+    });
+
+    // Event listener for handling errors during audio loading
+    backgroundMusic.current.addEventListener('error', (error) => {
+      console.error('Error loading background music:', error);
+    });
+
+    return () => {
+      if (backgroundMusic.current) {
+        backgroundMusic.current.pause();
+        backgroundMusic.current.removeEventListener('canplaythrough', () => {});
+        backgroundMusic.current.removeEventListener('error', () => {});
+      }
+    };
+  }, []);
+
+  // Play/Pause background music based on isMusicEnabled state
+  useEffect(() => {
+    if (backgroundMusic.current) {
+      if (isMusicEnabled) {
+        backgroundMusic.current.play().catch(error => {
+          console.error("Failed to play background music:", error);
+        });
+      } else {
+        backgroundMusic.current.pause();
+      }
+    }
+  }, [isMusicEnabled]);
 
 
   const speakVerse = (text: string, verseIndex: number, verse: Verse) => {
@@ -57,6 +98,8 @@ export function SearchForm() {
     setIsSpeaking(true);
 
     const utterThis = new SpeechSynthesisUtterance(text);
+    utterThis.pitch = 0.9; // Set the pitch to 1.5 for a higher-pitched voice
+    utterThis.rate = 1.0; // Set the rate to 1.2 for a faster speed
     utterThis.onboundary = (event: SpeechSynthesisEvent) => {
       if (event.name === 'word') {
         currentWordIndex = words.slice(0, event.charIndex).join(' ').split(' ').length;
@@ -81,6 +124,11 @@ export function SearchForm() {
       setIsSpeaking(false);
       setHighlightedWordIndex(-1);
     }
+  };
+
+   // Function to toggle background music
+   const toggleBackgroundMusic = () => {
+    setIsMusicEnabled((prev) => !prev);
   };
 
   // Function to handle the verse search
@@ -240,6 +288,16 @@ export function SearchForm() {
           onCheckedChange={toggleVoiceReader}
         />
       </div>
+
+       {/* Background Music Toggle */}
+       <div className="flex items-center space-x-2 mt-4">
+          <Label htmlFor="background-music">Background Music</Label>
+          <Switch
+            id="background-music"
+            checked={isMusicEnabled}
+            onCheckedChange={toggleBackgroundMusic}
+          />
+        </div>
 
       {isLoading ? (
         <div className="mt-6 flex justify-center">
