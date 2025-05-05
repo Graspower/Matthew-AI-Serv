@@ -3,7 +3,7 @@
 import {useState, useEffect, useRef} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
-import {Verse} from "@/services/bible";
+import type {Verse} from "@/services/bible"; // Use import type
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {
@@ -15,7 +15,8 @@ import {
 import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
-import {Loader2, Music} from "lucide-react";
+import {Loader2, Mic} from "lucide-react";
+import {Toaster} from "@/components/ui/toaster";
 
 export function SearchForm() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,226 +25,168 @@ export function SearchForm() {
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const [voiceSearchText, setVoiceSearchText] = useState('');
   const [autoSearch, setAutoSearch] = useState(false);
-  const {register, handleSubmit, setValue} = useForm();
-  const [isLoading, setIsLoading] = useState(false); // Add loading state
+  const {register, handleSubmit, setValue} = useForm<{ query: string }>(); // Add type for useForm
+  const [isLoading, setIsLoading] = useState(false);
 
   const [isVoiceReaderEnabled, setIsVoiceReaderEnabled] = useState(false);
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentSpeakingVerseIndex, setCurrentSpeakingVerseIndex] = useState<number | null>(null);
 
-  const verseTextRefs = useRef<HTMLParagraphElement[]>([]);
-
-  // Initialize SpeechSynthesisUtterance
+  const verseTextRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const synth = useRef<SpeechSynthesis | null>(null);
 
-  // Background Music State
-  const [isMusicEnabled, setIsMusicEnabled] = useState(false);
-  const backgroundMusic = useRef<HTMLAudioElement | null>(null);
-
   useEffect(() => {
-    synth.current = window.speechSynthesis;
-    return () => {
-      if (synth.current) {
-        synth.current.cancel();
-      }
-    };
+    if (typeof window !== 'undefined') {
+      synth.current = window.speechSynthesis;
+      return () => {
+        if (synth.current) {
+          synth.current.cancel();
+        }
+      };
+    }
+    return () => {};
   }, []);
 
-   // Initialize Background Music
-   useEffect(() => {
-    const fetchMusic = async () => {
-      const PIXABAY_API_KEY = process.env.NEXT_PUBLIC_PIXABAY_API_KEY;
-      if (!PIXABAY_API_KEY) {
-        toast({
-          title: 'API Key Missing',
-          description: 'Please set the Pixabay API key in your environment variables.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (!navigator.onLine) {
-        toast({
-          title: 'Network Error',
-          description: 'No internet connection available. Music cannot be loaded.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `https://pixabay.com/api/music?key=${PIXABAY_API_KEY}&q=piano&category=background`
-        );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.hits && data.hits.length > 0) {
-          // Select a random music track from the results
-          const randomIndex = Math.floor(Math.random() * data.hits.length);
-          const musicUrl = data.hits[randomIndex].previewURL;
-
-          backgroundMusic.current = new Audio(musicUrl);
-          backgroundMusic.current.loop = true;
-          backgroundMusic.current.volume = 0.2;
-
-          backgroundMusic.current.addEventListener('canplaythrough', () => {
-            console.log('Background music loaded');
-          });
-
-          backgroundMusic.current.addEventListener('error', (error) => {
-            console.error('Error loading background music:', error);
-            toast({
-              title: 'Music Error',
-              description: 'Failed to load background music. Please check your connection.',
-              variant: 'destructive',
-            });
-          });
-        } else {
-          toast({
-            title: 'Music Error',
-            description: 'No music tracks found matching the criteria.',
-            variant: 'destructive',
-          });
-        }
-      } catch (error: any) {
-        console.error('Fetch error:', error);
-        toast({
-          title: 'Music Error',
-          description: 'Failed to fetch background music. Please try again later.',
-          variant: 'destructive',
-        });
-      }
-    };
-
-    if (navigator.onLine) {
-      fetchMusic();
-    } else {
-      toast({
-        title: 'Network Error',
-        description: 'No internet connection available. Music cannot be loaded.',
-        variant: 'destructive',
-      });
-    }
-
-    return () => {
-        if (backgroundMusic.current) {
-            backgroundMusic.current.pause();
-            backgroundMusic.current.removeEventListener('canplaythrough', () => {});
-            backgroundMusic.current.removeEventListener('error', () => {});
-        }
-    };
-}, [toast]);
-
-  // Play/Pause background music based on isMusicEnabled state
-  useEffect(() => {
-    if (backgroundMusic.current) {
-      if (isMusicEnabled) {
-        const playPromise = backgroundMusic.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            // Autoplay started!
-          })
-          .catch(error => {
-            console.error("Autoplay was prevented:", error);
-            toast({
-              title: 'Autoplay Error',
-              description: 'Autoplay was prevented. Please interact with the site to enable music.',
-              variant: 'destructive',
-            });
-            // Show a UI element to let the user manually start playback
-          });
-        }
-      } else {
-        backgroundMusic.current.pause();
-      }
-    }
-  }, [isMusicEnabled, toast]);
-
-
   const speakVerse = (text: string, verseIndex: number, verse: Verse) => {
-    if (!synth.current) return;
+    if (!synth.current || typeof window === 'undefined') return;
 
-    // Split the text into words
-    const words = text.split(' ');
-    let currentWordIndex = 0;
-    setHighlightedWordIndex(-1);
     synth.current.cancel();
+
+    if (isSpeaking && currentSpeakingVerseIndex === verseIndex) {
+      setIsSpeaking(false);
+      setHighlightedWordIndex(-1);
+      setCurrentSpeakingVerseIndex(null);
+      return;
+    }
+
+    const words = text.split(/(\s+)/).filter(word => word.trim().length > 0);
+    let wordIndexRef = 0;
+
+    setHighlightedWordIndex(-1);
+    setCurrentSpeakingVerseIndex(verseIndex);
     setIsSpeaking(true);
 
     const utterThis = new SpeechSynthesisUtterance(text);
-    utterThis.pitch = 0.9; // Set the pitch to 1.5 for a higher-pitched voice
-    utterThis.rate = 1.0; // Set the rate to 1.2 for a faster speed
+    utterThis.pitch = 0.9;
+    utterThis.rate = 1.0;
+
     utterThis.onboundary = (event: SpeechSynthesisEvent) => {
-      if (event.name === 'word') {
-        currentWordIndex = words.slice(0, event.charIndex).join(' ').split(' ').length;
-        setHighlightedWordIndex(currentWordIndex -1);
-        if(currentWordIndex >= words.length){
-          setIsSpeaking(false);
+      if (event.name === 'word' && currentSpeakingVerseIndex === verseIndex) {
+        let charCounter = 0;
+        for (let i = 0; i < words.length; i++) {
+           // Use event.charIndex to find the current word
+           const wordLength = words[i].length;
+           if (event.charIndex >= charCounter && event.charIndex < charCounter + wordLength) {
+             wordIndexRef = i;
+             break;
+           }
+           charCounter += wordLength;
+           // Account for spaces between words
+           if (i < words.length - 1) {
+             const spaceMatch = text.substring(charCounter).match(/^\s+/);
+             if (spaceMatch) {
+               charCounter += spaceMatch[0].length;
+             }
+           }
         }
+        setHighlightedWordIndex(wordIndexRef); // Update state directly
       }
     };
+
     utterThis.onend = () => {
-      setHighlightedWordIndex(-1);
-      setIsSpeaking(false);
+       if (currentSpeakingVerseIndex === verseIndex) {
+            setHighlightedWordIndex(-1);
+            setIsSpeaking(false);
+            setCurrentSpeakingVerseIndex(null);
+       }
+    };
+
+     utterThis.onerror = (event: SpeechSynthesisEvent) => {
+      console.error('SpeechSynthesisUtterance.onerror', event);
+      toast({
+        title: 'Speech Error',
+        description: `Could not speak the verse. ${event.error || 'Unknown error'}`,
+        variant: 'destructive',
+      });
+       if (currentSpeakingVerseIndex === verseIndex) {
+          setHighlightedWordIndex(-1);
+          setIsSpeaking(false);
+          setCurrentSpeakingVerseIndex(null);
+       }
     };
 
     synth.current.speak(utterThis);
   };
 
   const toggleVoiceReader = () => {
-    setIsVoiceReaderEnabled((prev) => !prev);
-    if(isSpeaking && synth.current){
+    const turningOn = !isVoiceReaderEnabled;
+    setIsVoiceReaderEnabled(turningOn);
+
+    if (!turningOn && isSpeaking && synth.current) {
       synth.current.cancel();
       setIsSpeaking(false);
       setHighlightedWordIndex(-1);
+      setCurrentSpeakingVerseIndex(null);
     }
   };
 
-   // Function to toggle background music
-   const toggleBackgroundMusic = () => {
-    setIsMusicEnabled((prev) => !prev);
-  };
-
-  // Function to handle the verse search
   const searchVerses = async (query: string) => {
-    setIsLoading(true); // Start loading
+    if (!query.trim()) {
+       setVerses([]);
+       setSearchTerm('');
+       return;
+    }
+    setIsLoading(true);
     setSearchTerm(query);
+    if (synth.current) {
+        synth.current.cancel();
+        setIsSpeaking(false);
+        setHighlightedWordIndex(-1);
+        setCurrentSpeakingVerseIndex(null);
+    }
     try {
       const result = await interpretBibleVerseSearch({query: query});
-      setVerses(result.verses);
+      setVerses(result.verses || []);
     } catch (error: any) {
       console.error('Search failed', error);
       toast({
         title: 'Error',
-        description: 'Failed to perform search. Please try again.',
+        description: `Failed to perform search. ${error.message || 'Please try again.'}`,
         variant: 'destructive',
       });
       setVerses([]);
     } finally {
-      setIsLoading(false); // End loading
+      setIsLoading(false);
     }
   };
 
-  // UseEffect to trigger search when autoSearch is on and searchTerm changes
+   useEffect(() => {
+    if (!autoSearch) return;
+
+    const handler = setTimeout(() => {
+      if (searchTerm) {
+        searchVerses(searchTerm);
+      } else {
+        setVerses([]);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm, autoSearch]); // Dependencies remain the same
+
+
   useEffect(() => {
-    if (autoSearch && searchTerm) {
-      searchVerses(searchTerm);
+    if (typeof window === 'undefined' || !('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      return;
     }
-  }, [searchTerm, autoSearch]);
 
-  // Implement voice search using the Web Speech API
-  useEffect(() => {
     let recognition: SpeechRecognition | null = null;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (isVoiceSearch) {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
+    if (isVoiceSearch && SpeechRecognition) { // Check if SpeechRecognition exists
         recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = true;
@@ -251,6 +194,7 @@ export function SearchForm() {
 
         recognition.onstart = () => {
           console.log('Voice search started');
+          setVoiceSearchText('Listening...');
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -260,180 +204,248 @@ export function SearchForm() {
 
           setVoiceSearchText(transcript);
           setValue('query', transcript);
-          setSearchTerm(transcript); // Set searchTerm to trigger auto-search
+           if (!autoSearch) {
+             if (event.results[event.results.length - 1].isFinal) {
+               setSearchTerm(transcript);
+             }
+           } else {
+             setSearchTerm(transcript);
+           }
         };
 
-        recognition.onend = () => {
+         recognition.onend = () => {
           console.log('Voice search ended');
           setIsVoiceSearch(false);
+          setVoiceSearchText('');
+          const finalTranscript = (document.getElementById('bible-search-input') as HTMLInputElement)?.value;
+          if (!autoSearch && finalTranscript) {
+            searchVerses(finalTranscript);
+          }
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
           console.error('Speech recognition error:', event.error);
+           let errorMessage = 'Could not perform voice search.';
+            if (event.error === 'no-speech') {
+                errorMessage = 'No speech detected. Please try again.';
+            } else if (event.error === 'audio-capture') {
+                errorMessage = 'Microphone error. Please ensure it is enabled and working.';
+            } else if (event.error === 'not-allowed') {
+                errorMessage = 'Permission denied. Please allow microphone access.';
+            } else if (event.error === 'network') {
+                errorMessage = 'Network error during voice recognition.';
+            }
           toast({
-            title: 'Error',
-            description: `Could not perform voice search. ${event.error}`,
+            title: 'Voice Search Error',
+            description: errorMessage,
             variant: 'destructive',
           });
           setIsVoiceSearch(false);
+          setVoiceSearchText('');
         };
 
-        recognition.start();
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Your browser does not support voice search.',
-          variant: 'destructive',
-        });
-        setIsVoiceSearch(false);
-      }
-    } else if (recognition) {
-      recognition.stop();
-      console.log('Voice search stopped');
+        try {
+            recognition.start();
+        } catch (e) {
+             console.error('Error starting recognition:', e);
+             toast({
+                title: 'Voice Search Error',
+                description: 'Could not start voice search.',
+                variant: 'destructive',
+             });
+             setIsVoiceSearch(false);
+             setVoiceSearchText('');
+        }
+
     }
 
     return () => {
       if (recognition) {
+        recognition.stop();
         recognition.onstart = null;
         recognition.onresult = null;
         recognition.onend = null;
         recognition.onerror = null;
-        recognition.stop();
       }
     };
-  }, [isVoiceSearch, toast, setValue]);
+  }, [isVoiceSearch, toast, setValue, autoSearch]);
 
-  const onSubmit = async (data: any) => {
-    searchVerses(data.query);
+
+  const onSubmit = (data: { query: string }) => {
+     if (!autoSearch) {
+        searchVerses(data.query);
+     }
   };
 
   const toggleVoiceSearch = () => {
-    setIsVoiceSearch((prev) => !prev);
+     // Check for API support before toggling
+    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+        setIsVoiceSearch((prev) => !prev);
+    } else {
+        toast({
+            title: 'Unsupported Feature',
+            description: 'Voice search is not supported in your browser.',
+            variant: 'destructive',
+        });
+    }
   };
 
   const toggleAutoSearch = () => {
     setAutoSearch((prev) => !prev);
   };
 
-  const handleInputChange = (e: any) => {
-    setSearchTerm(e.target.value); // Update searchTerm as the user types
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+     setValue('query', e.target.value);
+     setSearchTerm(e.target.value);
   };
 
     const isJohn316 = (verse: Verse) => {
-    return verse.book === 'John' && verse.chapter === 3 && verse.verse === 16;
+        return verse.book === 'John' && verse.chapter === 3 && verse.verse === 16;
+    };
+
+  const renderVerseText = (verse: Verse, verseIndex: number) => {
+    const words = verse.text.split(/(\s+)/).filter(word => word.trim().length > 0);
+
+    // Only apply highlighting logic for John 3:16
+    if (isJohn316(verse)) {
+        return words.map((word, wordIndex) => (
+          <span
+            key={wordIndex}
+            style={{
+              backgroundColor:
+                isVoiceReaderEnabled && currentSpeakingVerseIndex === verseIndex && highlightedWordIndex === wordIndex
+                  ? 'lightblue'
+                  : 'transparent',
+              transition: 'background-color 0.1s linear',
+              display: 'inline',
+            }}
+          >
+            {word}
+            {wordIndex < words.length - 1 ? '\u00A0' : ''}
+          </span>
+        ));
+    } else {
+        // For other verses, just return the text without highlighting spans
+        return verse.text;
+    }
   };
 
+
+  // Main component return
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full max-w-md p-4">
+      <Toaster />
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <div className="relative">
+        <div className="relative flex items-center">
           <Input
+            id="bible-search-input"
             type="text"
-            placeholder="Search for a Bible verse..."
+            placeholder={isVoiceSearch ? voiceSearchText : "Search for a Bible verse..."}
             {...register('query')}
             aria-label="Bible verse search"
-            onChange={handleInputChange} // Call handle handleInputChange on input change
+            onChange={handleInputChange}
+            className="pr-12"
+            disabled={isVoiceSearch}
           />
           <Button
             type="button"
-            variant="secondary"
+            variant={isVoiceSearch ? "destructive" : "secondary"}
             size="icon"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full"
+            className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-8 w-8"
             onClick={toggleVoiceSearch}
+            aria-label={isVoiceSearch ? "Stop voice search" : "Start voice search"}
           >
-            {isVoiceSearch ? 'Stop' : 'Voice'}
+            <Mic className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="auto-search">Auto Search</Label>
-          <Switch
-            id="auto-search"
-            checked={autoSearch}
-            onCheckedChange={toggleAutoSearch}
-          />
+
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="auto-search"
+              checked={autoSearch}
+              onCheckedChange={toggleAutoSearch}
+              aria-label="Toggle auto search"
+            />
+            <Label htmlFor="auto-search">Auto Search</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="voice-reader"
+              checked={isVoiceReaderEnabled}
+              onCheckedChange={toggleVoiceReader}
+              aria-label="Toggle voice reader"
+            />
+            <Label htmlFor="voice-reader">Voice Reader</Label>
+          </div>
         </div>
+
+
         {!autoSearch && (
-          <Button type="submit" className="bg-accent text-background">
-            Search
+          <Button type="submit" className="w-full" disabled={isLoading || isVoiceSearch}>
+             {isLoading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
+             Search
           </Button>
         )}
       </form>
-      <div className="flex items-center space-x-2 mt-4">
-        <Label htmlFor="voice-reader">Voice Reader</Label>
-        <Switch
-          id="voice-reader"
-          checked={isVoiceReaderEnabled}
-          onCheckedChange={toggleVoiceReader}
-        />
-      </div>
 
-       {/* Background Music Toggle */}
-       <div className="flex items-center space-x-2 mt-4">
-          <Label htmlFor="background-music">Background Music</Label>
-          <Switch
-            id="background-music"
-            checked={isMusicEnabled}
-            onCheckedChange={toggleBackgroundMusic}
-          />
-        </div>
 
-      {isLoading ? (
-        <div className="mt-6 flex justify-center">
-          <Loader2 className="animate-spin h-6 w-6" />
+      {isLoading && (
+        <div className="mt-6 flex justify-center items-center h-20">
+          <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
-      ) : verses.length > 0 ? (
+      )}
+
+      {!isLoading && searchTerm && (
         <div className="mt-6">
-          <h2 className="text-2xl font-bold mb-4">Search Results for "{searchTerm}"</h2>
-          <div className="grid gap-4">
-            {verses.map((verse, index) => (
-              <Card key={index}>
-                <CardHeader>
-                  <CardTitle>{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p ref={(el) => (verseTextRefs.current[index] = el)}
-                     style={{ whiteSpace: 'pre-wrap' }}>
-                    {isVoiceReaderEnabled ? (
-                        verse.text.split(' ').map((word, wordIndex) => (
-                          <span
-                            key={wordIndex}
-                            style={{
-                              backgroundColor: (isJohn316(verse) && highlightedWordIndex === wordIndex) ? 'lightblue' : (highlightedWordIndex === wordIndex ? 'lightblue' : 'transparent'),
-                              transition: 'background-color 0.3s',
-                            }}
-                          >
-                            {word}{' '}
-                          </span>
-                        ))
-                      ) : (
-                      verse.text
+          <h2 className="text-2xl font-bold mb-4 text-center">Results for "{searchTerm}"</h2>
+          {verses.length > 0 ? (
+            <div className="grid gap-4">
+              {verses.map((verse, index) => (
+                <Card key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}`} className="shadow-md rounded-lg overflow-hidden">
+                  <CardHeader className="bg-secondary p-4">
+                    <CardTitle className="text-lg font-semibold">{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <p
+                        ref={(el) => { verseTextRefs.current[index] = el; }}
+                        className="text-base leading-relaxed"
+                        style={{ whiteSpace: 'pre-wrap' }}
+                      >
+                        {renderVerseText(verse, index)}
+                    </p>
+                    {/* Only show Speak button for John 3:16 if voice reader is enabled */}
+                    {isVoiceReaderEnabled && isJohn316(verse) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => speakVerse(verse.text, index, verse)}
+                        disabled={isSpeaking && currentSpeakingVerseIndex !== index}
+                        aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
+                      >
+                        {isSpeaking && currentSpeakingVerseIndex === index ? (
+                            <>
+                                <Loader2 className="animate-spin mr-2 h-4 w-4" /> Speaking...
+                            </>
+                         ) : (
+                            'Speak'
+                         )}
+                      </Button>
                     )}
-                  </p>
-                  {isVoiceReaderEnabled && (
-                    <Button
-                      onClick={() => speakVerse(verse.text, index, verse)}
-                      disabled={isSpeaking}
-                    >
-                      {isSpeaking ? 'Speaking...' : 'Speak'}
-                    </Button>
-                  )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+             <Card className="shadow-md rounded-lg">
+                <CardContent className="p-4 text-center text-muted-foreground">
+                  <p>No matching verses found. Please try another search.</p>
                 </CardContent>
-              </Card>
-            ))}
-          </div>
+             </Card>
+          )}
         </div>
-      ) : searchTerm && verses.length === 0 ? (
-        <div className="mt-6">
-          <h2 className="text-2xl font-bold mb-4">Search Results for "{searchTerm}"</h2>
-          <Card>
-            <CardContent>
-              <p>No matching verse found. Search another verse.</p>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
+      )}
     </div>
   );
 }
-
-
