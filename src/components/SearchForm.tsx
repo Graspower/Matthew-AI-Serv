@@ -1,5 +1,6 @@
 "use client";
 
+import type { ChangeEvent} from 'react'; // Use import type
 import {useState, useEffect, useRef} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
@@ -15,7 +16,7 @@ import {
 import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
-import {Loader2, Mic} from "lucide-react";
+import {Loader2, Mic, Volume2, VolumeX } from "lucide-react";
 import {Toaster} from "@/components/ui/toaster";
 
 
@@ -26,13 +27,14 @@ export function SearchForm() {
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const [voiceSearchText, setVoiceSearchText] = useState('');
   const [autoSearch, setAutoSearch] = useState(false);
-  const {register, handleSubmit, setValue} = useForm<{ query: string }>(); // Add type for useForm
+  const {register, handleSubmit, setValue, getValues} = useForm<{ query: string }>(); // Add getValues
   const [isLoading, setIsLoading] = useState(false);
 
   const [isVoiceReaderEnabled, setIsVoiceReaderEnabled] = useState(false);
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentSpeakingVerseIndex, setCurrentSpeakingVerseIndex] = useState<number | null>(null);
+
 
   const verseTextRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const synth = useRef<SpeechSynthesis | null>(null);
@@ -47,6 +49,7 @@ export function SearchForm() {
       } else {
         setIsSpeechRecognitionAPIAvailable(false);
       }
+
       return () => {
         if (synth.current) {
           synth.current.cancel();
@@ -60,7 +63,7 @@ export function SearchForm() {
   const speakVerse = (text: string, verseIndex: number, verse: Verse) => {
     if (!synth.current || typeof window === 'undefined') return;
 
-    synth.current.cancel(); 
+    synth.current.cancel();
 
     if (isSpeaking && currentSpeakingVerseIndex === verseIndex) {
       setIsSpeaking(false);
@@ -70,16 +73,16 @@ export function SearchForm() {
     }
 
     if (isSpeaking) {
-        setHighlightedWordIndex(-1);
+        setHighlightedWordIndex(-1); // Reset highlight for previous verse if any
     }
 
 
-    const words = text.split(/(\s+|\b)(?![^<]*>)/).filter(word => word.trim().length > 0); 
-    let wordIndexRef = 0; 
+    const words = text.split(/(\s+|\b)(?![^<]*>)/).filter(word => word.trim().length > 0);
+    let wordIndexRef = 0;
 
-    setHighlightedWordIndex(-1); 
+    setHighlightedWordIndex(-1);
     setCurrentSpeakingVerseIndex(verseIndex);
-    setIsSpeaking(true); 
+    setIsSpeaking(true);
 
     const utterThis = new SpeechSynthesisUtterance(text);
     utterThis.pitch = 0.9;
@@ -89,6 +92,7 @@ export function SearchForm() {
         if (event.name === 'word' && currentSpeakingVerseIndex === verseIndex) {
             let charCounter = 0;
             let currentWordIndex = -1;
+            // Ensure ref is current and textContent exists
             const plainTextContent = verseTextRefs.current[verseIndex]?.textContent || '';
             const plainWords = plainTextContent.split(/(\s+|\b)/).filter(w => w.trim().length > 0);
 
@@ -99,20 +103,21 @@ export function SearchForm() {
                      break;
                  }
                  charCounter += wordLength;
+                 // Account for spaces or boundaries between words in the plain text
                  const nextBoundaryMatch = plainTextContent.substring(charCounter).match(/^(\s+|\b)/);
                  if (nextBoundaryMatch) {
                      charCounter += nextBoundaryMatch[0].length;
                  }
             }
             if(currentWordIndex !== -1){
-                 setHighlightedWordIndex(currentWordIndex); 
+                 setHighlightedWordIndex(currentWordIndex);
             }
         }
     };
 
 
     utterThis.onend = () => {
-       if (currentSpeakingVerseIndex === verseIndex) {
+       if (currentSpeakingVerseIndex === verseIndex) { // Check if this is still the active speaking verse
             setHighlightedWordIndex(-1);
             setIsSpeaking(false);
             setCurrentSpeakingVerseIndex(null);
@@ -126,7 +131,7 @@ export function SearchForm() {
         description: `Could not speak the verse. ${event.error || 'Unknown error'}`,
         variant: 'destructive',
       });
-       if (currentSpeakingVerseIndex === verseIndex) {
+       if (currentSpeakingVerseIndex === verseIndex) { // Check if this is still the active speaking verse
           setHighlightedWordIndex(-1);
           setIsSpeaking(false);
           setCurrentSpeakingVerseIndex(null);
@@ -157,8 +162,8 @@ export function SearchForm() {
        return;
     }
     setIsLoading(true);
-    setSearchTerm(query); 
-    if (synth.current) {
+    setSearchTerm(query);
+    if (synth.current) { // Stop any ongoing speech synthesis
         synth.current.cancel();
         setIsSpeaking(false);
         setHighlightedWordIndex(-1);
@@ -174,7 +179,7 @@ export function SearchForm() {
         description: `Failed to perform search. ${error.message || 'Please try again.'}`,
         variant: 'destructive',
       });
-      setVerses([]); 
+      setVerses([]); // Clear verses on error
     } finally {
       setIsLoading(false);
     }
@@ -184,17 +189,18 @@ export function SearchForm() {
     if (!autoSearch) return;
 
     const handler = setTimeout(() => {
-      if (searchTerm) {
+      if (searchTerm.trim()) { // Check if searchTerm is not just whitespace
         searchVerses(searchTerm);
       } else {
-        setVerses([]);
+        // Optionally clear verses if search term becomes empty and autoSearch is on
+        // setVerses([]);
       }
-    }, 500); 
+    }, 500); // Debounce time for auto search
 
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, autoSearch]); 
+  }, [searchTerm, autoSearch]); // Rerun when searchTerm or autoSearch changes
 
 
   useEffect(() => {
@@ -205,15 +211,15 @@ export function SearchForm() {
     let recognition: SpeechRecognition | null = null;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (isVoiceSearch && SpeechRecognition) { 
+    if (isVoiceSearch && SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.continuous = false; 
-        recognition.interimResults = true; 
-        recognition.lang = 'en-US'; 
+        recognition.continuous = false; // Stop recognition after a pause
+        recognition.interimResults = true; // Get results as they are recognized
+        recognition.lang = 'en-US'; // Set language
 
         recognition.onstart = () => {
           console.log('Voice search started');
-          setVoiceSearchText('Listening...'); 
+          setVoiceSearchText('Listening...'); // Placeholder text
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -221,31 +227,37 @@ export function SearchForm() {
             .map((result) => result[0].transcript)
             .join('');
 
-          setVoiceSearchText(transcript); 
-          setValue('query', transcript); 
+          setVoiceSearchText(transcript); // Update placeholder with live transcript
+          setValue('query', transcript); // Update form value for submission
 
            if (!autoSearch) {
+             // For manual search, update searchTerm only on final result to avoid premature display
              if (event.results[event.results.length - 1].isFinal) {
                setSearchTerm(transcript);
              }
            } else {
+             // For auto search, update searchTerm continuously to trigger search
              setSearchTerm(transcript);
            }
         };
 
          recognition.onend = () => {
           console.log('Voice search ended');
-          setIsVoiceSearch(false); 
-          setVoiceSearchText(''); 
+          const finalTranscript = getValues('query'); // Use getValues from react-hook-form
+          if (finalTranscript) {
+            setSearchTerm(finalTranscript); // Ensure searchTerm is updated with the final value
+          }
+          setIsVoiceSearch(false); // Turn off voice search mode
+          setVoiceSearchText(''); // Clear placeholder
 
-          const finalTranscript = (document.getElementById('bible-search-input') as HTMLInputElement)?.value; 
-          if (!autoSearch && finalTranscript) {
-            handleSubmit(onSubmit)(); 
+          // If not auto-searching and there's a transcript, submit the form
+          if (!autoSearch && finalTranscript && finalTranscript.trim()) {
+            handleSubmit(onSubmit)();
           }
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.error('Speech recognition error details:', event); // Log full event
+          console.error('Speech recognition error details:', event);
            let errorMessage = 'Could not perform voice search.';
             if (event.error === 'no-speech') {
                 errorMessage = 'No speech detected. Please try again.';
@@ -261,8 +273,8 @@ export function SearchForm() {
             description: errorMessage,
             variant: 'destructive',
           });
-          setIsVoiceSearch(false); 
-          setVoiceSearchText(''); 
+          setIsVoiceSearch(false); // Turn off voice search mode
+          setVoiceSearchText(''); // Clear placeholder
         };
 
         try {
@@ -271,28 +283,29 @@ export function SearchForm() {
              console.error('Error starting recognition:', e);
              toast({
                 title: 'Voice Search Error',
-                description: 'Could not start voice search.',
+                description: 'Could not start voice search. Please check microphone permissions and setup.',
                 variant: 'destructive',
              });
-             setIsVoiceSearch(false); 
-             setVoiceSearchText('');
+             setIsVoiceSearch(false); // Turn off voice search mode
+             setVoiceSearchText(''); // Clear placeholder
         }
     }
 
     return () => {
       if (recognition) {
         recognition.stop();
+        // It's good practice to nullify handlers on cleanup
         recognition.onstart = null;
         recognition.onresult = null;
         recognition.onend = null;
         recognition.onerror = null;
       }
     };
-  }, [isVoiceSearch, toast, setValue, autoSearch, handleSubmit, isSpeechRecognitionAPIAvailable]);
+  }, [isVoiceSearch, toast, setValue, autoSearch, handleSubmit, isSpeechRecognitionAPIAvailable, getValues]);
 
 
   const onSubmit = (data: { query: string }) => {
-     if (!autoSearch) {
+     if (!autoSearch) { // Only submit if autoSearch is off; autoSearch has its own trigger
         searchVerses(data.query);
      }
   };
@@ -306,51 +319,52 @@ export function SearchForm() {
         });
         return;
     }
-    setIsVoiceSearch((prev) => !prev); 
+    setIsVoiceSearch((prev) => !prev); // Toggle voice search state
   };
 
   const toggleAutoSearch = () => {
     setAutoSearch((prev) => !prev);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
      const newQuery = e.target.value;
-     setValue('query', newQuery); 
-     setSearchTerm(newQuery); 
+     setValue('query', newQuery); // Update form state
+     setSearchTerm(newQuery); // Update searchTerm for auto-search or display
   };
 
+    // Helper to identify John 3:16 for special rendering/functionality
     const isJohn316 = (verse: Verse) => {
-        return verse.book === 'John' && verse.chapter === 3 && verse.verse === 16;
+        return verse.book.toLowerCase() === 'john' && verse.chapter === 3 && verse.verse === 16;
     };
 
-  const renderVerseText = (verse: Verse, verseIndex: number) => {
-    const textContent = verse.text;
-    const words = textContent.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
 
-
-    if (isJohn316(verse)) {
+  const renderVerseText = (text: string, verseIndex: number, verse: Verse) => {
+    // Only apply word-by-word span wrapping for John 3:16 if voice reader is enabled
+    if (isVoiceReaderEnabled && isJohn316(verse)) {
+        const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
         return words.map((word, wordIdx) => (
           <span
             key={wordIdx}
             style={{
               backgroundColor:
-                isVoiceReaderEnabled && 
-                currentSpeakingVerseIndex === verseIndex && 
-                highlightedWordIndex === wordIdx 
-                  ? 'lightblue' 
-                  : 'transparent', 
-              color: isVoiceReaderEnabled && currentSpeakingVerseIndex === verseIndex && highlightedWordIndex === wordIdx ? 'white': 'inherit',
-              transition: 'background-color 0.1s linear, color 0.1s linear', 
-              display: 'inline', 
+                currentSpeakingVerseIndex === verseIndex &&
+                highlightedWordIndex === wordIdx
+                  ? 'var(--accent)' // Use accent color from theme
+                  : 'transparent',
+              color: currentSpeakingVerseIndex === verseIndex && highlightedWordIndex === wordIdx ? 'var(--accent-foreground)' : 'inherit', // Use accent foreground from theme
+              transition: 'background-color 0.1s linear, color 0.1s linear',
+              display: 'inline', // Keep words inline
             }}
           >
-            {word} 
+            {word.includes('\n') ? word.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < word.split('\n').length - 1 && <br/>}</React.Fragment>) : word}
+            {text.split(/(\s+|\b)/).filter(w => w.trim().length > 0)[wordIdx + 1]?.match(/^\s+$/) ? '\u00A0' : ''}
           </span>
         ));
-    } else {
-        return verse.text;
     }
+    // For other verses or if voice reader is disabled, return plain text
+    return text.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < text.split('\n').length - 1 && <br/>}</React.Fragment>);
   };
+
 
 
   return (
@@ -364,17 +378,17 @@ export function SearchForm() {
             placeholder={isVoiceSearch ? voiceSearchText : "Search for a Bible verse..."}
             {...register('query')}
             aria-label="Bible verse search"
-            onChange={handleInputChange} 
-            className="pr-12" 
-            disabled={isVoiceSearch} 
+            onChange={handleInputChange}
+            className="pr-12" // Padding for the mic button
+            disabled={isVoiceSearch && voiceSearchText === 'Listening...'} // Disable input while listening
           />
           <Button
             type="button"
-            variant={isVoiceSearch ? "destructive" : "secondary"} 
+            variant={isVoiceSearch ? "destructive" : "secondary"} // Change variant when active
             size="icon"
             className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-8 w-8"
             onClick={toggleVoiceSearch}
-            disabled={!isSpeechRecognitionAPIAvailable}
+            disabled={!isSpeechRecognitionAPIAvailable} // Disable if API not available
             aria-label={isVoiceSearch ? "Stop voice search" : "Start voice search"}
           >
             <Mic className="h-4 w-4" />
@@ -400,6 +414,7 @@ export function SearchForm() {
             />
             <Label htmlFor="voice-reader">Voice Reader</Label>
           </div>
+
         </div>
 
 
@@ -425,35 +440,37 @@ export function SearchForm() {
             <div className="grid gap-4">
               {verses.map((verse, index) => (
                 <Card key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}`} className="shadow-md rounded-lg overflow-hidden">
-                  <CardHeader className="bg-secondary p-4">
+                  <CardHeader className="bg-secondary p-4 flex flex-row justify-between items-center">
                     <CardTitle className="text-lg font-semibold">{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <p
-                        ref={(el) => { verseTextRefs.current[index] = el; }} 
-                        className="text-base leading-relaxed"
-                        style={{ whiteSpace: 'pre-wrap' }} 
-                      >
-                        {renderVerseText(verse, index)}
-                    </p>
-                    {isVoiceReaderEnabled && isJohn316(verse) && (
+                     {isVoiceReaderEnabled && isJohn316(verse) && (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="mt-4"
                         onClick={() => speakVerse(verse.text, index, verse)}
-                        disabled={isSpeaking && currentSpeakingVerseIndex !== index}
+                        disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null}
                         aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
                       >
                         {isSpeaking && currentSpeakingVerseIndex === index ? (
                             <>
-                                <Loader2 className="animate-spin mr-2 h-4 w-4" /> Speaking...
+                                <VolumeX className="mr-2 h-4 w-4" /> Stop
                             </>
                          ) : (
-                            'Speak'
+                            <>
+                                <Volume2 className="mr-2 h-4 w-4" /> Speak
+                            </>
                          )}
                       </Button>
                     )}
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <p
+                        ref={(el) => { verseTextRefs.current[index] = el; }}
+                        className="text-base leading-relaxed"
+                        style={{ whiteSpace: 'pre-wrap' }} // Preserve line breaks from verse text
+                      >
+                        {renderVerseText(verse.text, index, verse)}
+                    </p>
+
                   </CardContent>
                 </Card>
               ))}
@@ -469,4 +486,3 @@ export function SearchForm() {
       )}
     </div>
   );
-}
