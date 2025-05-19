@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent} from 'react'; // Use import type
-import {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef} from 'react'; // Added React import
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
 import type {Verse} from "@/services/bible"; // Use import type
@@ -486,3 +486,4 @@ export function SearchForm() {
       )}
     </div>
   );
+}
