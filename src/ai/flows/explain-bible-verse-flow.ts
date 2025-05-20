@@ -22,7 +22,7 @@ const ExplainBibleVerseInputSchema = z.object({
 export type ExplainBibleVerseInput = z.infer<typeof ExplainBibleVerseInputSchema>;
 
 const ExplainBibleVerseOutputSchema = z.object({
-  explanation: z.string().describe('A comprehensive yet accessible explanation of the Bible verse, covering its meaning, context, and spiritual revelation.'),
+  explanation: z.string().describe('A brief and accessible explanation of the Bible verse (1-3 paragraphs), covering its meaning, context, and spiritual revelation.'),
 });
 export type ExplainBibleVerseOutput = z.infer<typeof ExplainBibleVerseOutputSchema>;
 
@@ -38,7 +38,7 @@ const explainVersePrompt = ai.definePrompt({
 
 {{verse.book}} {{verse.chapter}}:{{verse.verse}} - {{verse.text}}
 
-Provide a comprehensive yet accessible explanation. Focus on clarity and depth.`,
+Provide a brief and accessible explanation, ideally between one and three paragraphs. Focus on clarity and depth within this concise format.`,
 });
 
 const explainBibleVerseFlow = ai.defineFlow<
