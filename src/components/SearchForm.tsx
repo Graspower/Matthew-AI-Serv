@@ -1,11 +1,11 @@
 
 "use client";
 
-import type { ChangeEvent} from 'react'; // Use import type
+import type { ChangeEvent} from 'react';
 import React, {useState, useEffect, useRef} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
-import type {Verse} from "@/services/bible"; // Use import type
+import type {Verse} from "@/services/bible";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {
@@ -13,15 +13,19 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card"
 import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
 import {Loader2, Mic, Volume2, VolumeX } from "lucide-react";
-import {Toaster} from "@/components/ui/toaster";
 
 
-export function SearchForm() {
+interface SearchFormProps {
+  onVerseSelect: (verse: Verse) => void;
+}
+
+export function SearchForm({ onVerseSelect }: SearchFormProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [verses, setVerses] = useState<Verse[]>([]);
   const {toast} = useToast();
@@ -61,12 +65,12 @@ export function SearchForm() {
   }, []);
 
 
-  const speakVerse = (text: string, verseIndex: number, verse: Verse) => {
+  const speakVerse = (text: string, verseIndex: number, verse: Verse, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent card click when speak button is clicked
     if (!synth.current || typeof window === 'undefined') return;
 
-    synth.current.cancel(); // Stop any current speech
+    synth.current.cancel();
 
-    // If clicking the "Stop" button (already speaking this verse)
     if (isSpeaking && currentSpeakingVerseIndex === verseIndex) {
       setIsSpeaking(false);
       setHighlightedWordIndex(-1);
@@ -74,20 +78,11 @@ export function SearchForm() {
       return;
     }
 
-    // If switching to speak a new verse while another is already speaking or highlighted
     if (isSpeaking || currentSpeakingVerseIndex !== null) {
-        setHighlightedWordIndex(-1); // Reset highlight for previous verse
-        // setCurrentSpeakingVerseIndex(null); // Will be set to new index below
-        // setIsSpeaking(false); // Will be set to true below
+        setHighlightedWordIndex(-1);
     }
 
-
-    // Splitting text into words for highlighting purposes, considering HTML might be complex.
-    // This basic split works for plain text. For HTML, a more robust parser would be needed.
-    // const words = text.split(/(\s+|\b)(?![^<]*>)/).filter(word => word.trim().length > 0);
-
-
-    setHighlightedWordIndex(-1); // Reset before starting new speech
+    setHighlightedWordIndex(-1);
     setCurrentSpeakingVerseIndex(verseIndex);
     setIsSpeaking(true);
 
@@ -96,15 +91,12 @@ export function SearchForm() {
     utterThis.rate = 1.0;
 
     utterThis.onboundary = (event: SpeechSynthesisEvent) => {
-        // Ensure we are still supposed to be speaking this verse
         if (event.name === 'word' && currentSpeakingVerseIndex === verseIndex && synth.current && synth.current.speaking) {
             let charCounter = 0;
             let currentWordIdx = -1;
             const plainTextContent = verseTextRefs.current[verseIndex]?.textContent || '';
-            const plainWords = plainTextContent.split(/(\s+|\b)/).filter(w => w.trim().length > 0);
+            const plainWords = plainTextContent.split(/(\\s+|\\b)/).filter(w => w.trim().length > 0);
 
-
-            // Iterate through words to find the one that matches the current character index
             for (let i = 0; i < plainWords.length; i++) {
                  const wordLength = plainWords[i].length;
                  if (event.charIndex >= charCounter && event.charIndex < charCounter + wordLength) {
@@ -112,8 +104,7 @@ export function SearchForm() {
                      break;
                  }
                  charCounter += wordLength;
-                 // Account for spaces or boundaries between words in the plain text
-                 const nextBoundaryMatch = plainTextContent.substring(charCounter).match(/^(\s+|\b)/);
+                 const nextBoundaryMatch = plainTextContent.substring(charCounter).match(/^(\\s+|\\b)/);
                  if (nextBoundaryMatch) {
                      charCounter += nextBoundaryMatch[0].length;
                  }
@@ -126,7 +117,7 @@ export function SearchForm() {
 
 
     utterThis.onend = () => {
-       if (currentSpeakingVerseIndex === verseIndex) { // Check if this is still the active speaking verse
+       if (currentSpeakingVerseIndex === verseIndex) {
             setHighlightedWordIndex(-1);
             setIsSpeaking(false);
             setCurrentSpeakingVerseIndex(null);
@@ -140,7 +131,7 @@ export function SearchForm() {
         description: `Could not speak the verse. ${event.error || 'Unknown error'}`,
         variant: 'destructive',
       });
-       if (currentSpeakingVerseIndex === verseIndex) { // Check if this is still the active speaking verse
+       if (currentSpeakingVerseIndex === verseIndex) {
           setHighlightedWordIndex(-1);
           setIsSpeaking(false);
           setCurrentSpeakingVerseIndex(null);
@@ -168,11 +159,12 @@ export function SearchForm() {
     if (!query.trim()) {
        setVerses([]);
        setSearchTerm('');
+       // onVerseSelect(null); // Clear explanation if query is empty
        return;
     }
     setIsLoading(true);
     setSearchTerm(query);
-    if (synth.current) { // Stop any ongoing speech synthesis
+    if (synth.current) {
         synth.current.cancel();
         setIsSpeaking(false);
         setHighlightedWordIndex(-1);
@@ -180,7 +172,13 @@ export function SearchForm() {
     }
     try {
       const result = await interpretBibleVerseSearch({query: query});
-      setVerses(result.verses || []);
+      const foundVerses = result.verses || [];
+      setVerses(foundVerses);
+      // if (foundVerses.length > 0) {
+      //   onVerseSelect(foundVerses[0]); // Auto-select first verse for explanation
+      // } else {
+      //   onVerseSelect(null); // No verses found, clear explanation
+      // }
     } catch (error: any) {
       console.error('Search failed', error);
       toast({
@@ -188,7 +186,8 @@ export function SearchForm() {
         description: `Failed to perform search. ${error.message || 'Please try again.'}`,
         variant: 'destructive',
       });
-      setVerses([]); // Clear verses on error
+      setVerses([]);
+      // onVerseSelect(null); // Clear explanation on error
     } finally {
       setIsLoading(false);
     }
@@ -200,13 +199,16 @@ export function SearchForm() {
     const handler = setTimeout(() => {
       if (searchTerm.trim()) {
         searchVerses(searchTerm);
+      } else {
+        setVerses([]); // Clear verses if search term is empty in auto-search mode
+        // onVerseSelect(null);
       }
     }, 500);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, autoSearch]);
+  }, [searchTerm, autoSearch]); // Removed onVerseSelect from dependencies
 
 
   useEffect(() => {
@@ -362,6 +364,10 @@ export function SearchForm() {
      const newQuery = e.target.value;
      setValue('query', newQuery);
      setSearchTerm(newQuery);
+     if (!newQuery.trim() && !autoSearch) {
+        setVerses([]);
+        // onVerseSelect(null); // Clear explanation if search term is cleared manually
+     }
   };
 
     const isJohn316 = (verse: Verse) => {
@@ -371,7 +377,7 @@ export function SearchForm() {
 
   const renderVerseText = (text: string, verseIndex: number, verse: Verse) => {
     if (isVoiceReaderEnabled && isJohn316(verse)) {
-        const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
+        const words = text.split(/(\\s+|\\b)/).filter(word => word.trim().length > 0);
         return words.map((word, wordIdx) => (
           <span
             key={wordIdx}
@@ -387,8 +393,7 @@ export function SearchForm() {
             }}
           >
             {word.includes('\n') ? word.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < word.split('\n').length - 1 && <br/>}</React.Fragment>) : word}
-            {/* Add a non-breaking space if the original text had a space after this word */}
-            {text.split(/(\s+|\b)/).filter(w => w.trim().length > 0)[wordIdx + 1]?.match(/^\s+$/) ? '\u00A0' : ''}
+            {text.split(/(\\s+|\\b)/).filter(w => w.trim().length > 0)[wordIdx + 1]?.match(/^\\s+$/) ? '\\u00A0' : ''}
 
           </span>
         ));
@@ -399,8 +404,7 @@ export function SearchForm() {
 
 
   return (
-    <div className="w-full max-w-md p-4">
-      {/* <Toaster /> already in layout.tsx */}
+    <div className="w-full max-w-md p-4 mx-auto">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="relative flex items-center">
           <Input
@@ -445,9 +449,7 @@ export function SearchForm() {
             />
             <Label htmlFor="voice-reader">Voice Reader</Label>
           </div>
-
         </div>
-
 
         {!autoSearch && (
           <Button type="submit" className="w-full" disabled={isLoading || (isVoiceSearch && voiceSearchText === 'Listening...')}>
@@ -466,42 +468,49 @@ export function SearchForm() {
 
       {!isLoading && searchTerm && (
         <div className="mt-6">
-          <h2 className="text-2xl font-bold mb-4 text-center">Results for "{searchTerm}"</h2>
+          <h2 className="text-xl font-semibold mb-3 text-center">Results for "{searchTerm}"</h2>
           {verses.length > 0 ? (
             <div className="grid gap-4">
               {verses.map((verse, index) => (
-                <Card key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}`} className="shadow-md rounded-lg overflow-hidden">
-                  <CardHeader className="bg-secondary p-4 flex flex-row justify-between items-center">
-                    <CardTitle className="text-lg font-semibold">{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
+                <Card
+                  key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}`}
+                  className="shadow-md rounded-lg overflow-hidden cursor-pointer hover:bg-secondary/50 transition-colors"
+                  onClick={() => onVerseSelect(verse)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Select verse ${verse.book} ${verse.chapter}:${verse.verse} for explanation`}
+                >
+                  <CardHeader className="bg-secondary/70 p-3 flex flex-row justify-between items-center">
+                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
                      {isVoiceReaderEnabled && isJohn316(verse) && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => speakVerse(verse.text, index, verse)}
+                        onClick={(e) => speakVerse(verse.text, index, verse, e)}
                         disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null}
                         aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
+                        className="text-xs px-2 py-1 h-auto"
                       >
                         {isSpeaking && currentSpeakingVerseIndex === index ? (
                             <>
-                                <VolumeX className="mr-2 h-4 w-4" /> Stop
+                                <VolumeX className="mr-1 h-3 w-3" /> Stop
                             </>
                          ) : (
                             <>
-                                <Volume2 className="mr-2 h-4 w-4" /> Speak
+                                <Volume2 className="mr-1 h-3 w-3" /> Speak
                             </>
                          )}
                       </Button>
                     )}
                   </CardHeader>
-                  <CardContent className="p-4">
+                  <CardContent className="p-3">
                     <p
                         ref={(el) => { verseTextRefs.current[index] = el; }}
-                        className="text-base leading-relaxed"
+                        className="text-sm leading-relaxed"
                         style={{ whiteSpace: 'pre-wrap' }}
                       >
                         {renderVerseText(verse.text, index, verse)}
                     </p>
-
                   </CardContent>
                 </Card>
               ))}
