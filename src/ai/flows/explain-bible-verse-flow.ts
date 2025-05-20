@@ -22,7 +22,7 @@ const ExplainBibleVerseInputSchema = z.object({
 export type ExplainBibleVerseInput = z.infer<typeof ExplainBibleVerseInputSchema>;
 
 const ExplainBibleVerseOutputSchema = z.object({
-  explanation: z.string().describe('A brief and accessible explanation of the Bible verse (1-3 paragraphs), covering its meaning, context, and spiritual revelation.'),
+  explanation: z.string().describe('A clear, engaging, and uplifting explanation of the Bible verse (1-3 paragraphs), focusing on its core message, practical insights, and spiritual revelation.'),
 });
 export type ExplainBibleVerseOutput = z.infer<typeof ExplainBibleVerseOutputSchema>;
 
@@ -34,11 +34,11 @@ const explainVersePrompt = ai.definePrompt({
   name: 'explainBibleVersePrompt',
   input: {schema: ExplainBibleVerseInputSchema},
   output: {schema: ExplainBibleVerseOutputSchema},
-  prompt: `You are a theological scholar providing insights into Bible verses. Explain the meaning, context, and spiritual revelation of the following verse:
+  prompt: `You are an insightful Bible teacher, skilled at making scripture come alive. Your goal is to provide a clear, engaging, and uplifting explanation of the following verse, focusing on its core message, practical insights, and spiritual revelation.
 
-{{verse.book}} {{verse.chapter}}:{{verse.verse}} - {{verse.text}}
+Verse: {{verse.book}} {{verse.chapter}}:{{verse.verse}} - "{{verse.text}}"
 
-Provide a brief and accessible explanation, ideally between one and three paragraphs. Focus on clarity and depth within this concise format.`,
+Please present this explanation in a concise manner, ideally one to three paragraphs, making it easy for anyone to understand and connect with the verse's meaning. Emphasize the direct revelation and actionable takeaways from the verse.`,
 });
 
 const explainBibleVerseFlow = ai.defineFlow<
