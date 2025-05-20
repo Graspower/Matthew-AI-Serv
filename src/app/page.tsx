@@ -2,37 +2,48 @@
 
 import React, {useState, useCallback} from 'react';
 import {SearchForm} from '@/components/SearchForm';
-import {VerseExplanationCard} from '@/components/VerseExplanationCard';
+import {TeachingDisplayCard} from '@/components/VerseExplanationCard'; // Renamed import
 import type {Verse} from '@/services/bible';
-import {explainBibleVerse} from '@/ai/flows/explain-bible-verse-flow';
+import {generateTeaching} from '@/ai/flows/generateTeachingFlow'; // New import
 import {useToast} from '@/hooks/use-toast';
 
 export default function Home() {
-  const [verseToExplain, setVerseToExplain] = useState<Verse | null>(null);
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [isExplanationLoading, setIsExplanationLoading] = useState(false);
-  const [explanationError, setExplanationError] = useState<string | null>(null);
+  const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
+  const [teachingText, setTeachingText] = useState<string | null>(null);
+  const [isTeachingLoading, setIsTeachingLoading] = useState(false);
+  const [teachingError, setTeachingError] = useState<string | null>(null);
+  const [versesFoundCountForTopic, setVersesFoundCountForTopic] = useState<number | undefined>(undefined);
   const {toast} = useToast();
 
-  const handleVerseSelect = useCallback(async (verse: Verse) => {
-    setVerseToExplain(verse);
-    setExplanation(null);
-    setIsExplanationLoading(true);
-    setExplanationError(null);
+  const handleSearchResults = useCallback(async (query: string, verses: Verse[]) => {
+    setCurrentQueryTopic(query);
+    setTeachingText(null);
+    setIsTeachingLoading(true);
+    setTeachingError(null);
+    setVersesFoundCountForTopic(verses.length);
+
+    if (verses.length === 0) {
+      setIsTeachingLoading(false);
+      // No need to call generateTeaching if no verses are found
+      // The TeachingDisplayCard will handle the "no verses found" message.
+      return;
+    }
 
     try {
-      const result = await explainBibleVerse({verse});
-      setExplanation(result.explanation);
-    } catch (error: any) {
-      console.error('Failed to get verse explanation:', error);
-      setExplanationError(`Failed to get explanation. ${error.message || 'Please try again.'}`);
+      const result = await generateTeaching({query, verses});
+      setTeachingText(result.teaching);
+    } catch (error: any)
+    {
+      console.error('Failed to generate teaching:', error);
+      const errorMessage = `Failed to generate teaching for "${query}". ${error.message || 'Please try again.'}`;
+      setTeachingError(errorMessage);
       toast({
-        title: 'Error Fetching Explanation',
-        description: `Could not load explanation for ${verse.book} ${verse.chapter}:${verse.verse}. ${error.message || ''}`,
+        title: 'Error Generating Teaching',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
-      setIsExplanationLoading(false);
+      setIsTeachingLoading(false);
     }
   }, [toast]);
 
@@ -40,20 +51,21 @@ export default function Home() {
     <div className="flex flex-col md:flex-row min-h-screen">
       <div className="md:w-2/5 p-4 flex flex-col">
         <header className="mb-4 text-center md:text-left">
-          <h1 className="text-3xl font-bold">Matthew AI</h1>
-          <p className="text-muted-foreground">Search Bible verses and get AI-powered explanations.</p>
+          <h1 className="text-3xl font-bold">VerseFinder AI</h1>
+          <p className="text-muted-foreground">Search Bible topics and get AI-powered teachings.</p>
         </header>
         <div className="flex-grow">
-           <SearchForm onVerseSelect={handleVerseSelect} />
+           <SearchForm onSearchResults={handleSearchResults} />
         </div>
       </div>
       <div className="md:w-3/5 p-4 bg-muted/20 md:border-l border-border flex flex-col">
         <div className="flex-grow">
-          <VerseExplanationCard
-            verse={verseToExplain}
-            explanation={explanation}
-            isLoading={isExplanationLoading}
-            error={explanationError}
+          <TeachingDisplayCard
+            queryTopic={currentQueryTopic}
+            teachingText={teachingText}
+            isLoading={isTeachingLoading}
+            error={teachingError}
+            versesFoundCount={versesFoundCountForTopic}
           />
         </div>
       </div>
