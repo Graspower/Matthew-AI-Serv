@@ -24,7 +24,7 @@ const GenerateTeachingInputSchema = z.object({
   ).describe('A list of relevant Bible verses related to the query.'),
   lengthPreference: z.enum(['brief', 'medium', 'detailed'])
     .default('medium')
-    .describe('The desired length of the teaching: brief (approx. 1 paragraph), medium (approx. 1-3 paragraphs), detailed (approx. 3-5 paragraphs).')
+    .describe('The desired length of the teaching: brief (approx. 3 sentences), medium (approx. 1-3 paragraphs), detailed (approx. 3-5 paragraphs).')
 });
 export type GenerateTeachingInput = z.infer<typeof GenerateTeachingInputSchema>;
 
@@ -85,7 +85,7 @@ const generateTeachingFlow = ai.defineFlow(
 
     let lengthInstructionText = "This teaching should be approximately 1-3 paragraphs."; // Default for medium
     if (input.lengthPreference === 'brief') {
-      lengthInstructionText = "This teaching should be very concise, aiming for approximately 1 paragraph.";
+      lengthInstructionText = "This teaching should be very concise, aiming for approximately three sentences.";
     } else if (input.lengthPreference === 'detailed') {
       lengthInstructionText = "This teaching should be more detailed, aiming for approximately 3-5 paragraphs.";
     }
@@ -98,3 +98,4 @@ const generateTeachingFlow = ai.defineFlow(
     return output!;
   }
 );
+
