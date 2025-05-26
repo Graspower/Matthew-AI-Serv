@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Generates a teaching or sermonette based on a user's query and relevant Bible verses.
@@ -21,11 +22,14 @@ const GenerateTeachingInputSchema = z.object({
       text: z.string().describe('The text of the verse.'),
     })
   ).describe('A list of relevant Bible verses related to the query.'),
+  lengthPreference: z.enum(['brief', 'medium', 'detailed'])
+    .default('medium')
+    .describe('The desired length of the teaching: brief (approx. 1 paragraph), medium (approx. 1-3 paragraphs), detailed (approx. 3-5 paragraphs).')
 });
 export type GenerateTeachingInput = z.infer<typeof GenerateTeachingInputSchema>;
 
 const GenerateTeachingOutputSchema = z.object({
-  teaching: z.string().describe('A concise (1-3 paragraphs), engaging, and uplifting teaching that provides clear spiritual revelation and practical insights related to the user query, seamlessly integrating the essence of the provided verses.'),
+  teaching: z.string().describe('A concise, engaging, and uplifting teaching that provides clear spiritual revelation and practical insights related to the user query, seamlessly integrating the essence of the provided verses, and adhering to the requested length.'),
 });
 export type GenerateTeachingOutput = z.infer<typeof GenerateTeachingOutputSchema>;
 
@@ -33,13 +37,29 @@ export async function generateTeaching(input: GenerateTeachingInput): Promise<Ge
   return generateTeachingFlow(input);
 }
 
+// Define a more specific input schema for the prompt itself
+const TeachingPromptInputSchema = z.object({
+  query: z.string(),
+  verses: z.array(
+    z.object({
+      book: z.string(),
+      chapter: z.number(),
+      verse: z.number(),
+      text: z.string(),
+    })
+  ),
+  lengthInstruction: z.string(), // This will carry the dynamic instruction
+});
+
+
 const teachingPrompt = ai.definePrompt({
   name: 'generateTeachingPrompt',
-  input: {schema: GenerateTeachingInputSchema},
+  input: {schema: TeachingPromptInputSchema}, // Use the specific prompt input schema
   output: {schema: GenerateTeachingOutputSchema},
   prompt: `You are an insightful Bible teacher, skilled at making scripture come alive. The user is exploring the topic: '{{query}}'.
-Based on this topic and the following relevant Bible verses you've identified, please craft a concise, engaging, and uplifting teaching.
-This teaching should be 1-3 paragraphs and offer clear spiritual revelation and practical insights related to the user's query.
+Based on this topic and the following relevant Bible verses you've identified, please craft an engaging and uplifting teaching.
+{{lengthInstruction}}
+This teaching should offer clear spiritual revelation and practical insights related to the user's query.
 Seamlessly integrate the essence of these verses into your message.
 
 User's Query/Topic: '{{query}}'
@@ -52,21 +72,29 @@ Relevant Verses:
 Your Teaching:`,
 });
 
-const generateTeachingFlow = ai.defineFlow<
-  typeof GenerateTeachingInputSchema,
-  typeof GenerateTeachingOutputSchema
->(
+const generateTeachingFlow = ai.defineFlow(
   {
     name: 'generateTeachingFlow',
-    inputSchema: GenerateTeachingInputSchema,
+    inputSchema: GenerateTeachingInputSchema, // Flow input schema
     outputSchema: GenerateTeachingOutputSchema,
   },
   async (input) => {
-    // Ensure there are verses to teach from, otherwise, it might not make sense.
     if (!input.verses || input.verses.length === 0) {
       return { teaching: "No specific verses were found for this query to base a teaching on. Please try a different search." };
     }
-    const {output} = await teachingPrompt(input);
+
+    let lengthInstructionText = "This teaching should be approximately 1-3 paragraphs."; // Default for medium
+    if (input.lengthPreference === 'brief') {
+      lengthInstructionText = "This teaching should be very concise, aiming for approximately 1 paragraph.";
+    } else if (input.lengthPreference === 'detailed') {
+      lengthInstructionText = "This teaching should be more detailed, aiming for approximately 3-5 paragraphs.";
+    }
+
+    const {output} = await teachingPrompt({
+      query: input.query,
+      verses: input.verses,
+      lengthInstruction: lengthInstructionText, // Pass the constructed instruction
+    });
     return output!;
   }
 );

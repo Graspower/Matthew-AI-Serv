@@ -226,27 +226,17 @@ export function SearchForm({ onSearchResults }: SearchFormProps) {
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              transcript += event.results[i][0].transcript;
-            } else {
-              // Use interim results for live feedback if desired, but final is more reliable
-              setVoiceSearchText(event.results[i][0].transcript + '...');
-            }
-          }
-          
-          if (transcript) {
-            setValue('query', transcript, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+ let finalTranscript = '';
+ for (let i = event.resultIndex; i < event.results.length; ++i) {
+ finalTranscript += event.results[i][0].transcript;
+ }
+
+ setVoiceSearchText(finalTranscript); // Update the text displayed in the input
+ if (event.results[event.results.length - 1].isFinal) {
+ setValue('query', finalTranscript, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
              // If autoSearch is on, the useEffect for formQuery will trigger search.
              // If autoSearch is off, we wait for onend to submit.
-            if (event.results[event.results.length - 1].isFinal) {
-                 setSearchTerm(transcript); // Update local searchTerm as well
-                 if (!autoSearch) {
-                    // Explicitly trigger search if not auto-searching and voice input is final
-                    // searchVerses(transcript); // This would trigger search immediately
-                 }
-            }
+ searchVerses(finalTranscript); // Trigger search with the final transcript
           }
         };
 

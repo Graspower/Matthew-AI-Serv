@@ -1,4 +1,4 @@
-# **App Name**: VerseFinder AI
+# **App Name**: Matthew AI
 
 ## Core Features:
 
