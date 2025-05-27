@@ -21,7 +21,7 @@ import {Loader2, Mic, Volume2, VolumeX } from "lucide-react";
 
 interface SearchFormProps {
   onSearchResults: (query: string, verses: Verse[]) => void;
-  onVerseSelect: (verse: Verse) => void;
+  onVerseSelect?: (verse: Verse) => void; // Made optional as it's not used if only teaching is displayed
 }
 
 export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) {
@@ -96,20 +96,16 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
 
     utterThis.onboundary = (event: SpeechSynthesisEvent) => {
-        // Ensure speech is still active for this specific verse
         if (event.name === 'word' && currentSpeakingVerseIndex === verseIndex && synth.current && synth.current.speaking) {
             let currentWordIdx = -1;
             let accumulatedCharLength = 0;
 
-            // Find the index of the currently spoken word
             for (let i = 0; i < words.length; i++) {
                 const wordLength = words[i].length;
-                // Check if the event's character index falls within the current word's range
                 if (event.charIndex >= accumulatedCharLength && event.charIndex < accumulatedCharLength + wordLength) {
                     currentWordIdx = i;
                     break;
                 }
-                // Add word length and 1 for the space/boundary character
                 accumulatedCharLength += wordLength + (text.substring(accumulatedCharLength + wordLength).match(/^(\s+|\b)/)?.[0]?.length || 0);
             }
             if(currentWordIdx !== -1){
@@ -120,7 +116,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
 
     utterThis.onend = () => {
-       // Only reset if this was the verse that just finished speaking
        if (currentSpeakingVerseIndex === verseIndex) {
             setHighlightedWordIndex(-1);
             setIsSpeaking(false);
@@ -135,7 +130,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         description: `Could not speak the verse. ${event.error || 'Unknown error'}`,
         variant: 'destructive',
       });
-      // Only reset if this was the verse that had an error
        if (currentSpeakingVerseIndex === verseIndex) {
           setHighlightedWordIndex(-1);
           setIsSpeaking(false);
@@ -151,7 +145,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     const turningOn = !isVoiceReaderEnabled;
     setIsVoiceReaderEnabled(turningOn);
 
-    // If turning off voice reader and speech is active, stop it
     if (!turningOn && isSpeaking && synth.current) {
       synth.current.cancel();
       setIsSpeaking(false);
@@ -164,13 +157,12 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
   const searchVerses = async (query: string) => {
     if (!query.trim()) {
        setVerses([]);
-       setSearchTerm(''); // Clear search term as well
-       onSearchResults(query, []); // Notify parent even if query is empty
+       setSearchTerm('');
+       onSearchResults(query, []);
        return;
     }
     setIsLoading(true);
-    setSearchTerm(query); // Set search term for display
-    // Cancel any ongoing speech before starting a new search
+    setSearchTerm(query);
     if (synth.current) {
         synth.current.cancel();
         setIsSpeaking(false);
@@ -181,7 +173,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
       const result = await interpretBibleVerseSearch({query: query});
       const foundVerses = result.verses || [];
       setVerses(foundVerses);
-      onSearchResults(query, foundVerses); // Pass both query and verses
+      onSearchResults(query, foundVerses);
     } catch (error: any) {
       console.error('Search failed', error);
       toast({
@@ -189,54 +181,50 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         description: `Failed to perform search. ${error.message || 'Please try again.'}`,
         variant: 'destructive',
       });
-      setVerses([]); // Clear verses on error
-      onSearchResults(query, []); // Notify parent about the error (empty verses)
+      setVerses([]);
+      onSearchResults(query, []);
     } finally {
       setIsLoading(false);
     }
   };
 
-   // Effect for auto-search
    useEffect(() => {
     if (!autoSearch) return;
 
     const handler = setTimeout(() => {
-      const currentFormQuery = getValues('query'); // Get current value from react-hook-form
+      const currentFormQuery = getValues('query');
       if (currentFormQuery && currentFormQuery.trim()) {
         searchVerses(currentFormQuery);
       } else {
-        // If autoSearch is on and input becomes empty, clear results
         setVerses([]);
         setSearchTerm('');
         onSearchResults('', []);
       }
-    }, 500); // Debounce time
+    }, 500);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [formQuery, autoSearch, onSearchResults, getValues]); // formQuery comes from watch('query')
+  }, [formQuery, autoSearch, getValues, onSearchResults]); // Removed searchVerses from here as it's called inside
 
 
-  // Effect for voice search
   useEffect(() => {
     if (!isSpeechRecognitionAPIAvailable) {
       return;
     }
 
     let recognition: SpeechRecognition | null = null;
-    // Ensure window context for SpeechRecognition APIs
     const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (isVoiceSearch && SpeechRecognitionAPI) {
         recognition = new SpeechRecognitionAPI();
-        recognition.continuous = false; // Stop after first final result
-        recognition.interimResults = true; // Get interim results for responsiveness
+        recognition.continuous = false;
+        recognition.interimResults = true;
         recognition.lang = 'en-US';
 
         recognition.onstart = () => {
           console.log('Voice search started');
-          setVoiceSearchText('Listening...'); // Placeholder while listening
+          setVoiceSearchText('Listening...');
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -245,11 +233,12 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             finalTranscript += event.results[i][0].transcript;
           }
 
-          setVoiceSearchText(finalTranscript); // Update placeholder with interim/final transcript
-          // Once a final result is received
+          setVoiceSearchText(finalTranscript);
           if (event.results[event.results.length - 1].isFinal) {
-            setValue('query', finalTranscript, { shouldValidate: true, shouldDirty: true, shouldTouch: true }); // Update form state
-            if (autoSearch) { // If auto-search is on, trigger search
+            // Update the form input's value with the final transcribed text.
+            // This text will be used for searching.
+            setValue('query', finalTranscript, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+            if (autoSearch) {
                 searchVerses(finalTranscript);
             }
           }
@@ -257,18 +246,18 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
          recognition.onend = () => {
           console.log('Voice search ended');
-          const finalTranscript = getValues('query'); // Get the most recent value, possibly set by onresult
-          setIsVoiceSearch(false); // Turn off voice search mode
-          setVoiceSearchText(''); // Clear the voice search placeholder
+          const finalTranscribedText = getValues('query');
+          setIsVoiceSearch(false);
+          setVoiceSearchText('');
 
-          // If there's a final transcript and auto-search is off, submit the form
-          if (finalTranscript && finalTranscript.trim()) {
-            setSearchTerm(finalTranscript); // Update displayed search term
+          if (finalTranscribedText && finalTranscribedText.trim()) {
+            setSearchTerm(finalTranscribedText);
             if (!autoSearch) {
-              handleSubmit(onSubmit)(); // Programmatically submit the form
+              // If autoSearch is off, and we have a final transcript,
+              // directly initiate the search with this transcribed text.
+              searchVerses(finalTranscribedText);
             }
           } else if (!autoSearch) {
-            // If voice search ends with no input and auto-search is off, clear results
             setVerses([]);
             setSearchTerm('');
             onSearchResults('', []);
@@ -283,6 +272,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             console.error('Speech recognition error. Code:', event.error, 'Message:', event.message);
             console.error('Full SpeechRecognitionErrorEvent object:', event);
           }
+
 
            let errorMessage = 'Could not perform voice search.';
            if (event.error) {
@@ -352,11 +342,10 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         recognition.onerror = null;
       }
     };
-  }, [isVoiceSearch, toast, setValue, autoSearch, handleSubmit, isSpeechRecognitionAPIAvailable, getValues, onSearchResults, searchVerses]); // Added searchVerses to dependency array
+  }, [isVoiceSearch, toast, setValue, autoSearch, getValues, onSearchResults, isSpeechRecognitionAPIAvailable]);
 
 
   const onSubmit = (data: { query: string }) => {
-     // Only search if autoSearch is off. If on, useEffect handles it.
      if (!autoSearch) {
         searchVerses(data.query);
      }
@@ -376,7 +365,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
   const toggleAutoSearch = () => {
     setAutoSearch((prev) => {
-        // If turning autoSearch ON and there's a query, perform search
         if (!prev && getValues('query')?.trim()) {
             searchVerses(getValues('query'));
         }
@@ -384,25 +372,20 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     });
   };
 
-  // Handle manual input changes
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
      const newQuery = e.target.value;
-     // If autoSearch is OFF and input becomes empty, clear results
      if (!autoSearch && !newQuery.trim()) {
         setVerses([]);
         setSearchTerm('');
         onSearchResults('', []);
      }
-     // If autoSearch is ON, the useEffect for formQuery will handle it
   };
 
-    // Helper function to check if a verse is John 3:16
     const isJohn316 = (verse: Verse) => {
         return verse.book.toLowerCase() === 'john' && verse.chapter === 3 && verse.verse === 16;
     };
 
 
-  // Function to render verse text with word highlighting for John 3:16
   const renderVerseText = (text: string, verseIndex: number, verse: Verse) => {
     if (isVoiceReaderEnabled && isJohn316(verse)) {
         const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
@@ -413,22 +396,19 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
               backgroundColor:
                 currentSpeakingVerseIndex === verseIndex &&
                 highlightedWordIndex === wordIdx
-                  ? 'var(--accent)' // Use accent color from globals.css
+                  ? 'var(--accent)'
                   : 'transparent',
-              color: currentSpeakingVerseIndex === verseIndex && highlightedWordIndex === wordIdx ? 'var(--accent-foreground)' : 'inherit', // Use accent foreground
-              transition: 'background-color 0.1s linear, color 0.1s linear', // Smooth transition
-              display: 'inline', // Ensure spans flow like text
+              color: currentSpeakingVerseIndex === verseIndex && highlightedWordIndex === wordIdx ? 'var(--accent-foreground)' : 'inherit',
+              transition: 'background-color 0.1s linear, color 0.1s linear',
+              display: 'inline',
             }}
           >
-            {/* Handle newlines within words if any, though unlikely for single words */}
             {word.includes('\n') ? word.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < word.split('\n').length - 1 && <br/>}</React.Fragment>) : word}
-            {/* Preserve spaces between words by checking the next boundary character */}
             {text.split(/(\s+|\b)/).filter(w => w.trim().length > 0)[wordIdx + 1]?.match(/^\s+$/) ? '\u00A0' : ''}
 
           </span>
         ));
     }
-    // For other verses or if voice reader is disabled, return plain text
     return text.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < text.split('\n').length - 1 && <br/>}</React.Fragment>);
   };
 
@@ -445,16 +425,16 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             {...register('query')}
             aria-label="Bible verse search"
             onChange={handleInputChange}
-            className="pr-12" // Padding right for the mic button
-            disabled={isVoiceSearch && voiceSearchText === 'Listening...'} // Disable input while "Listening..."
+            className="pr-12"
+            disabled={isVoiceSearch && voiceSearchText === 'Listening...'}
           />
           <Button
-            type="button" // Important: type="button" to prevent form submission
-            variant={isVoiceSearch ? "destructive" : "secondary"} // Change variant when active
+            type="button"
+            variant={isVoiceSearch ? "destructive" : "secondary"}
             size="icon"
-            className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-8 w-8" // Position inside input
+            className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-8 w-8"
             onClick={toggleVoiceSearch}
-            disabled={!isSpeechRecognitionAPIAvailable} // Disable if API not available
+            disabled={!isSpeechRecognitionAPIAvailable}
             aria-label={isVoiceSearch ? "Stop voice search" : "Start voice search"}
           >
             <Mic className="h-4 w-4" />
@@ -482,7 +462,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           </div>
         </div>
 
-        {!autoSearch && ( // Only show manual search button if autoSearch is OFF
+        {!autoSearch && (
           <Button type="submit" className="w-full" disabled={isLoading || (isVoiceSearch && voiceSearchText === 'Listening...') || isSubmitting}>
              {(isLoading || isSubmitting) ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
              Search
@@ -491,15 +471,13 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
       </form>
 
 
-      {/* Loading indicator for search results */}
       {isLoading && (
         <div className="mt-6 flex justify-center items-center h-20">
           <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
       )}
 
-      {/* Display search term and results */}
-      {!isLoading && searchTerm && ( // Only show results section if a search has been performed
+      {!isLoading && searchTerm && (
         <div className="mt-6">
           <h2 className="text-xl font-semibold mb-3 text-center">Results for "{searchTerm}"</h2>
           {verses.length > 0 ? (
@@ -508,22 +486,21 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
                 <Card
                   key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}`}
                   className="shadow-md rounded-lg overflow-hidden cursor-pointer transition-colors hover:bg-muted/10"
-                  onClick={() => onVerseSelect(verse)} // Make card clickable
-                  tabIndex={0} // Make it focusable
+                  onClick={() => onVerseSelect && onVerseSelect(verse)}
+                  tabIndex={0}
                   role="article"
                   aria-label={`Verse ${verse.book} ${verse.chapter}:${verse.verse}`}
                 >
                   <CardHeader className="bg-secondary/70 p-3 flex flex-row justify-between items-center">
                     <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
-                     {/* Show Speak button only if voice reader is enabled and it's John 3:16 */}
                      {isVoiceReaderEnabled && isJohn316(verse) && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={(e) => speakVerse(verse.text, index, verse, e)}
-                        disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null} // Disable other speak buttons while one is active
+                        disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null}
                         aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
-                        className="text-xs px-2 py-1 h-auto" // Smaller button
+                        className="text-xs px-2 py-1 h-auto"
                       >
                         {isSpeaking && currentSpeakingVerseIndex === index ? (
                             <>
@@ -541,7 +518,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
                     <p
                         ref={(el) => { verseTextRefs.current[index] = el; }}
                         className="text-sm leading-relaxed"
-                        style={{ whiteSpace: 'pre-wrap' }} // Preserve newlines from verse text
+                        style={{ whiteSpace: 'pre-wrap' }}
                       >
                         {renderVerseText(verse.text, index, verse)}
                     </p>
@@ -550,7 +527,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
               ))}
             </div>
           ) : (
-             // Message when no verses are found for the searchTerm
              <Card className="shadow-md rounded-lg">
                 <CardContent className="p-4 text-center text-muted-foreground">
                   <p>No matching verses found. Please try another search.</p>
