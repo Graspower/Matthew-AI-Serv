@@ -13,7 +13,7 @@ export interface Verse {
  * Represents a Bible book for the Bible Reader.
  */
 export interface BibleBook {
-  id: string; // Will use the full book name as ID, e.g., "Genesis"
+  id: string; // Full book name, e.g., "Genesis"
   name: string; // e.g., "Genesis"
   chapterCount: number;
 }
@@ -26,35 +26,47 @@ export interface BibleChapter {
   name: string; // e.g. "Chapter 1"
 }
 
-// --- KJV JSON Specific Interfaces (internal to this module) ---
-interface KJVVerse {
+// --- KJV JSON Specific Interfaces ---
+
+// Structure of each object in the flat kjv-bible.json array
+interface KJVRawVerse {
+  book_name: string;
+  book: number; // Book number (e.g., 1 for Genesis), currently not used by reader logic
+  chapter: number;
   verse: number;
   text: string;
 }
 
-interface KJVChapterData {
-  chapter: number;
-  verses: KJVVerse[];
+// Internal processed structure for verses
+interface KJVInternalVerse {
+  verse: number;
+  text: string;
 }
 
-interface KJVBookData {
-  book: string; // Full book name, e.g., "Genesis"
-  abbrev?: string; // Optional abbreviation
-  chapters: KJVChapterData[];
+// Internal processed structure for chapters
+interface KJVInternalChapterData {
+  chapter: number;
+  verses: KJVInternalVerse[];
+}
+
+// Internal processed structure for books
+interface KJVInternalBookData {
+  bookName: string;
+  chapters: KJVInternalChapterData[];
 }
 // --- End KJV JSON Specific Interfaces ---
 
-let loadedBibleData: KJVBookData[] | null = null;
-let bibleDataPromise: Promise<KJVBookData[]> | null = null;
+let processedBibleData: Map<string, KJVInternalBookData> | null = null;
+let bibleDataPromise: Promise<Map<string, KJVInternalBookData>> | null = null;
 
 /**
- * Loads and parses the KJV Bible data from public/kjv-bible.json.
- * Caches the data in memory to avoid re-fetching.
- * @returns A promise that resolves to the array of KJVBookData.
+ * Loads and parses the KJV Bible data from public/kjv-bible.json (expected flat array of verses).
+ * Processes it into an internal nested Map structure and caches it.
+ * @returns A promise that resolves to the Map of processed KJVInternalBookData.
  */
-async function loadKJVData(): Promise<KJVBookData[]> {
-  if (loadedBibleData) {
-    return loadedBibleData;
+async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>> {
+  if (processedBibleData) {
+    return processedBibleData;
   }
   if (bibleDataPromise) {
     return bibleDataPromise;
@@ -67,30 +79,61 @@ async function loadKJVData(): Promise<KJVBookData[]> {
       }
       return response.json();
     })
-    .then((data: KJVBookData[]) => {
-      // Basic validation of the data structure by checking the first book, chapter, and verse.
+    .then((rawVerses: KJVRawVerse[]) => {
       if (
-        !Array.isArray(data) ||
-        data.length === 0 ||
-        typeof data[0]?.book !== 'string' ||
-        !Array.isArray(data[0]?.chapters) ||
-        data[0]?.chapters.length === 0 ||
-        typeof data[0]?.chapters[0]?.chapter !== 'number' ||
-        !Array.isArray(data[0]?.chapters[0]?.verses) ||
-        data[0]?.chapters[0]?.verses.length === 0 ||
-        typeof data[0]?.chapters[0]?.verses[0]?.verse !== 'number' ||
-        typeof data[0]?.chapters[0]?.verses[0]?.text !== 'string'
+        !Array.isArray(rawVerses) ||
+        rawVerses.length === 0 ||
+        typeof rawVerses[0]?.book_name !== 'string' ||
+        typeof rawVerses[0]?.chapter !== 'number' ||
+        typeof rawVerses[0]?.verse !== 'number' ||
+        typeof rawVerses[0]?.text !== 'string'
       ) {
-        console.error("KJV JSON data (public/kjv-bible.json) does not match expected structure. First book data:", data[0]);
-        throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected structure. Expected format: Array of books, each with 'book' (string), 'chapters' (array of chapter objects). Each chapter object with 'chapter' (number), 'verses' (array of verse objects). Each verse object with 'verse' (number), 'text' (string). Please verify the file format and check console for details on the first book found.");
+        console.error("KJV JSON data (public/kjv-bible.json) does not match expected flat structure. First verse object found:", rawVerses[0]);
+        throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected flat structure. Expected format: Array of verse objects, each with 'book_name' (string), 'chapter' (number), 'verse' (number), 'text' (string). Please verify the file format and check console for details on the first verse object found.");
       }
-      loadedBibleData = data;
-      return data;
+
+      const booksMap = new Map<string, KJVInternalBookData>();
+
+      for (const rawVerse of rawVerses) {
+        if (!booksMap.has(rawVerse.book_name)) {
+          booksMap.set(rawVerse.book_name, {
+            bookName: rawVerse.book_name,
+            chapters: [],
+          });
+        }
+
+        const bookData = booksMap.get(rawVerse.book_name)!;
+        let chapterData = bookData.chapters.find(c => c.chapter === rawVerse.chapter);
+
+        if (!chapterData) {
+          chapterData = {
+            chapter: rawVerse.chapter,
+            verses: [],
+          };
+          bookData.chapters.push(chapterData);
+        }
+
+        chapterData.verses.push({
+          verse: rawVerse.verse,
+          text: rawVerse.text,
+        });
+      }
+
+      // Sort chapters and verses after processing all raw verses
+      for (const book of booksMap.values()) {
+        book.chapters.sort((a, b) => a.chapter - b.chapter);
+        for (const chap of book.chapters) {
+          chap.verses.sort((a, b) => a.verse - b.verse);
+        }
+      }
+      
+      processedBibleData = booksMap;
+      return booksMap;
     })
     .catch(error => {
-      console.error("Error loading or parsing KJV Bible data from public/kjv-bible.json:", error);
-      bibleDataPromise = null; // Reset promise so it can be retried if needed
-      loadedBibleData = null;
+      console.error("Error loading or processing KJV Bible data from public/kjv-bible.json:", error);
+      bibleDataPromise = null; // Reset promise so it can be retried
+      processedBibleData = null;
       throw new Error(`Could not load Bible data. ${error.message}`);
     });
   return bibleDataPromise;
@@ -111,29 +154,32 @@ export async function searchVerses(query: string): Promise<Verse[]> {
 }
 
 /**
- * Asynchronously retrieves a list of Bible books from the KJV JSON.
+ * Asynchronously retrieves a list of Bible books from the processed KJV JSON data.
  * @returns A promise that resolves to an array of BibleBook objects.
  */
 export async function getBooks(): Promise<BibleBook[]> {
-  const data = await loadKJVData();
-  return data.map((book) => ({
-    id: book.book, // Using the full book name as a unique ID
-    name: book.book,
+  const dataMap = await loadAndProcessKJVData();
+  // The order of books will be based on the insertion order into the Map,
+  // which depends on the order in the flat JSON file.
+  return Array.from(dataMap.values()).map((book) => ({
+    id: book.bookName,
+    name: book.bookName,
     chapterCount: book.chapters.length,
   }));
 }
 
 /**
- * Asynchronously retrieves the chapters for a given book from the KJV JSON.
+ * Asynchronously retrieves the chapters for a given book from the processed KJV JSON data.
  * @param bookId The ID of the book (full book name, e.g., "Genesis").
  * @returns A promise that resolves to an array of BibleChapter objects.
  */
 export async function getChaptersForBook(bookId: string): Promise<BibleChapter[]> {
-  const data = await loadKJVData();
-  const book = data.find(b => b.book === bookId);
+  const dataMap = await loadAndProcessKJVData();
+  const book = dataMap.get(bookId);
   if (!book) {
     throw new Error(`Book not found: ${bookId}`);
   }
+  // Chapters are sorted during loadAndProcessKJVData
   return book.chapters.map(ch => ({
     id: ch.chapter,
     name: `Chapter ${ch.chapter}`,
@@ -141,14 +187,14 @@ export async function getChaptersForBook(bookId: string): Promise<BibleChapter[]
 }
 
 /**
- * Asynchronously retrieves the formatted text for a specific Bible chapter from KJV JSON.
+ * Asynchronously retrieves the formatted text for a specific Bible chapter from processed KJV JSON data.
  * @param bookId The ID of the book (full book name).
  * @param chapterNumber The chapter number.
  * @returns A promise that resolves to a string containing the chapter text (HTML formatted).
  */
 export async function getChapterText(bookId: string, chapterNumber: number): Promise<string> {
-  const data = await loadKJVData();
-  const book = data.find(b => b.book === bookId);
+  const dataMap = await loadAndProcessKJVData();
+  const book = dataMap.get(bookId);
 
   if (!book) {
     throw new Error(`Book not found: ${bookId}`);
@@ -156,10 +202,11 @@ export async function getChapterText(bookId: string, chapterNumber: number): Pro
 
   const chapterData = book.chapters.find(ch => ch.chapter === chapterNumber);
   if (!chapterData) {
-    throw new Error(`Chapter ${chapterNumber} not found in ${book.book}`);
+    throw new Error(`Chapter ${chapterNumber} not found in ${book.bookName}`);
   }
 
-  let formattedText = `<h3 class="text-lg font-semibold mb-2">${book.book} - Chapter ${chapterNumber}</h3>\n`;
-  formattedText += chapterData.verses.map(v => `<p class="mb-1"><strong class="mr-1">${v.verse}</strong>${v.text}</p>`).join('\n');
+  // Verses are sorted during loadAndProcessKJVData
+  let formattedText = `<h3 class="text-lg font-semibold mb-2">${book.bookName} - Chapter ${chapterNumber}</h3>\n`;
+  formattedText += chapterData.verses.map(v => `<p class="mb-1"><strong class="mr-1">${v.verse}</strong>${v.text.replace(/^\s*¶\s*/, '')}</p>`).join('\n');
   return formattedText;
 }
