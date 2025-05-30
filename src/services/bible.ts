@@ -1,133 +1,166 @@
 
 /**
- * Represents a Bible verse.
+ * Represents a Bible verse for AI search results.
  */
 export interface Verse {
-  /**
-   * The book of the Bible the verse is from.
-   */
-  book: string; // e.g., "Genesis", "John"
-  /**
-   * The chapter of the Bible the verse is from.
-   */
+  book: string;
   chapter: number;
-  /**
-   * The verse number.
-   */
   verse: number;
-  /**
-   * The text of the verse.
-   */
   text: string;
 }
 
 /**
- * Represents a Bible book.
+ * Represents a Bible book for the Bible Reader.
  */
 export interface BibleBook {
-  id: string; // e.g., "GEN" or "John"
-  name: string; // e.g., "Genesis" or "John"
-  testament: 'OT' | 'NT';
+  id: string; // Will use the full book name as ID, e.g., "Genesis"
+  name: string; // e.g., "Genesis"
   chapterCount: number;
 }
 
 /**
- * Represents a chapter identifier.
+ * Represents a chapter identifier for the Bible Reader.
  */
 export interface BibleChapter {
   id: number; // chapter number
   name: string; // e.g. "Chapter 1"
 }
 
+// --- KJV JSON Specific Interfaces (internal to this module) ---
+interface KJVVerse {
+  verse: number;
+  text: string;
+}
 
-// Mock Bible Data (simplified)
-const MOCK_BIBLE_BOOKS: BibleBook[] = [
-  { id: 'GEN', name: 'Genesis', testament: 'OT', chapterCount: 50 },
-  { id: 'EXO', name: 'Exodus', testament: 'OT', chapterCount: 40 },
-  { id: 'LEV', name: 'Leviticus', testament: 'OT', chapterCount: 27 },
-  // ... more Old Testament books
-  { id: 'MAT', name: 'Matthew', testament: 'NT', chapterCount: 28 },
-  { id: 'MRK', name: 'Mark', testament: 'NT', chapterCount: 16 },
-  { id: 'LUK', name: 'Luke', testament: 'NT', chapterCount: 24 },
-  { id: 'JHN', name: 'John', testament: 'NT', chapterCount: 21 },
-  { id: 'ACT', name: 'Acts', testament: 'NT', chapterCount: 28 },
-  { id: 'ROM', name: 'Romans', testament: 'NT', chapterCount: 16 },
-  // ... more New Testament books
-  { id: 'REV', name: 'Revelation', testament: 'NT', chapterCount: 22 },
-];
+interface KJVChapterData {
+  chapter: number;
+  verses: KJVVerse[];
+}
+
+interface KJVBookData {
+  book: string; // Full book name, e.g., "Genesis"
+  abbrev?: string; // Optional abbreviation
+  chapters: KJVChapterData[];
+}
+// --- End KJV JSON Specific Interfaces ---
+
+let loadedBibleData: KJVBookData[] | null = null;
+let bibleDataPromise: Promise<KJVBookData[]> | null = null;
+
+/**
+ * Loads and parses the KJV Bible data from public/kjv-bible.json.
+ * Caches the data in memory to avoid re-fetching.
+ * @returns A promise that resolves to the array of KJVBookData.
+ */
+async function loadKJVData(): Promise<KJVBookData[]> {
+  if (loadedBibleData) {
+    return loadedBibleData;
+  }
+  if (bibleDataPromise) {
+    return bibleDataPromise;
+  }
+
+  bibleDataPromise = fetch('/kjv-bible.json')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch kjv-bible.json: ${response.statusText}. Ensure the file exists in the 'public' folder.`);
+      }
+      return response.json();
+    })
+    .then((data: KJVBookData[]) => {
+      // Basic validation of the data structure
+      if (
+        !Array.isArray(data) ||
+        data.length === 0 ||
+        !data[0]?.book ||
+        !Array.isArray(data[0]?.chapters) ||
+        data[0]?.chapters.length === 0 ||
+        data[0]?.chapters[0]?.chapter === undefined ||
+        !Array.isArray(data[0]?.chapters[0]?.verses) ||
+        data[0]?.chapters[0]?.verses.length === 0 ||
+        data[0]?.chapters[0]?.verses[0]?.verse === undefined ||
+        data[0]?.chapters[0]?.verses[0]?.text === undefined
+      ) {
+        console.error("KJV JSON data (public/kjv-bible.json) does not match expected structure.", data[0]);
+        throw new Error("KJV JSON data has an unexpected structure. Please verify the file format.");
+      }
+      loadedBibleData = data;
+      return data;
+    })
+    .catch(error => {
+      console.error("Error loading or parsing KJV Bible data from public/kjv-bible.json:", error);
+      bibleDataPromise = null; // Reset promise so it can be retried if needed
+      loadedBibleData = null;
+      // Make sure to inform the user about the error, perhaps re-throw
+      throw new Error(`Could not load Bible data. ${error.message}`);
+    });
+  return bibleDataPromise;
+}
 
 
 /**
- * Asynchronously retrieves Bible verses based on a query.
- * This function is used by the AI teaching feature.
+ * Asynchronously retrieves Bible verses based on a query (for AI search).
+ * This function is used by the AI teaching feature and is separate from KJV data loading.
  * @param query The search query for Bible verses.
  * @returns A promise that resolves to an array of Verse objects.
  */
 export async function searchVerses(query: string): Promise<Verse[]> {
-  // This remains for the AI teaching feature, actual implementation for this
-  // would typically involve an AI call or a more sophisticated search algorithm.
-  console.log(`Searching verses for query: ${query}`);
-  // For now, returning an empty array or mock relevant verses.
-  // Example: if (query.toLowerCase().includes("love")) return [{book: "1 John", chapter: 4, verse: 8, text: "He who does not love does not know God, for God is love."}];
+  console.log(`Searching verses for query (AI): ${query}`);
+  // This function remains for the AI teaching feature.
+  // Actual implementation involves an AI call.
   return [];
 }
 
 /**
- * Asynchronously retrieves a list of Bible books.
+ * Asynchronously retrieves a list of Bible books from the KJV JSON.
  * @returns A promise that resolves to an array of BibleBook objects.
  */
 export async function getBooks(): Promise<BibleBook[]> {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_BIBLE_BOOKS;
-}
-
-/**
- * Asynchronously retrieves the chapters for a given book.
- * @param bookId The ID of the book (e.g., "GEN", "JHN").
- * @returns A promise that resolves to an array of BibleChapter objects.
- */
-export async function getChaptersForBook(bookId: string): Promise<BibleChapter[]> {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const book = MOCK_BIBLE_BOOKS.find(b => b.id === bookId);
-  if (!book) {
-    throw new Error('Book not found');
-  }
-  return Array.from({ length: book.chapterCount }, (_, i) => ({
-    id: i + 1,
-    name: `Chapter ${i + 1}`,
+  const data = await loadKJVData();
+  return data.map((book) => ({
+    id: book.book, // Using the full book name as a unique ID
+    name: book.book,
+    chapterCount: book.chapters.length,
   }));
 }
 
 /**
- * Asynchronously retrieves the text for a specific Bible chapter.
- * In a real application, this would fetch from a Bible API or local data source.
- * @param bookId The ID of the book.
- * @param chapter The chapter number.
- * @returns A promise that resolves to a string containing the chapter text (can include HTML for formatting).
+ * Asynchronously retrieves the chapters for a given book from the KJV JSON.
+ * @param bookId The ID of the book (full book name, e.g., "Genesis").
+ * @returns A promise that resolves to an array of BibleChapter objects.
  */
-export async function getChapterText(bookId: string, chapter: number): Promise<string> {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 500));
-  const book = MOCK_BIBLE_BOOKS.find(b => b.id === bookId);
+export async function getChaptersForBook(bookId: string): Promise<BibleChapter[]> {
+  const data = await loadKJVData();
+  const book = data.find(b => b.book === bookId);
   if (!book) {
-    return Promise.reject('Book not found');
+    throw new Error(`Book not found: ${bookId}`);
   }
-  if (chapter < 1 || chapter > book.chapterCount) {
-    return Promise.reject('Chapter not found');
-  }
-
-  // Placeholder text - in a real app, this would be actual scripture.
-  // Adding some basic HTML structure for demonstration.
-  let placeholderContent = `<h3>${book.name} - Chapter ${chapter}</h3>\n`;
-  placeholderContent += `<p><strong>1.</strong> This is placeholder text for ${book.name} chapter ${chapter}, verse 1. Imagine the profound wisdom and stories contained herein.</p>\n`;
-  placeholderContent += `<p><strong>2.</strong> Each verse would unfold, revealing timeless truths and narratives. For demonstration, this text is repeated.</p>\n`;
-  for (let i = 3; i <= 15; i++) {
-    placeholderContent += `<p><strong>${i}.</strong> This is verse ${i} of ${book.name} chapter ${chapter}. More placeholder content to simulate a chapter's length.</p>\n`;
-  }
-  placeholderContent += `<p><em>End of ${book.name} chapter ${chapter} (placeholder).</em></p>`;
-
-  return placeholderContent;
+  return book.chapters.map(ch => ({
+    id: ch.chapter,
+    name: `Chapter ${ch.chapter}`,
+  }));
 }
 
+/**
+ * Asynchronously retrieves the formatted text for a specific Bible chapter from KJV JSON.
+ * @param bookId The ID of the book (full book name).
+ * @param chapterNumber The chapter number.
+ * @returns A promise that resolves to a string containing the chapter text (HTML formatted).
+ */
+export async function getChapterText(bookId: string, chapterNumber: number): Promise<string> {
+  const data = await loadKJVData();
+  const book = data.find(b => b.book === bookId);
+
+  if (!book) {
+    throw new Error(`Book not found: ${bookId}`);
+  }
+
+  const chapterData = book.chapters.find(ch => ch.chapter === chapterNumber);
+  if (!chapterData) {
+    throw new Error(`Chapter ${chapterNumber} not found in ${book.book}`);
+  }
+
+  let formattedText = `<h3 class="text-lg font-semibold mb-2">${book.book} - Chapter ${chapterNumber}</h3>\n`;
+  formattedText += chapterData.verses.map(v => `<p class="mb-1"><strong class="mr-1">${v.verse}</strong>${v.text}</p>`).join('\n');
+  return formattedText;
+}
