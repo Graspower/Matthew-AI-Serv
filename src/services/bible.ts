@@ -60,7 +60,8 @@ let processedBibleData: Map<string, KJVInternalBookData> | null = null;
 let bibleDataPromise: Promise<Map<string, KJVInternalBookData>> | null = null;
 
 /**
- * Loads and parses the KJV Bible data from public/kjv-bible.json (expected flat array of verses).
+ * Loads and parses the KJV Bible data from public/kjv-bible.json.
+ * Expects either a flat array of KJVRawVerse objects, or an object with a "verses" key holding such an array.
  * Processes it into an internal nested Map structure and caches it.
  * @returns A promise that resolves to the Map of processed KJVInternalBookData.
  */
@@ -79,17 +80,38 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
       }
       return response.json();
     })
-    .then((rawVerses: KJVRawVerse[]) => {
+    .then((jsonData: unknown) => { // Use unknown for better type checking initial json
+      let rawVerses: KJVRawVerse[];
+
+      if (Array.isArray(jsonData)) {
+        rawVerses = jsonData as KJVRawVerse[];
+      } else if (jsonData && typeof jsonData === 'object' && jsonData !== null && 'verses' in jsonData && Array.isArray((jsonData as { verses: unknown }).verses)) {
+        rawVerses = (jsonData as { verses: KJVRawVerse[] }).verses;
+      } else {
+        console.error("KJV JSON data (public/kjv-bible.json) is not in the expected format. Expected an array of verses or an object with a 'verses' property containing an array of verses. Received:", jsonData);
+        throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected root structure. Please ensure it's either a direct array of verse objects or an object with a 'verses' key holding this array.");
+      }
+
+      if (!Array.isArray(rawVerses)) {
+        // This should ideally be caught by the logic above, but as a defensive measure:
+        console.error("Processed Bible data did not result in an array. Original JSON structure might be problematic. Received for rawVerses processing:", rawVerses);
+        throw new Error("Failed to process Bible data into an array of verses. Check console for details.");
+      }
+
+      if (rawVerses.length === 0) {
+        console.warn("KJV JSON data (public/kjv-bible.json) resulted in an empty list of verses. The 'verses' array in your JSON might be empty, or the file itself might represent an empty list.");
+        throw new Error("The Bible data file (public/kjv-bible.json) contains no verses. Please check the file content.");
+      }
+
+      const firstVerse = rawVerses[0];
       if (
-        !Array.isArray(rawVerses) ||
-        rawVerses.length === 0 ||
-        typeof rawVerses[0]?.book_name !== 'string' ||
-        typeof rawVerses[0]?.chapter !== 'number' ||
-        typeof rawVerses[0]?.verse !== 'number' ||
-        typeof rawVerses[0]?.text !== 'string'
+        typeof firstVerse?.book_name !== 'string' ||
+        typeof firstVerse?.chapter !== 'number' ||
+        typeof firstVerse?.verse !== 'number' ||
+        typeof firstVerse?.text !== 'string'
       ) {
-        console.error("KJV JSON data (public/kjv-bible.json) does not match expected flat structure. First verse object found:", rawVerses[0]);
-        throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected flat structure. Expected format: Array of verse objects, each with 'book_name' (string), 'chapter' (number), 'verse' (number), 'text' (string). Please verify the file format and check console for details on the first verse object found.");
+        console.error("KJV JSON data (public/kjv-bible.json) - first verse object has an unexpected structure. First verse object found:", firstVerse);
+        throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected verse structure. Expected format for each verse: 'book_name' (string), 'chapter' (number), 'verse' (number), 'text' (string). Please verify the file format and check console for details on the first verse object found.");
       }
 
       const booksMap = new Map<string, KJVInternalBookData>();
@@ -210,3 +232,4 @@ export async function getChapterText(bookId: string, chapterNumber: number): Pro
   formattedText += chapterData.verses.map(v => `<p class="mb-1"><strong class="mr-1">${v.verse}</strong>${v.text.replace(/^\s*¶\s*/, '')}</p>`).join('\n');
   return formattedText;
 }
+
