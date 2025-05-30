@@ -63,26 +63,26 @@ async function loadKJVData(): Promise<KJVBookData[]> {
   bibleDataPromise = fetch('/kjv-bible.json')
     .then(response => {
       if (!response.ok) {
-        throw new Error(`Failed to fetch kjv-bible.json: ${response.statusText}. Ensure the file exists in the 'public' folder.`);
+        throw new Error(`Failed to fetch kjv-bible.json: ${response.statusText}. Ensure the file exists in the 'public' folder at the project root.`);
       }
       return response.json();
     })
     .then((data: KJVBookData[]) => {
-      // Basic validation of the data structure
+      // Basic validation of the data structure by checking the first book, chapter, and verse.
       if (
         !Array.isArray(data) ||
         data.length === 0 ||
-        !data[0]?.book ||
+        typeof data[0]?.book !== 'string' ||
         !Array.isArray(data[0]?.chapters) ||
         data[0]?.chapters.length === 0 ||
-        data[0]?.chapters[0]?.chapter === undefined ||
+        typeof data[0]?.chapters[0]?.chapter !== 'number' ||
         !Array.isArray(data[0]?.chapters[0]?.verses) ||
         data[0]?.chapters[0]?.verses.length === 0 ||
-        data[0]?.chapters[0]?.verses[0]?.verse === undefined ||
-        data[0]?.chapters[0]?.verses[0]?.text === undefined
+        typeof data[0]?.chapters[0]?.verses[0]?.verse !== 'number' ||
+        typeof data[0]?.chapters[0]?.verses[0]?.text !== 'string'
       ) {
-        console.error("KJV JSON data (public/kjv-bible.json) does not match expected structure.", data[0]);
-        throw new Error("KJV JSON data has an unexpected structure. Please verify the file format.");
+        console.error("KJV JSON data (public/kjv-bible.json) does not match expected structure. First book data:", data[0]);
+        throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected structure. Expected format: Array of books, each with 'book' (string), 'chapters' (array of chapter objects). Each chapter object with 'chapter' (number), 'verses' (array of verse objects). Each verse object with 'verse' (number), 'text' (string). Please verify the file format and check console for details on the first book found.");
       }
       loadedBibleData = data;
       return data;
@@ -91,7 +91,6 @@ async function loadKJVData(): Promise<KJVBookData[]> {
       console.error("Error loading or parsing KJV Bible data from public/kjv-bible.json:", error);
       bibleDataPromise = null; // Reset promise so it can be retried if needed
       loadedBibleData = null;
-      // Make sure to inform the user about the error, perhaps re-throw
       throw new Error(`Could not load Bible data. ${error.message}`);
     });
   return bibleDataPromise;
