@@ -9,6 +9,8 @@ import {generateTeaching} from '@/ai/flows/generateTeachingFlow';
 import {useToast} from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BibleReaderPage } from '@/components/BibleReaderPage';
 
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
@@ -71,48 +73,63 @@ export default function Home() {
   }, [currentQueryTopic, currentVersesForTopic, teachingLength, toast]);
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen">
-      <div className="md:w-2/5 p-4 flex flex-col md:ml-0 ml-2">
-        <header className="mb-3 text-center md:text-left ml-5">
-          <h1 className="text-3xl font-bold">Matthew AI</h1>
-          <p className="text-muted-foreground ml-0">Search to get bible revelations.</p>
-        </header>
-        <div className="flex-grow">
-           <SearchForm onSearchResults={handleSearchResults} />
+    <div className="flex flex-col min-h-screen">
+      <Tabs defaultValue="matthewAI" className="flex flex-col flex-grow">
+        <div className="p-4 border-b">
+            <header className="text-center">
+              <h1 className="text-3xl font-bold">Matthew AI</h1>
+              <p className="text-muted-foreground">Salvation to the World AI</p>
+            </header>
+            <TabsList className="grid w-full grid-cols-2 mt-4 max-w-md mx-auto">
+              <TabsTrigger value="matthewAI">AI Teaching</TabsTrigger>
+              <TabsTrigger value="bibleReader">Bible Reader</TabsTrigger>
+            </TabsList>
         </div>
-        <div className="mt-6 p-4 border-t border-border">
-          <Label className="text-md font-semibold mb-3 block text-center md:text-left">Teaching Length</Label>
-          <RadioGroup
-            value={teachingLength}
-            onValueChange={(value) => setTeachingLength(value as 'brief' | 'medium' | 'detailed')}
-            className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 justify-center md:justify-start"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="brief" id="r-brief" />
-              <Label htmlFor="r-brief" className="cursor-pointer">Brief</Label>
+
+        <TabsContent value="matthewAI" className="flex-grow flex flex-col md:flex-row mt-0 data-[state=inactive]:hidden">
+          <div className="md:w-2/5 p-4 flex flex-col md:ml-0 ml-2 border-r">
+            <div className="flex-grow">
+               <SearchForm onSearchResults={handleSearchResults} />
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="medium" id="r-medium" />
-              <Label htmlFor="r-medium" className="cursor-pointer">Medium</Label>
+            <div className="mt-6 p-4 border-t border-border">
+              <Label className="text-md font-semibold mb-3 block text-center md:text-left">Teaching Length</Label>
+              <RadioGroup
+                value={teachingLength}
+                onValueChange={(value) => setTeachingLength(value as 'brief' | 'medium' | 'detailed')}
+                className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 justify-center md:justify-start"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="brief" id="r-brief" />
+                  <Label htmlFor="r-brief" className="cursor-pointer">Brief</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="medium" id="r-medium" />
+                  <Label htmlFor="r-medium" className="cursor-pointer">Medium</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="detailed" id="r-detailed" />
+                  <Label htmlFor="r-detailed" className="cursor-pointer">Detailed</Label>
+                </div>
+              </RadioGroup>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="detailed" id="r-detailed" />
-              <Label htmlFor="r-detailed" className="cursor-pointer">Detailed</Label>
+          </div>
+          <div className="md:w-3/5 p-4 bg-muted/20 flex flex-col">
+            <div className="flex-grow">
+              <TeachingDisplayCard
+                queryTopic={currentQueryTopic}
+                teachingText={teachingText}
+                isLoading={isTeachingLoading}
+                error={teachingError}
+                versesFoundCount={currentVersesForTopic?.length}
+              />
             </div>
-          </RadioGroup>
-        </div>
-      </div>
-      <div className="md:w-3/5 p-4 bg-muted/20 md:border-l border-border flex flex-col">
-        <div className="flex-grow">
-          <TeachingDisplayCard
-            queryTopic={currentQueryTopic}
-            teachingText={teachingText}
-            isLoading={isTeachingLoading}
-            error={teachingError}
-            versesFoundCount={currentVersesForTopic?.length}
-          />
-        </div>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="bibleReader" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
+          <BibleReaderPage />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
