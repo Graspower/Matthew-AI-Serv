@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BibleReaderPage } from '@/components/BibleReaderPage';
+import { HomePage } from '@/components/HomePage'; // Added import
 
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
@@ -74,17 +75,22 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Tabs defaultValue="matthewAI" className="flex flex-col flex-grow">
+      <Tabs defaultValue="home" className="flex flex-col flex-grow"> {/* Changed defaultValue */}
         <div className="p-4 border-b">
             <header className="text-center">
               <h1 className="text-3xl font-bold">Matthew AI</h1>
               <p className="text-muted-foreground">Salvation to the World AI</p>
             </header>
-            <TabsList className="grid w-full grid-cols-2 mt-4 max-w-md mx-auto">
+            <TabsList className="grid w-full grid-cols-3 mt-4 max-w-lg mx-auto"> {/* Updated grid-cols */}
+              <TabsTrigger value="home">Home</TabsTrigger> {/* Added Home trigger */}
               <TabsTrigger value="matthewAI">AI Teaching</TabsTrigger>
               <TabsTrigger value="bibleReader">Bible Reader</TabsTrigger>
             </TabsList>
         </div>
+
+        <TabsContent value="home" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden"> {/* Added Home content */}
+          <HomePage />
+        </TabsContent>
 
         <TabsContent value="matthewAI" className="flex-grow flex flex-col md:flex-row mt-0 data-[state=inactive]:hidden">
           <div className="md:w-2/5 p-4 flex flex-col md:ml-0 ml-2 border-r">
