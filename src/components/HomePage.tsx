@@ -5,12 +5,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, RefreshCw } from 'lucide-react';
-import { generateEncouragement } from '@/ai/flows/generateEncouragementFlow'; // Ensure this path is correct
+import { generateEncouragement } from '@/ai/flows/generateEncouragementFlow';
 import { useToast } from '@/hooks/use-toast';
 
 export function HomePage() {
   const [encouragement, setEncouragement] = useState<string | null>(null);
   const [currentTopic, setCurrentTopic] = useState<string | null>(null);
+  const [bibleVerseReference, setBibleVerseReference] = useState<string | null>(null);
+  const [bibleVerseText, setBibleVerseText] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -18,10 +20,16 @@ export function HomePage() {
   const fetchEncouragement = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setEncouragement(null);
+    setCurrentTopic(null);
+    setBibleVerseReference(null);
+    setBibleVerseText(null);
     try {
-      const result = await generateEncouragement({}); // Pass empty object if no input needed, or specific input
+      const result = await generateEncouragement({});
       setEncouragement(result.message);
       setCurrentTopic(result.topic);
+      setBibleVerseReference(result.bibleVerseReference);
+      setBibleVerseText(result.bibleVerseText);
     } catch (err: any) {
       console.error('Failed to generate encouragement:', err);
       const errorMessage = `Failed to load an encouraging message. ${err.message || 'Please try again.'}`;
@@ -60,11 +68,17 @@ export function HomePage() {
             </div>
           )}
           {!isLoading && !error && encouragement && (
-            <div className="my-6">
+            <div className="my-6 space-y-4">
               {currentTopic && (
-                <p className="text-sm text-muted-foreground mb-2 italic">
+                <p className="text-sm text-muted-foreground italic">
                   Today's Focus: <strong>{currentTopic}</strong>
                 </p>
+              )}
+              {bibleVerseReference && bibleVerseReference !== "N/A" && bibleVerseText && (
+                <div className="p-3 bg-secondary/30 rounded-md border border-border">
+                  <p className="text-md font-semibold text-primary">{bibleVerseReference}</p>
+                  <p className="mt-1 text-sm italic">"{bibleVerseText}"</p>
+                </div>
               )}
               <blockquote className="text-lg leading-relaxed border-l-4 border-primary pl-4 py-2 bg-muted/20 rounded-r-md">
                 {encouragement.split('\n').map((paragraph, index) => (

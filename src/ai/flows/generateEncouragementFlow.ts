@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Generates an encouraging message based on God's word, focusing on a random spiritual topic.
+ * @fileOverview Generates an encouraging message based on God's word, focusing on a random spiritual topic and a specific Bible verse.
  *
  * - generateEncouragement - A function that crafts an encouraging message.
  * - GenerateEncouragementInput - The input type for the generateEncouragement function (currently empty).
@@ -34,8 +34,10 @@ const GenerateEncouragementInputSchema = z.object({
 export type GenerateEncouragementInput = z.infer<typeof GenerateEncouragementInputSchema>;
 
 const GenerateEncouragementOutputSchema = z.object({
-  message: z.string().describe("An uplifting and encouraging message (1-2 paragraphs) based on God's word and the selected topic."),
+  message: z.string().describe("An uplifting and encouraging message (1-2 paragraphs) based on the selected Bible verse and topic."),
   topic: z.string().describe("The spiritual topic the message is focused on."),
+  bibleVerseReference: z.string().describe("The Bible verse reference (e.g., John 3:16) the encouragement is based on."),
+  bibleVerseText: z.string().describe("The text of the Bible verse."),
 });
 export type GenerateEncouragementOutput = z.infer<typeof GenerateEncouragementOutputSchema>;
 
@@ -45,23 +47,29 @@ export async function generateEncouragement(input: GenerateEncouragementInput): 
 
 const encouragementPrompt = ai.definePrompt({
   name: 'generateEncouragementPrompt',
-  // model: 'openai/gpt-3.5-turbo', // Specify OpenAI model here - Temporarily commented out
+  // model: 'openai/gpt-3.5-turbo', // Temporarily commented out
   input: { schema: z.object({ selectedTopic: z.string() }) }, // Internal input for the prompt
   output: { schema: GenerateEncouragementOutputSchema },
   prompt: `You are a warm, insightful, and uplifting spiritual guide.
-Your purpose is to provide an encouraging message rooted in the principles of God's word.
-Please focus your message on the topic of: **{{{selectedTopic}}}**.
+Your purpose is to provide an encouraging message rooted in God's word, specifically based on a relevant Bible verse.
 
-Craft a message that is:
+Please select a single, fitting Bible verse related to the topic of: **{{{selectedTopic}}}**.
+
+Then, craft an encouraging message that is:
 - Positive and hopeful.
 - Concise (ideally 1-2 short paragraphs).
-- Easy to understand and relatable.
+- Directly explains or elaborates on the chosen Bible verse in an easy-to-understand and relatable way.
 - Spiritually nourishing.
 
-Avoid platitudes and aim for genuine, heartfelt encouragement.
-You can allude to biblical concepts or themes without necessarily quoting specific verses, unless it feels natural and concise.
-The goal is to uplift the reader's spirit in relation to the topic of {{{selectedTopic}}}.
-Generate the message and also return the topic you focused on.`,
+Avoid platitudes and aim for genuine, heartfelt encouragement based on the verse.
+Your response MUST include:
+1. The Bible verse reference (e.g., 'John 3:16') for the 'bibleVerseReference' field.
+2. The full text of the chosen Bible verse for the 'bibleVerseText' field.
+3. Your encouraging message for the 'message' field.
+4. The original topic for the 'topic' field.
+
+Topic: {{{selectedTopic}}}
+`,
 });
 
 const generateEncouragementFlow = ai.defineFlow(
@@ -80,14 +88,11 @@ const generateEncouragementFlow = ai.defineFlow(
       throw new Error('The AI failed to generate an encouraging message.');
     }
     
-    // The prompt itself will fill the 'topic' field in the output schema based on its instructions.
-    // However, if the prompt's output schema didn't explicitly include 'topic', we'd set it here.
-    // In this case, the schema `GenerateEncouragementOutputSchema` asks for `topic`, so the AI should provide it.
-    // For robustness, we can ensure it's set using our `randomTopic`.
     return {
         message: output.message,
-        topic: output.topic || randomTopic // Fallback if AI doesn't set it, though it should
+        topic: output.topic || randomTopic, // Fallback for topic if AI misses it
+        bibleVerseReference: output.bibleVerseReference || "N/A",
+        bibleVerseText: output.bibleVerseText || "Verse text not provided by AI.",
     };
   }
 );
-
