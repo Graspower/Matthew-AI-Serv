@@ -45,6 +45,7 @@ export async function generateEncouragement(input: GenerateEncouragementInput): 
 
 const encouragementPrompt = ai.definePrompt({
   name: 'generateEncouragementPrompt',
+  // model: 'openai/gpt-3.5-turbo', // Specify OpenAI model here - Temporarily commented out
   input: { schema: z.object({ selectedTopic: z.string() }) }, // Internal input for the prompt
   output: { schema: GenerateEncouragementOutputSchema },
   prompt: `You are a warm, insightful, and uplifting spiritual guide.
@@ -89,3 +90,4 @@ const generateEncouragementFlow = ai.defineFlow(
     };
   }
 );
+
