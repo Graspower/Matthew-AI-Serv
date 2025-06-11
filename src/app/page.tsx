@@ -11,10 +11,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BibleReaderPage } from '@/components/BibleReaderPage';
-import { HomePage } from '@/components/HomePage'; // Added import
+import { HomePage } from '@/components/HomePage';
 
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
+  // currentVersesForTopic now stores Verse objects with KJV text (from SearchForm)
   const [currentVersesForTopic, setCurrentVersesForTopic] = useState<Verse[] | null>(null);
   const [teachingText, setTeachingText] = useState<string | null>(null);
   const [isTeachingLoading, setIsTeachingLoading] = useState(false);
@@ -22,10 +23,11 @@ export default function Home() {
   const [teachingLength, setTeachingLength] = useState<'brief' | 'medium' | 'detailed'>('medium');
   const {toast} = useToast();
 
-  const handleSearchResults = useCallback(async (query: string, verses: Verse[]) => {
+  // onSearchResults now receives verses already enriched with KJV text from SearchForm
+  const handleSearchResults = useCallback(async (query: string, versesWithKJVText: Verse[]) => {
     setCurrentQueryTopic(query);
-    setCurrentVersesForTopic(verses);
-    // useEffect will now handle calling generateTeaching
+    setCurrentVersesForTopic(versesWithKJVText);
+    // useEffect will now handle calling generateTeaching with these KJV verses
   }, []);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export default function Home() {
       }
 
       if (currentVersesForTopic.length === 0) {
-        setTeachingText(null); // No teaching if no verses found
+        setTeachingText(null); 
         setTeachingError(null);
         setIsTeachingLoading(false);
         return;
@@ -46,12 +48,13 @@ export default function Home() {
 
       setIsTeachingLoading(true);
       setTeachingError(null);
-      setTeachingText(null); // Clear previous teaching
+      setTeachingText(null); 
 
       try {
+        // currentVersesForTopic now contains Verse objects with KJV text
         const result = await generateTeaching({
           query: currentQueryTopic,
-          verses: currentVersesForTopic,
+          verses: currentVersesForTopic, 
           lengthPreference: teachingLength,
         });
         setTeachingText(result.teaching);
@@ -75,20 +78,20 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Tabs defaultValue="home" className="flex flex-col flex-grow"> {/* Changed defaultValue */}
+      <Tabs defaultValue="home" className="flex flex-col flex-grow">
         <div className="p-4 border-b">
             <header className="text-center">
               <h1 className="text-3xl font-bold">Matthew AI</h1>
               <p className="text-muted-foreground">Salvation to the World AI</p>
             </header>
-            <TabsList className="grid w-full grid-cols-3 mt-4 max-w-lg mx-auto"> {/* Updated grid-cols */}
-              <TabsTrigger value="home">Home</TabsTrigger> {/* Added Home trigger */}
+            <TabsList className="grid w-full grid-cols-3 mt-4 max-w-lg mx-auto">
+              <TabsTrigger value="home">Home</TabsTrigger>
               <TabsTrigger value="matthewAI">AI Teaching</TabsTrigger>
               <TabsTrigger value="bibleReader">Bible Reader</TabsTrigger>
             </TabsList>
         </div>
 
-        <TabsContent value="home" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden"> {/* Added Home content */}
+        <TabsContent value="home" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
           <HomePage />
         </TabsContent>
 

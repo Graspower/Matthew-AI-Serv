@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Generates an encouraging message based on God's word, focusing on a random spiritual topic and a specific Bible verse.
+ * @fileOverview Generates an encouraging message based on God's word, focusing on a random spiritual topic and a specific Bible verse from the King James Version (KJV).
  *
  * - generateEncouragement - A function that crafts an encouraging message.
  * - GenerateEncouragementInput - The input type for the generateEncouragement function (currently empty).
@@ -36,8 +36,8 @@ export type GenerateEncouragementInput = z.infer<typeof GenerateEncouragementInp
 const GenerateEncouragementOutputSchema = z.object({
   message: z.string().describe("An uplifting and encouraging message (1-2 paragraphs) based on the selected Bible verse and topic."),
   topic: z.string().describe("The spiritual topic the message is focused on."),
-  bibleVerseReference: z.string().describe("The Bible verse reference (e.g., John 3:16) the encouragement is based on."),
-  bibleVerseText: z.string().describe("The text of the Bible verse."),
+  bibleVerseReference: z.string().describe("The King James Version (KJV) Bible verse reference (e.g., John 3:16) the encouragement is based on."),
+  bibleVerseText: z.string().describe("The text of the King James Version (KJV) Bible verse."),
 });
 export type GenerateEncouragementOutput = z.infer<typeof GenerateEncouragementOutputSchema>;
 
@@ -51,20 +51,20 @@ const encouragementPrompt = ai.definePrompt({
   input: { schema: z.object({ selectedTopic: z.string() }) }, // Internal input for the prompt
   output: { schema: GenerateEncouragementOutputSchema },
   prompt: `You are a warm, insightful, and uplifting spiritual guide.
-Your purpose is to provide an encouraging message rooted in God's word, specifically based on a relevant Bible verse.
+Your purpose is to provide an encouraging message rooted in God's word.
 
-Please select a single, fitting Bible verse related to the topic of: **{{{selectedTopic}}}**.
+Please select a single, fitting Bible verse from the **King James Version (KJV)** related to the topic of: **{{{selectedTopic}}}**.
 
 Then, craft an encouraging message that is:
 - Positive and hopeful.
 - Concise (ideally 1-2 short paragraphs).
-- Directly explains or elaborates on the chosen Bible verse in an easy-to-understand and relatable way.
+- Directly explains or elaborates on the chosen KJV Bible verse in an easy-to-understand and relatable way.
 - Spiritually nourishing.
 
 Avoid platitudes and aim for genuine, heartfelt encouragement based on the verse.
 Your response MUST include:
-1. The Bible verse reference (e.g., 'John 3:16') for the 'bibleVerseReference' field.
-2. The full text of the chosen Bible verse for the 'bibleVerseText' field.
+1. The KJV Bible verse reference (e.g., 'John 3:16') for the 'bibleVerseReference' field.
+2. The full text of the chosen KJV Bible verse for the 'bibleVerseText' field.
 3. Your encouraging message for the 'message' field.
 4. The original topic for the 'topic' field.
 

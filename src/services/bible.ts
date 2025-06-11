@@ -10,6 +10,15 @@ export interface Verse {
 }
 
 /**
+ * Represents a Bible verse reference (without text).
+ */
+export interface VerseReference {
+  book: string;
+  chapter: number;
+  verse: number;
+}
+
+/**
  * Represents a Bible book for the Bible Reader.
  */
 export interface BibleBook {
@@ -91,28 +100,23 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
         console.error("KJV JSON data (public/kjv-bible.json) is not in the expected format. Expected an array of verses or an object with a 'verses' property containing an array of verses. Received:", jsonData);
         throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected root structure. Please ensure it's either a direct array of verse objects or an object with a 'verses' key holding this array.");
       }
-
-      if (!Array.isArray(rawVerses)) {
-        // This should ideally be caught by the logic above, but as a defensive measure:
-        console.error("Processed Bible data did not result in an array. Original JSON structure might be problematic. Received for rawVerses processing:", rawVerses);
-        throw new Error("Failed to process Bible data into an array of verses. Check console for details.");
-      }
-
+      
       if (rawVerses.length === 0) {
         console.warn("KJV JSON data (public/kjv-bible.json) resulted in an empty list of verses. The 'verses' array in your JSON might be empty, or the file itself might represent an empty list.");
-        throw new Error("The Bible data file (public/kjv-bible.json) contains no verses. Please check the file content.");
+        // Do not throw error here, allow empty dataset to be processed, subsequent functions will handle missing data.
+      } else {
+          const firstVerse = rawVerses[0];
+          if (
+            typeof firstVerse?.book_name !== 'string' ||
+            typeof firstVerse?.chapter !== 'number' ||
+            typeof firstVerse?.verse !== 'number' ||
+            typeof firstVerse?.text !== 'string'
+          ) {
+            console.error("KJV JSON data (public/kjv-bible.json) - first verse object has an unexpected structure. First verse object found:", firstVerse);
+            throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected verse structure. Expected format for each verse: 'book_name' (string), 'chapter' (number), 'verse' (number), 'text' (string). Please verify the file format and check console for details on the first verse object found.");
+          }
       }
 
-      const firstVerse = rawVerses[0];
-      if (
-        typeof firstVerse?.book_name !== 'string' ||
-        typeof firstVerse?.chapter !== 'number' ||
-        typeof firstVerse?.verse !== 'number' ||
-        typeof firstVerse?.text !== 'string'
-      ) {
-        console.error("KJV JSON data (public/kjv-bible.json) - first verse object has an unexpected structure. First verse object found:", firstVerse);
-        throw new Error("KJV JSON data (public/kjv-bible.json) has an unexpected verse structure. Expected format for each verse: 'book_name' (string), 'chapter' (number), 'verse' (number), 'text' (string). Please verify the file format and check console for details on the first verse object found.");
-      }
 
       const booksMap = new Map<string, KJVInternalBookData>();
 
@@ -161,19 +165,6 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
   return bibleDataPromise;
 }
 
-
-/**
- * Asynchronously retrieves Bible verses based on a query (for AI search).
- * This function is used by the AI teaching feature and is separate from KJV data loading.
- * @param query The search query for Bible verses.
- * @returns A promise that resolves to an array of Verse objects.
- */
-export async function searchVerses(query: string): Promise<Verse[]> {
-  console.log(`Searching verses for query (AI): ${query}`);
-  // This function remains for the AI teaching feature.
-  // Actual implementation involves an AI call.
-  return [];
-}
 
 /**
  * Asynchronously retrieves a list of Bible books from the processed KJV JSON data.
@@ -233,3 +224,37 @@ export async function getChapterText(bookId: string, chapterNumber: number): Pro
   return formattedText;
 }
 
+/**
+ * Asynchronously retrieves a specific Bible verse (KJV) from the processed data.
+ * @param bookName The name of the book (e.g., "Genesis").
+ * @param chapterNumber The chapter number.
+ * @param verseNumber The verse number.
+ * @returns A promise that resolves to a Verse object (including KJV text) or null if not found.
+ */
+export async function getVerse(bookName: string, chapterNumber: number, verseNumber: number): Promise<Verse | null> {
+  const dataMap = await loadAndProcessKJVData();
+  const bookData = dataMap.get(bookName);
+  if (!bookData) {
+    console.warn(`Book not found in KJV data: ${bookName}`);
+    return null;
+  }
+
+  const chapterData = bookData.chapters.find(ch => ch.chapter === chapterNumber);
+  if (!chapterData) {
+    console.warn(`Chapter ${chapterNumber} not found in ${bookName} (KJV data)`);
+    return null;
+  }
+
+  const verseData = chapterData.verses.find(v => v.verse === verseNumber);
+  if (!verseData) {
+    console.warn(`Verse ${verseNumber} not found in ${bookName} ${chapterNumber} (KJV data)`);
+    return null;
+  }
+
+  return {
+    book: bookName,
+    chapter: chapterNumber,
+    verse: verseNumber,
+    text: verseData.text,
+  };
+}

@@ -4,7 +4,8 @@
 import React, {type ChangeEvent, useState, useEffect, useRef} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
-import type {Verse} from "@/services/bible";
+import type {Verse, VerseReference} from "@/services/bible"; // Added VerseReference
+import {getVerse} from "@/services/bible"; // Added getVerse
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {
@@ -20,13 +21,13 @@ import {Loader2, Mic, Volume2, VolumeX } from "lucide-react";
 
 
 interface SearchFormProps {
-  onSearchResults: (query: string, verses: Verse[]) => void;
-  onVerseSelect?: (verse: Verse) => void; // Made optional as it's not used if only teaching is displayed
+  onSearchResults: (query: string, verses: Verse[]) => void; // Will now pass full Verse objects with KJV text
+  onVerseSelect?: (verse: Verse) => void;
 }
 
 export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [verses, setVerses] = useState<Verse[]>([]);
+  const [displayedVerses, setDisplayedVerses] = useState<Verse[]>([]); // Stores full Verse objects for display
   const {toast} = useToast();
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const [voiceSearchText, setVoiceSearchText] = useState('');
@@ -67,12 +68,11 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
 
   const speakVerse = (text: string, verseIndex: number, verse: Verse, event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent card click when clicking speak button
+    event.stopPropagation(); 
     if (!synth.current || typeof window === 'undefined') return;
 
-    synth.current.cancel(); // Stop any ongoing speech
+    synth.current.cancel(); 
 
-    // If currently speaking this verse, stop it
     if (isSpeaking && currentSpeakingVerseIndex === verseIndex) {
       setIsSpeaking(false);
       setHighlightedWordIndex(-1);
@@ -80,12 +80,11 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
       return;
     }
 
-    // If speaking another verse, or just starting, clear previous highlighting
     if (isSpeaking || currentSpeakingVerseIndex !== null) {
-        setHighlightedWordIndex(-1); // Clear highlighting from any previous verse
+        setHighlightedWordIndex(-1); 
     }
 
-    setHighlightedWordIndex(-1); // Reset for the new verse
+    setHighlightedWordIndex(-1); 
     setCurrentSpeakingVerseIndex(verseIndex);
     setIsSpeaking(true);
 
@@ -154,9 +153,9 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
   };
 
 
-  const searchVerses = async (query: string) => {
+  const searchAndFetchVerses = async (query: string) => {
     if (!query.trim()) {
-       setVerses([]);
+       setDisplayedVerses([]);
        setSearchTerm('');
        onSearchResults(query, []);
        return;
@@ -171,17 +170,25 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     }
     try {
       const result = await interpretBibleVerseSearch({query: query});
-      const foundVerses = result.verses || [];
-      setVerses(foundVerses);
-      onSearchResults(query, foundVerses);
+      const verseReferences = result.verseReferences || [];
+      
+      const fetchedVersesPromises = verseReferences.map(ref => 
+        getVerse(ref.book, ref.chapter, ref.verse)
+      );
+      const fetchedVersesData = await Promise.all(fetchedVersesPromises);
+      const successfullyFetchedVerses = fetchedVersesData.filter(v => v !== null) as Verse[];
+
+      setDisplayedVerses(successfullyFetchedVerses);
+      onSearchResults(query, successfullyFetchedVerses);
+
     } catch (error: any) {
-      console.error('Search failed', error);
+      console.error('Search or verse fetching failed', error);
       toast({
         title: 'Error',
-        description: `Failed to perform search. ${error.message || 'Please try again.'}`,
+        description: `Failed to perform search or fetch verse details. ${error.message || 'Please try again.'}`,
         variant: 'destructive',
       });
-      setVerses([]);
+      setDisplayedVerses([]);
       onSearchResults(query, []);
     } finally {
       setIsLoading(false);
@@ -194,9 +201,9 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     const handler = setTimeout(() => {
       const currentFormQuery = getValues('query');
       if (currentFormQuery && currentFormQuery.trim()) {
-        searchVerses(currentFormQuery);
+        searchAndFetchVerses(currentFormQuery);
       } else {
-        setVerses([]);
+        setDisplayedVerses([]);
         setSearchTerm('');
         onSearchResults('', []);
       }
@@ -205,7 +212,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     return () => {
       clearTimeout(handler);
     };
-  }, [formQuery, autoSearch, getValues, onSearchResults]); // Removed searchVerses from here as it's called inside
+  }, [formQuery, autoSearch, getValues, onSearchResults]);
 
 
   useEffect(() => {
@@ -235,11 +242,9 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
           setVoiceSearchText(finalTranscript);
           if (event.results[event.results.length - 1].isFinal) {
-            // Update the form input's value with the final transcribed text.
-            // This text will be used for searching.
             setValue('query', finalTranscript, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
             if (autoSearch) {
-                searchVerses(finalTranscript);
+                searchAndFetchVerses(finalTranscript);
             }
           }
         };
@@ -253,12 +258,10 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           if (finalTranscribedText && finalTranscribedText.trim()) {
             setSearchTerm(finalTranscribedText);
             if (!autoSearch) {
-              // If autoSearch is off, and we have a final transcript,
-              // directly initiate the search with this transcribed text.
-              searchVerses(finalTranscribedText);
+              searchAndFetchVerses(finalTranscribedText);
             }
           } else if (!autoSearch) {
-            setVerses([]);
+            setDisplayedVerses([]);
             setSearchTerm('');
             onSearchResults('', []);
           }
@@ -272,7 +275,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             console.error('Speech recognition error. Code:', event.error, 'Message:', event.message);
             console.error('Full SpeechRecognitionErrorEvent object:', event);
           }
-
 
            let errorMessage = 'Could not perform voice search.';
            if (event.error) {
@@ -347,7 +349,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
   const onSubmit = (data: { query: string }) => {
      if (!autoSearch) {
-        searchVerses(data.query);
+        searchAndFetchVerses(data.query);
      }
   };
 
@@ -366,7 +368,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
   const toggleAutoSearch = () => {
     setAutoSearch((prev) => {
         if (!prev && getValues('query')?.trim()) {
-            searchVerses(getValues('query'));
+            searchAndFetchVerses(getValues('query'));
         }
         return !prev;
     });
@@ -375,7 +377,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
      const newQuery = e.target.value;
      if (!autoSearch && !newQuery.trim()) {
-        setVerses([]);
+        setDisplayedVerses([]);
         setSearchTerm('');
         onSearchResults('', []);
      }
@@ -411,8 +413,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     }
     return text.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < text.split('\n').length - 1 && <br/>}</React.Fragment>);
   };
-
-
 
   return (
     <div className="w-full max-w-md p-4 mx-auto">
@@ -480,9 +480,9 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
       {!isLoading && searchTerm && (
         <div className="mt-6">
           <h2 className="text-xl font-semibold mb-3 text-center">Results for "{searchTerm}"</h2>
-          {verses.length > 0 ? (
+          {displayedVerses.length > 0 ? (
             <div className="grid gap-4">
-              {verses.map((verse, index) => (
+              {displayedVerses.map((verse, index) => (
                 <Card
                   key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}`}
                   className="shadow-md rounded-lg overflow-hidden cursor-pointer transition-colors hover:bg-muted/10"
@@ -529,7 +529,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           ) : (
              <Card className="shadow-md rounded-lg">
                 <CardContent className="p-4 text-center text-muted-foreground">
-                  <p>No matching verses found. Please try another search.</p>
+                  <p>No matching KJV verses found for your query, or unable to fetch verse details. Please try another search.</p>
                 </CardContent>
              </Card>
           )}
