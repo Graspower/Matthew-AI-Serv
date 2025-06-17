@@ -20,7 +20,7 @@ export default function Home() {
   const [teachingText, setTeachingText] = useState<string | null>(null);
   const [isTeachingLoading, setIsTeachingLoading] = useState(false);
   const [teachingError, setTeachingError] = useState<string | null>(null);
-  const [teachingLength, setTeachingLength] = useState<'brief' | 'medium' | 'detailed'>('medium');
+  const [teachingLength, setTeachingLength] = useState<'brief' | 'medium'>('medium');
   const {toast} = useToast();
 
   // onSearchResults now receives verses already enriched with KJV text from SearchForm
@@ -104,7 +104,7 @@ export default function Home() {
               <Label className="text-md font-semibold mb-3 block text-center md:text-left">Teaching Length</Label>
               <RadioGroup
                 value={teachingLength}
-                onValueChange={(value) => setTeachingLength(value as 'brief' | 'medium' | 'detailed')}
+                onValueChange={(value) => setTeachingLength(value as 'brief' | 'medium')}
                 className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 justify-center md:justify-start"
               >
                 <div className="flex items-center space-x-2">
@@ -114,10 +114,6 @@ export default function Home() {
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="medium" id="r-medium" />
                   <Label htmlFor="r-medium" className="cursor-pointer">Medium</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="detailed" id="r-detailed" />
-                  <Label htmlFor="r-detailed" className="cursor-pointer">Detailed</Label>
                 </div>
               </RadioGroup>
             </div>
