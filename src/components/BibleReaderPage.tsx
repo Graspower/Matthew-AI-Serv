@@ -13,64 +13,63 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { getChapterText, getBooks, getChaptersForBook } from '@/services/bible';
+import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter } from '@/services/bible';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useSettings, type BibleTranslation } from '@/contexts/SettingsContext';
 
-interface Book {
-  id: string;
-  name: string;
-}
-
-interface Chapter {
-  id: number;
-  name: string; // e.g. "Chapter 1"
-}
 
 export function BibleReaderPage() {
-  const [books, setBooks] = useState<Book[]>([]);
+  const { bibleTranslation } = useSettings();
+  const [books, setBooks] = useState<BibleBook[]>([]);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapters, setChapters] = useState<BibleChapter[]>([]);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [chapterText, setChapterText] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchBooks() {
+    async function fetchBooksForTranslation() {
       setIsLoading(true);
+      setError(null);
+      setBooks([]); // Clear previous books
+      setSelectedBook(null); // Reset book selection
+      setChapters([]); // Reset chapters
+      setSelectedChapter(null); // Reset chapter selection
+      setChapterText(null); // Clear text
       try {
-        const fetchedBooks = await getBooks();
+        const fetchedBooks = await getBooks(bibleTranslation);
         setBooks(fetchedBooks);
-        if (fetchedBooks.length > 0) {
-          // Optionally select the first book by default
-          // setSelectedBook(fetchedBooks[0].id);
+        if (fetchedBooks.length === 0 && (bibleTranslation === 'ESV' || bibleTranslation === 'NIV' || bibleTranslation === 'NRSV')) {
+             console.warn(`No books loaded for ${bibleTranslation}. This might be due to its parsing function not being fully implemented in src/services/bible.ts.`);
+             setError(`Book list for ${bibleTranslation} is currently unavailable. Parsing logic might be pending.`);
         }
-      } catch (err) {
-        setError("Failed to load Bible books.");
+      } catch (err: any) {
+        setError(`Failed to load Bible books for ${bibleTranslation}: ${err.message}`);
         console.error(err);
       } finally {
         setIsLoading(false);
       }
     }
-    fetchBooks();
-  }, []);
+    fetchBooksForTranslation();
+  }, [bibleTranslation]);
 
   useEffect(() => {
-    async function fetchChapters() {
+    async function fetchChaptersForBookAndTranslation() {
       if (selectedBook) {
         setIsLoading(true);
         setError(null);
+        setChapters([]); // Clear previous chapters
+        setSelectedChapter(null); // Reset chapter selection
+        setChapterText(null); // Clear previous text
         try {
-          const fetchedChapters = await getChaptersForBook(selectedBook);
+          const fetchedChapters = await getChaptersForBook(bibleTranslation, selectedBook);
           setChapters(fetchedChapters);
-          setSelectedChapter(null); // Reset chapter selection
-          setChapterText(null); // Clear previous text
-          if (fetchedChapters.length > 0) {
-            // Optionally select the first chapter by default
-            // setSelectedChapter(fetchedChapters[0].id);
+           if (fetchedChapters.length === 0 && (bibleTranslation === 'ESV' || bibleTranslation === 'NIV' || bibleTranslation === 'NRSV')) {
+             console.warn(`No chapters loaded for ${selectedBook} in ${bibleTranslation}. This might be due to its parsing function not being fully implemented.`);
           }
-        } catch (err) {
-          setError(`Failed to load chapters for ${selectedBook}.`);
+        } catch (err: any) {
+          setError(`Failed to load chapters for ${selectedBook} (${bibleTranslation}): ${err.message}`);
           console.error(err);
         } finally {
           setIsLoading(false);
@@ -81,8 +80,8 @@ export function BibleReaderPage() {
         setChapterText(null);
       }
     }
-    fetchChapters();
-  }, [selectedBook]);
+    fetchChaptersForBookAndTranslation();
+  }, [selectedBook, bibleTranslation]);
 
   const loadChapterContent = useCallback(async () => {
     if (selectedBook && selectedChapter !== null) {
@@ -90,23 +89,22 @@ export function BibleReaderPage() {
       setError(null);
       setChapterText(null);
       try {
-        const text = await getChapterText(selectedBook, selectedChapter);
+        const text = await getChapterText(bibleTranslation, selectedBook, selectedChapter);
         setChapterText(text);
       } catch (err: any) {
-        setError(`Failed to load ${selectedBook} chapter ${selectedChapter}: ${err.message}`);
+        setError(`Failed to load ${selectedBook} chapter ${selectedChapter} (${bibleTranslation}): ${err.message}`);
         console.error(err);
       } finally {
         setIsLoading(false);
       }
     }
-  }, [selectedBook, selectedChapter]);
+  }, [selectedBook, selectedChapter, bibleTranslation]);
 
   useEffect(() => {
     if (selectedBook && selectedChapter !== null) {
       loadChapterContent();
     }
-  }, [selectedBook, selectedChapter, loadChapterContent]);
-
+  }, [selectedBook, selectedChapter, loadChapterContent]); // loadChapterContent includes bibleTranslation in its dependencies
 
   const handlePreviousChapter = () => {
     if (!selectedBook || selectedChapter === null || chapters.length === 0) return;
@@ -127,11 +125,13 @@ export function BibleReaderPage() {
   const currentChapterIndex = selectedChapter !== null ? chapters.findIndex(ch => ch.id === selectedChapter) : -1;
   const canGoPrevious = currentChapterIndex > 0;
   const canGoNext = currentChapterIndex !== -1 && currentChapterIndex < chapters.length - 1;
+  const noBooksOrChaptersMessage = books.length === 0 || (selectedBook && chapters.length === 0);
+
 
   return (
     <Card className="w-full h-full flex flex-col shadow-lg rounded-xl">
       <CardHeader>
-        <CardTitle className="text-xl font-semibold">Read the Bible</CardTitle>
+        <CardTitle className="text-xl font-semibold">Read the Bible ({bibleTranslation})</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col gap-4 p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
@@ -140,9 +140,10 @@ export function BibleReaderPage() {
             <Select
               value={selectedBook || undefined}
               onValueChange={(value) => setSelectedBook(value)}
+              disabled={isLoading || books.length === 0}
             >
-              <SelectTrigger id="book-select" className="w-full" disabled={isLoading && books.length === 0}>
-                <SelectValue placeholder="Select a book" />
+              <SelectTrigger id="book-select" className="w-full">
+                <SelectValue placeholder={isLoading && books.length === 0 ? "Loading books..." : "Select a book"} />
               </SelectTrigger>
               <SelectContent>
                 {books.map((book) => (
@@ -172,7 +173,7 @@ export function BibleReaderPage() {
                 disabled={!selectedBook || chapters.length === 0 || isLoading}
               >
                 <SelectTrigger id="chapter-select" className="w-full">
-                  <SelectValue placeholder="Chapter" />
+                  <SelectValue placeholder={isLoading && selectedBook ? "Loading chapters..." : "Chapter"} />
                 </SelectTrigger>
                 <SelectContent>
                   {chapters.map((chapter) => (
@@ -196,6 +197,13 @@ export function BibleReaderPage() {
         </div>
 
         {error && <p className="text-destructive text-center py-2">{error}</p>}
+        
+        {!error && noBooksOrChaptersMessage && !isLoading && (
+             <p className="text-muted-foreground text-center pt-10">
+                {`No content available for ${bibleTranslation} at the moment. Please ensure its data file and parsing logic in 'src/services/bible.ts' are correctly set up.`}
+            </p>
+        )}
+
 
         <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/10 min-h-[300px] relative">
           {isLoading && (
@@ -206,9 +214,9 @@ export function BibleReaderPage() {
           {chapterText ? (
             <div className="whitespace-pre-line text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: chapterText }}></div>
           ) : (
-             !isLoading && (
+             !isLoading && !error && !noBooksOrChaptersMessage && (
                 <p className="text-muted-foreground text-center pt-10">
-                {selectedBook && selectedChapter !== null ? 'Loading chapter...' : 'Select a book and chapter to read.'}
+                {selectedBook && selectedChapter !== null ? `Loading ${bibleTranslation} chapter...` : `Select a book and chapter to read in ${bibleTranslation}.`}
                 </p>
              )
           )}
@@ -218,3 +226,4 @@ export function BibleReaderPage() {
   );
 }
 
+    

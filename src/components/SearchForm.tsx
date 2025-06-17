@@ -165,7 +165,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
   const searchAndFetchVerses = useCallback(async (query: string) => {
     if (!query.trim()) {
        setDisplayedVerses([]);
-       setSearchTerm(''); // Clear search term if query is empty
+       setSearchTerm(''); 
        onSearchResults(query, []);
        return;
     }
@@ -186,7 +186,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
       const verseReferences = result.verseReferences || [];
       
       const fetchedVersesPromises = verseReferences.map(ref =>
-        getVerse(ref.book, ref.chapter, ref.verse) 
+        getVerse(bibleTranslation, ref.book, ref.chapter, ref.verse) 
       );
       const fetchedVersesData = await Promise.all(fetchedVersesPromises);
 
@@ -217,7 +217,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
   }, [language, bibleTranslation, onSearchResults, toast]); 
 
 
-  // EFFECT 1: Handles auto-search, and clearing results when query becomes empty.
   const autoSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     const currentQueryValue = formQuery?.trim();
@@ -232,15 +231,13 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           searchAndFetchVerses(currentQueryValue);
         }, 500);
       } else {
-        // Auto-search is on, query is empty: clear results.
         setDisplayedVerses([]);
-        if (searchTerm) { // Only clear if there was a previous search term
+        if (searchTerm) { 
             setSearchTerm('');
             onSearchResults('', []);
         }
       }
     } else {
-      // Auto-search is OFF. If query becomes empty, clear results.
       if (!currentQueryValue && searchTerm) { 
         setDisplayedVerses([]);
         setSearchTerm('');
@@ -254,28 +251,28 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     }
   }, [formQuery, autoSearch, searchAndFetchVerses, onSearchResults, searchTerm]);
 
-  // EFFECT 2: Handles re-fetching if language/translation changes when autoSearch is OFF and a query exists.
+
   const settingsChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const previousSearchAndFetchVersesRef = useRef(searchAndFetchVerses);
+
   useEffect(() => {
     const currentQueryValue = formQuery?.trim();
 
     if (settingsChangeTimeoutRef.current) {
         clearTimeout(settingsChangeTimeoutRef.current);
     }
-
-    if (
-      !autoSearch &&
-      currentQueryValue &&
-      previousSearchAndFetchVersesRef.current !== searchAndFetchVerses 
-    ) {
-      // searchAndFetchVerses changed (due to lang/transl), autoSearch is OFF, and there's a query.
-      settingsChangeTimeoutRef.current = setTimeout(() => {
-        searchAndFetchVerses(currentQueryValue);
-      }, 500); 
+    // Check if searchAndFetchVerses function itself has changed due to language/translation dependencies
+    if (previousSearchAndFetchVersesRef.current !== searchAndFetchVerses) {
+        if (!autoSearch && currentQueryValue) {
+          // If autoSearch is OFF, there's a query, and lang/transl changed, then re-search
+          settingsChangeTimeoutRef.current = setTimeout(() => {
+            searchAndFetchVerses(currentQueryValue);
+          }, 500);
+        }
+        // Always update the ref to the latest version of searchAndFetchVerses
+        previousSearchAndFetchVersesRef.current = searchAndFetchVerses;
     }
-    previousSearchAndFetchVersesRef.current = searchAndFetchVerses;
-
+    
     return () => {
         if (settingsChangeTimeoutRef.current) {
             clearTimeout(settingsChangeTimeoutRef.current);
@@ -312,9 +309,6 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           setVoiceSearchText(finalTranscript);
           if (event.results[event.results.length - 1].isFinal) {
             setValue('query', finalTranscript, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-             if (autoSearch) { 
-                // The main useEffect watching formQuery and autoSearch will pick this up.
-             }
           }
         };
 
@@ -424,19 +418,19 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
      const newQuery = e.target.value;
      setValue('query', newQuery, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
      if (!autoSearch && !newQuery.trim()) {
-        // If autoSearch is off and input is cleared, also clear results
         setDisplayedVerses([]);
         setSearchTerm('');
         onSearchResults('', []);
      }
   };
 
-    const isJohn316KJV = (verse: Verse) => {
-        return verse.book.toLowerCase() === 'john' && verse.chapter === 3 && verse.verse === 16 && bibleTranslation === 'KJV';
+    const isJohn316KJV = (verse: Verse) => { // Example, make dynamic based on selected translation if needed
+        return verse.book.toLowerCase() === 'john' && verse.chapter === 3 && verse.verse === 16 && verse.translationContext === 'KJV';
     };
 
 
   const renderVerseText = (text: string, verseIndex: number, verse: Verse) => {
+    // Enable voice reader for specific verses or based on broader criteria if needed
     if (isVoiceReaderEnabled && isJohn316KJV(verse)) { 
         const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
         return words.map((word, wordIdx) => (
@@ -538,7 +532,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             <div className="grid gap-4">
               {displayedVerses.map((verse, index) => (
                 <Card
-                  key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}-${language}-${bibleTranslation}`} 
+                  key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}-${verse.languageContext || language}-${verse.translationContext || bibleTranslation}`} 
                   className="shadow-md rounded-lg overflow-hidden cursor-pointer transition-colors hover:bg-muted/10"
                   onClick={() => onVerseSelect && onVerseSelect(verse)}
                   tabIndex={0}
@@ -546,7 +540,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
                   aria-label={`Verse ${verse.book} ${verse.chapter}:${verse.verse}`}
                 >
                   <CardHeader className="bg-secondary/70 p-3 flex flex-row justify-between items-center">
-                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} (KJV)</CardTitle>
+                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} ({verse.translationContext || bibleTranslation})</CardTitle>
                      {isVoiceReaderEnabled && isJohn316KJV(verse) && ( 
                       <Button
                         variant="outline"
@@ -583,7 +577,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           ) : (
              <Card className="shadow-md rounded-lg">
                 <CardContent className="p-4 text-center text-muted-foreground">
-                  <p>No matching KJV verses found for your query in the selected language ({language.toUpperCase()}) and context ({bibleTranslation}), or unable to fetch verse details. Please try another search.</p>
+                  <p>No matching verses found for your query in the selected language ({language.toUpperCase()}) and translation ({bibleTranslation}), or unable to fetch verse details from local data for {bibleTranslation}. Ensure parsing for {bibleTranslation} is implemented in src/services/bible.ts if local data is expected.</p>
                 </CardContent>
              </Card>
           )}
@@ -592,3 +586,5 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     </div>
   );
 }
+
+    
