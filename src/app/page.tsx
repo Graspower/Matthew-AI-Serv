@@ -12,22 +12,32 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BibleReaderPage } from '@/components/BibleReaderPage';
 import { HomePage } from '@/components/HomePage';
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { BookOpenText } from 'lucide-react';
+import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
 
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
-  // currentVersesForTopic now stores Verse objects with KJV text (from SearchForm)
   const [currentVersesForTopic, setCurrentVersesForTopic] = useState<Verse[] | null>(null);
   const [teachingText, setTeachingText] = useState<string | null>(null);
   const [isTeachingLoading, setIsTeachingLoading] = useState(false);
   const [teachingError, setTeachingError] = useState<string | null>(null);
   const [teachingLength, setTeachingLength] = useState<'brief' | 'medium'>('medium');
   const {toast} = useToast();
+  const { language, setLanguage, bibleTranslation, setBibleTranslation } = useSettings();
 
-  // onSearchResults now receives verses already enriched with KJV text from SearchForm
   const handleSearchResults = useCallback(async (query: string, versesWithKJVText: Verse[]) => {
     setCurrentQueryTopic(query);
     setCurrentVersesForTopic(versesWithKJVText);
-    // useEffect will now handle calling generateTeaching with these KJV verses
   }, []);
 
   useEffect(() => {
@@ -40,7 +50,7 @@ export default function Home() {
       }
 
       if (currentVersesForTopic.length === 0) {
-        setTeachingText(null); 
+        setTeachingText(null);
         setTeachingError(null);
         setIsTeachingLoading(false);
         return;
@@ -48,14 +58,15 @@ export default function Home() {
 
       setIsTeachingLoading(true);
       setTeachingError(null);
-      setTeachingText(null); 
+      setTeachingText(null);
 
       try {
-        // currentVersesForTopic now contains Verse objects with KJV text
         const result = await generateTeaching({
           query: currentQueryTopic,
-          verses: currentVersesForTopic, 
+          verses: currentVersesForTopic,
           lengthPreference: teachingLength,
+          language: language,
+          bibleTranslation: bibleTranslation,
         });
         setTeachingText(result.teaching);
       } catch (error: any)
@@ -74,15 +85,41 @@ export default function Home() {
     };
 
     fetchTeaching();
-  }, [currentQueryTopic, currentVersesForTopic, teachingLength, toast]);
+  }, [currentQueryTopic, currentVersesForTopic, teachingLength, toast, language, bibleTranslation]);
 
   return (
     <div className="flex flex-col min-h-screen">
       <Tabs defaultValue="home" className="flex flex-col flex-grow">
         <div className="p-4 border-b">
-            <header className="text-center">
-              <h1 className="text-3xl font-bold">Matthew AI</h1>
-              <p className="text-muted-foreground">Salvation to the World AI</p>
+            <header className="flex justify-between items-center">
+              <div className="text-center flex-grow">
+                <h1 className="text-3xl font-bold">Matthew AI</h1>
+                <p className="text-muted-foreground">Salvation to the World AI</p>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <BookOpenText className="h-5 w-5" />
+                    <span className="sr-only">Open Settings</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end">
+                  <DropdownMenuLabel>Language</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Language)}>
+                    <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="fr">French</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="zh">Chinese</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Bible Translation</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup value={bibleTranslation} onValueChange={(value) => setBibleTranslation(value as BibleTranslation)}>
+                    <DropdownMenuRadioItem value="KJV">KJV</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="NIV">NIV</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="NRSV">NRSV</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="ESV">ESV</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </header>
             <TabsList className="grid w-full grid-cols-3 mt-4 max-w-lg mx-auto">
               <TabsTrigger value="home">Home</TabsTrigger>

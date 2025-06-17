@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Loader2 } from 'lucide-react';
 import { generateEncouragement } from '@/ai/flows/generateEncouragementFlow';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/contexts/SettingsContext';
 
 interface DailyEncouragement {
   message: string;
@@ -14,6 +15,8 @@ interface DailyEncouragement {
   bibleVerseReference: string;
   bibleVerseText: string;
   date: string; // YYYY-MM-DD
+  language: string;
+  translation: string;
 }
 
 export function HomePage() {
@@ -21,12 +24,16 @@ export function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { language, bibleTranslation } = useSettings();
 
-  const fetchAndStoreEncouragement = useCallback(async () => {
+  const fetchAndStoreEncouragement = useCallback(async (currentLanguage: string, currentTranslation: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await generateEncouragement({});
+      const result = await generateEncouragement({
+        language: currentLanguage,
+        bibleTranslation: currentTranslation,
+      });
       const today = new Date().toISOString().split('T')[0];
       const newEncouragement: DailyEncouragement = {
         message: result.message,
@@ -34,6 +41,8 @@ export function HomePage() {
         bibleVerseReference: result.bibleVerseReference,
         bibleVerseText: result.bibleVerseText,
         date: today,
+        language: currentLanguage,
+        translation: currentTranslation,
       };
       localStorage.setItem('dailyEncouragement', JSON.stringify(newEncouragement));
       setEncouragementData(newEncouragement);
@@ -46,7 +55,7 @@ export function HomePage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      setEncouragementData(null); // Clear data on error
+      setEncouragementData(null);
     } finally {
       setIsLoading(false);
     }
@@ -59,24 +68,21 @@ export function HomePage() {
     if (storedData) {
       try {
         const parsedData: DailyEncouragement = JSON.parse(storedData);
-        if (parsedData.date === todayStr) {
+        if (parsedData.date === todayStr && parsedData.language === language && parsedData.translation === bibleTranslation) {
           setEncouragementData(parsedData);
           setIsLoading(false);
         } else {
-          // Data is outdated, fetch new one
-          fetchAndStoreEncouragement();
+          fetchAndStoreEncouragement(language, bibleTranslation);
         }
       } catch (e) {
-        // Invalid data in localStorage
         console.error("Failed to parse stored encouragement data:", e);
         localStorage.removeItem('dailyEncouragement');
-        fetchAndStoreEncouragement();
+        fetchAndStoreEncouragement(language, bibleTranslation);
       }
     } else {
-      // No data stored, fetch new one
-      fetchAndStoreEncouragement();
+      fetchAndStoreEncouragement(language, bibleTranslation);
     }
-  }, [fetchAndStoreEncouragement]);
+  }, [fetchAndStoreEncouragement, language, bibleTranslation]);
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-4">
@@ -95,7 +101,7 @@ export function HomePage() {
           {error && !isLoading && (
             <div className="my-8 text-destructive">
               <p>{error}</p>
-              <Button onClick={fetchAndStoreEncouragement} className="mt-4">Try Again</Button>
+              <Button onClick={() => fetchAndStoreEncouragement(language, bibleTranslation)} className="mt-4">Try Again</Button>
             </div>
           )}
           {!isLoading && !error && encouragementData && (
@@ -108,7 +114,7 @@ export function HomePage() {
               {encouragementData.bibleVerseReference && encouragementData.bibleVerseReference !== "N/A" && encouragementData.bibleVerseText && (
                 <div className="p-4 bg-secondary/30 rounded-md border border-border">
                   <p className="text-lg font-semibold text-primary">{encouragementData.bibleVerseReference}</p>
-                  <p className="mt-2 text-xl font-bold">"{encouragementData.bibleVerseText}"</p>
+                  <p className="mt-2 text-2xl font-bold">"{encouragementData.bibleVerseText}"</p>
                 </div>
               )}
               <blockquote className="text-lg leading-relaxed border-l-4 border-primary pl-4 py-2 bg-muted/20 rounded-r-md">

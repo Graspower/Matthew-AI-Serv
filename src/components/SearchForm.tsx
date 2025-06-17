@@ -4,8 +4,8 @@
 import React, {type ChangeEvent, useState, useEffect, useRef} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
-import type {Verse, VerseReference} from "@/services/bible"; // Added VerseReference
-import {getVerse} from "@/services/bible"; // Added getVerse
+import type {Verse, VerseReference} from "@/services/bible";
+import {getVerse} from "@/services/bible";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {
@@ -18,22 +18,24 @@ import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
 import {Loader2, Mic, Volume2, VolumeX } from "lucide-react";
+import { useSettings } from '@/contexts/SettingsContext';
 
 
 interface SearchFormProps {
-  onSearchResults: (query: string, verses: Verse[]) => void; // Will now pass full Verse objects with KJV text
+  onSearchResults: (query: string, verses: Verse[]) => void;
   onVerseSelect?: (verse: Verse) => void;
 }
 
 export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [displayedVerses, setDisplayedVerses] = useState<Verse[]>([]); // Stores full Verse objects for display
+  const [displayedVerses, setDisplayedVerses] = useState<Verse[]>([]);
   const {toast} = useToast();
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const [voiceSearchText, setVoiceSearchText] = useState('');
   const [autoSearch, setAutoSearch] = useState(false);
   const {register, handleSubmit, setValue, getValues, watch, formState: { isSubmitting }} = useForm<{ query: string }>();
   const [isLoading, setIsLoading] = useState(false);
+  const { language, bibleTranslation } = useSettings();
 
   const [isVoiceReaderEnabled, setIsVoiceReaderEnabled] = useState(false);
   const [highlightedWordIndex, setHighlightedWordIndex] = useState(-1);
@@ -68,10 +70,10 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
 
   const speakVerse = (text: string, verseIndex: number, verse: Verse, event: React.MouseEvent) => {
-    event.stopPropagation(); 
+    event.stopPropagation();
     if (!synth.current || typeof window === 'undefined') return;
 
-    synth.current.cancel(); 
+    synth.current.cancel();
 
     if (isSpeaking && currentSpeakingVerseIndex === verseIndex) {
       setIsSpeaking(false);
@@ -81,18 +83,25 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     }
 
     if (isSpeaking || currentSpeakingVerseIndex !== null) {
-        setHighlightedWordIndex(-1); 
+        setHighlightedWordIndex(-1);
     }
 
-    setHighlightedWordIndex(-1); 
+    setHighlightedWordIndex(-1);
     setCurrentSpeakingVerseIndex(verseIndex);
     setIsSpeaking(true);
 
     const utterThis = new SpeechSynthesisUtterance(text);
     utterThis.pitch = 0.9;
     utterThis.rate = 1.0;
+    // Attempt to set language for speech synthesis if supported
+    if (language && synth.current.getVoices().some(voice => voice.lang.startsWith(language))) {
+        utterThis.lang = language;
+    } else {
+        utterThis.lang = 'en-US'; // Fallback
+    }
 
-    const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
+
+    const words = text.split(/(\\s+|\\b)/).filter(word => word.trim().length > 0);
 
     utterThis.onboundary = (event: SpeechSynthesisEvent) => {
         if (event.name === 'word' && currentSpeakingVerseIndex === verseIndex && synth.current && synth.current.speaking) {
@@ -105,7 +114,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
                     currentWordIdx = i;
                     break;
                 }
-                accumulatedCharLength += wordLength + (text.substring(accumulatedCharLength + wordLength).match(/^(\s+|\b)/)?.[0]?.length || 0);
+                accumulatedCharLength += wordLength + (text.substring(accumulatedCharLength + wordLength).match(/^(\\s+|\\b)/)?.[0]?.length || 0);
             }
             if(currentWordIdx !== -1){
                  setHighlightedWordIndex(currentWordIdx);
@@ -169,10 +178,16 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         setCurrentSpeakingVerseIndex(null);
     }
     try {
-      const result = await interpretBibleVerseSearch({query: query});
+      const result = await interpretBibleVerseSearch({
+        query: query,
+        language: language,
+        bibleTranslation: bibleTranslation
+      });
       const verseReferences = result.verseReferences || [];
       
-      const fetchedVersesPromises = verseReferences.map(ref => 
+      // For now, getVerse still fetches KJV. This would need to be updated
+      // if multiple local Bible versions are supported in bible.ts
+      const fetchedVersesPromises = verseReferences.map(ref =>
         getVerse(ref.book, ref.chapter, ref.verse)
       );
       const fetchedVersesData = await Promise.all(fetchedVersesPromises);
@@ -212,7 +227,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     return () => {
       clearTimeout(handler);
     };
-  }, [formQuery, autoSearch, getValues, onSearchResults]);
+  }, [formQuery, autoSearch, getValues, onSearchResults, language, bibleTranslation]); // Added language, bibleTranslation
 
 
   useEffect(() => {
@@ -227,7 +242,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         recognition = new SpeechRecognitionAPI();
         recognition.continuous = false;
         recognition.interimResults = true;
-        recognition.lang = 'en-US';
+        recognition.lang = language === 'zh' ? 'zh-CN' : language; // Basic language mapping for speech recognition
 
         recognition.onstart = () => {
           console.log('Voice search started');
@@ -270,42 +285,22 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
           if (event.error === 'no-speech') {
             console.info('Speech recognition: No speech detected.', 'Message:', event.message || '(No message)');
-            console.info('Full SpeechRecognitionErrorEvent object for no-speech:', event);
           } else {
             console.error('Speech recognition error. Code:', event.error, 'Message:', event.message);
-            console.error('Full SpeechRecognitionErrorEvent object:', event);
           }
 
            let errorMessage = 'Could not perform voice search.';
            if (event.error) {
                 switch (event.error) {
-                    case 'no-speech':
-                        errorMessage = 'No speech detected. Please try again.';
-                        break;
-                    case 'audio-capture':
-                        errorMessage = 'Microphone error. Please ensure it is enabled and working.';
-                        break;
-                    case 'not-allowed':
-                        errorMessage = 'Permission denied. Please allow microphone access.';
-                        break;
-                    case 'network':
-                        errorMessage = 'Network error during voice recognition.';
-                        break;
-                    case 'aborted':
-                        errorMessage = 'Speech recognition aborted.';
-                        break;
-                    case 'service-not-allowed':
-                        errorMessage = 'Speech recognition service is not allowed. Check browser settings.';
-                        break;
-                    case 'bad-grammar':
-                        errorMessage = 'Error in speech grammar. Please try again.';
-                        break;
-                    case 'language-not-supported':
-                        errorMessage = 'The specified language is not supported for speech recognition.';
-                        break;
-                    default:
-                        errorMessage = `Voice search error: ${event.error}. ${event.message || 'Please try again.'}`;
-                        break;
+                    case 'no-speech': errorMessage = 'No speech detected. Please try again.'; break;
+                    case 'audio-capture': errorMessage = 'Microphone error. Please ensure it is enabled and working.'; break;
+                    case 'not-allowed': errorMessage = 'Permission denied. Please allow microphone access.'; break;
+                    case 'network': errorMessage = 'Network error during voice recognition.'; break;
+                    case 'aborted': errorMessage = 'Speech recognition aborted.'; break;
+                    case 'service-not-allowed': errorMessage = 'Speech recognition service is not allowed. Check browser settings.'; break;
+                    case 'bad-grammar': errorMessage = 'Error in speech grammar. Please try again.'; break;
+                    case 'language-not-supported': errorMessage = `Voice search in ${language} is not supported by your browser.`; break;
+                    default: errorMessage = `Voice search error: ${event.error}. ${event.message || 'Please try again.'}`; break;
                 }
             } else if (event.message) {
                  errorMessage = `Voice search error: ${event.message}`;
@@ -323,8 +318,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         try {
             recognition.start();
         } catch (e: any) {
-             console.error('Error starting speech recognition.', 'Name:', e?.name, 'Message:', e?.message);
-             console.error('Full error object on start:', e);
+             console.error('Error starting speech recognition.', e);
              toast({
                 title: 'Voice Search Error',
                 description: `Could not start voice search. ${e?.message || 'Please check microphone permissions and setup.'}`,
@@ -344,7 +338,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
         recognition.onerror = null;
       }
     };
-  }, [isVoiceSearch, toast, setValue, autoSearch, getValues, onSearchResults, isSpeechRecognitionAPIAvailable]);
+  }, [isVoiceSearch, toast, setValue, autoSearch, getValues, onSearchResults, isSpeechRecognitionAPIAvailable, language, bibleTranslation]);
 
 
   const onSubmit = (data: { query: string }) => {
@@ -383,14 +377,16 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
      }
   };
 
-    const isJohn316 = (verse: Verse) => {
-        return verse.book.toLowerCase() === 'john' && verse.chapter === 3 && verse.verse === 16;
+    const isJohn316 = (verse: Verse) => { // This function could be more generic if needed.
+        // For now, assuming John 3:16 KJV is what we enable special voice features for.
+        // If bibleTranslation context changes, this might need adjustment or removal.
+        return verse.book.toLowerCase() === 'john' && verse.chapter === 3 && verse.verse === 16 && bibleTranslation === 'KJV';
     };
 
 
   const renderVerseText = (text: string, verseIndex: number, verse: Verse) => {
     if (isVoiceReaderEnabled && isJohn316(verse)) {
-        const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
+        const words = text.split(/(\\s+|\\b)/).filter(word => word.trim().length > 0);
         return words.map((word, wordIdx) => (
           <span
             key={wordIdx}
@@ -406,7 +402,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             }}
           >
             {word.includes('\n') ? word.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < word.split('\n').length - 1 && <br/>}</React.Fragment>) : word}
-            {text.split(/(\s+|\b)/).filter(w => w.trim().length > 0)[wordIdx + 1]?.match(/^\s+$/) ? '\u00A0' : ''}
+            {text.split(/(\\s+|\\b)/).filter(w => w.trim().length > 0)[wordIdx + 1]?.match(/^\\s+$/) ? '\\u00A0' : ''}
 
           </span>
         ));
@@ -492,8 +488,8 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
                   aria-label={`Verse ${verse.book} ${verse.chapter}:${verse.verse}`}
                 >
                   <CardHeader className="bg-secondary/70 p-3 flex flex-row justify-between items-center">
-                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse}</CardTitle>
-                     {isVoiceReaderEnabled && isJohn316(verse) && (
+                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} ({bibleTranslation})</CardTitle>
+                     {isVoiceReaderEnabled && isJohn316(verse) && ( // isJohn316 logic might need to be more generic
                       <Button
                         variant="outline"
                         size="sm"
@@ -520,6 +516,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
                         className="text-sm leading-relaxed"
                         style={{ whiteSpace: 'pre-wrap' }}
                       >
+                        {/* Display KJV text for now, AI was asked for specific translation verse refs */}
                         {renderVerseText(verse.text, index, verse)}
                     </p>
                   </CardContent>
@@ -529,7 +526,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           ) : (
              <Card className="shadow-md rounded-lg">
                 <CardContent className="p-4 text-center text-muted-foreground">
-                  <p>No matching KJV verses found for your query, or unable to fetch verse details. Please try another search.</p>
+                  <p>No matching {bibleTranslation} verses found for your query, or unable to fetch verse details. Please try another search.</p>
                 </CardContent>
              </Card>
           )}

@@ -1,7 +1,9 @@
+
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google'; // Correct import location
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
+import { SettingsProvider } from '@/contexts/SettingsContext'; // Import SettingsProvider
 
 // Initialize fonts correctly in the layout
 const geistSans = Geist({
@@ -27,10 +29,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-       {/* Apply font variables to the body */}
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
-        <Toaster /> {/* Add Toaster component here */}
+        <SettingsProvider>
+          {children}
+          <Toaster />
+        </SettingsProvider>
       </body>
     </html>
   );
