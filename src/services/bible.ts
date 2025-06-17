@@ -124,21 +124,32 @@ function parseKJVData(rawVerses: KJVRawVerse[]): Map<string, ProcessedBookData> 
  * into the common ProcessedBookData structure.
  * Used for ESV, NIV, NRSV based on the provided format.
  */
-function parseGenericBibleData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
+function parseGenericBibleData(jsonData: GenericRawBibleData, translation: BibleTranslation): Map<string, ProcessedBookData> {
   const booksMap = new Map<string, ProcessedBookData>();
+  console.log(`Starting to parse generic data for ${translation}`);
 
   for (const bookName in jsonData) {
     if (Object.prototype.hasOwnProperty.call(jsonData, bookName)) {
       const rawBookData = jsonData[bookName];
       const processedChapters: ProcessedChapterData[] = [];
 
+      if (typeof rawBookData !== 'object' || rawBookData === null) {
+        console.warn(`[${translation}] Skipping book "${bookName}" as its data is not an object.`);
+        continue;
+      }
+
       for (const chapterNumberStr in rawBookData) {
         if (Object.prototype.hasOwnProperty.call(rawBookData, chapterNumberStr)) {
           const rawChapterData = rawBookData[chapterNumberStr];
           const chapterNumber = parseInt(chapterNumberStr, 10);
           if (isNaN(chapterNumber)) {
-            console.warn(`Skipping invalid chapter number: ${chapterNumberStr} in book ${bookName}`);
+            console.warn(`[${translation}] Skipping invalid chapter number: ${chapterNumberStr} in book ${bookName}`);
             continue;
+          }
+
+          if (typeof rawChapterData !== 'object' || rawChapterData === null) {
+             console.warn(`[${translation}] Skipping chapter ${chapterNumberStr} in book "${bookName}" as its data is not an object.`);
+             continue;
           }
 
           const processedVerses: ProcessedVerseData[] = [];
@@ -147,7 +158,11 @@ function parseGenericBibleData(jsonData: GenericRawBibleData): Map<string, Proce
               const verseText = rawChapterData[verseNumberStr];
               const verseNumber = parseInt(verseNumberStr, 10);
               if (isNaN(verseNumber)) {
-                console.warn(`Skipping invalid verse number: ${verseNumberStr} in book ${bookName}, chapter ${chapterNumber}`);
+                console.warn(`[${translation}] Skipping invalid verse number: ${verseNumberStr} in book ${bookName}, chapter ${chapterNumber}`);
+                continue;
+              }
+              if (typeof verseText !== 'string') {
+                console.warn(`[${translation}] Skipping verse ${verseNumberStr} in book ${bookName}, chapter ${chapterNumber} as its text is not a string.`);
                 continue;
               }
               processedVerses.push({
@@ -172,6 +187,11 @@ function parseGenericBibleData(jsonData: GenericRawBibleData): Map<string, Proce
       });
     }
   }
+  if (booksMap.size === 0) {
+    console.warn(`[${translation}] parseGenericBibleData resulted in an empty map. Original JSON data might have been empty or had an unexpected top-level structure.`);
+  } else {
+    console.log(`[${translation}] Successfully parsed ${booksMap.size} books using generic parser.`);
+  }
   return booksMap;
 }
 
@@ -179,24 +199,24 @@ function parseGenericBibleData(jsonData: GenericRawBibleData): Map<string, Proce
  * Parser for ESV data. Calls the generic parser.
  */
 function parseESVData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
-  console.log("Parsing ESV data...");
-  return parseGenericBibleData(jsonData);
+  console.log("Attempting to parse ESV data using generic parser...");
+  return parseGenericBibleData(jsonData, 'ESV');
 }
 
 /**
  * Parser for NIV data. Calls the generic parser.
  */
 function parseNIVData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
-  console.log("Parsing NIV data...");
-  return parseGenericBibleData(jsonData);
+  console.log("Attempting to parse NIV data using generic parser...");
+  return parseGenericBibleData(jsonData, 'NIV');
 }
 
 /**
  * Parser for NRSV data. Calls the generic parser.
  */
 function parseNRSVData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
-  console.log("Parsing NRSV data...");
-  return parseGenericBibleData(jsonData);
+  console.log("Attempting to parse NRSV data using generic parser...");
+  return parseGenericBibleData(jsonData, 'NRSV');
 }
 
 
@@ -208,9 +228,16 @@ function parseNRSVData(jsonData: GenericRawBibleData): Map<string, ProcessedBook
  */
 async function loadAndProcessBibleData(translation: BibleTranslation): Promise<Map<string, ProcessedBookData>> {
   if (processedBibleCache.has(translation)) {
-    return processedBibleCache.get(translation)!;
+    const cachedData = processedBibleCache.get(translation)!;
+    if (cachedData.size > 0) { // Only return from cache if it's not empty, forcing a re-fetch/parse if previous attempt was empty
+        console.log(`Returning cached data for ${translation}.`);
+        return cachedData;
+    } else {
+        console.log(`Cached data for ${translation} was empty, attempting to re-fetch and parse.`);
+    }
   }
   if (bibleDataPromiseCache.has(translation)) {
+    console.log(`Waiting for existing promise to resolve for ${translation}.`);
     return bibleDataPromiseCache.get(translation)!;
   }
 
@@ -218,18 +245,19 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
   if (!filePath) {
     throw new Error(`No file path defined for translation: ${translation}`);
   }
+  console.log(`Fetching and processing ${translation} Bible data from ${filePath}...`);
 
   const promise = fetch(filePath)
     .then(response => {
       if (!response.ok) {
-        let detailedErrorMessage = `Failed to fetch ${filePath} (Status: ${response.status}).`;
+        let detailedErrorMessage = `ERROR FETCHING BIBLE DATA: Failed to fetch '${filePath}' (HTTP Status: ${response.status}).`;
         if (response.statusText) {
-          detailedErrorMessage += ` Message: ${response.statusText}.`;
+          detailedErrorMessage += ` Server message: '${response.statusText}'.`;
         } else {
-          detailedErrorMessage += ` (No status text from server).`;
+          detailedErrorMessage += ` (No specific status text from server).`;
         }
-        detailedErrorMessage += ` Please ensure the file exists in the 'public' folder and is accessible.`;
-        console.error(detailedErrorMessage); // Log it for server-side debugging too
+        detailedErrorMessage += `\n\nTROUBLESHOOTING:\n1. Verify that the file '${filePath.substring(1)}' (e.g., '${filePath.substring(1).split('/').pop()}') is located directly inside the 'public' folder of your project.\n2. Check for exact filename match (case-sensitive, correct extension .json).\n3. Ensure your development server has picked up the file (a restart might be needed if recently added).\n`;
+        console.error(detailedErrorMessage);
         throw new Error(detailedErrorMessage);
       }
       return response.json();
@@ -239,19 +267,19 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
       
       if (translation === 'KJV') {
         let rawVersesKJV: KJVRawVerse[];
-         if (Array.isArray(jsonData)) { // Handles direct array of verses
+         if (Array.isArray(jsonData)) {
             rawVersesKJV = jsonData as KJVRawVerse[];
-        } else if (jsonData && typeof jsonData === 'object' && jsonData !== null && 'verses' in jsonData && Array.isArray((jsonData as { verses: unknown }).verses)) { // Handles object with a 'verses' array property
+        } else if (jsonData && typeof jsonData === 'object' && jsonData !== null && 'verses' in jsonData && Array.isArray((jsonData as { verses: unknown }).verses)) { 
             rawVersesKJV = (jsonData as { verses: KJVRawVerse[] }).verses;
         } else {
-            console.error(`KJV JSON data (${filePath}) is not in the expected format. Expected an array of verses or an object with a 'verses' property. Received:`, jsonData);
-            throw new Error(`KJV JSON data (${filePath}) has an unexpected root structure.`);
+            console.error(`[KJV] JSON data (${filePath}) is not in the expected format. Expected an array of verses or an object with a 'verses' property. Received:`, jsonData);
+            throw new Error(`[KJV] JSON data (${filePath}) has an unexpected root structure.`);
         }
-        if (rawVersesKJV.length > 0) { // Basic validation of KJV verse structure
+        if (rawVersesKJV.length > 0) { 
             const firstVerse = rawVersesKJV[0];
             if ( typeof firstVerse?.book_name !== 'string' || typeof firstVerse?.chapter !== 'number' || typeof firstVerse?.verse !== 'number' || typeof firstVerse?.text !== 'string') {
-                console.error(`KJV JSON data (${filePath}) - first verse object has an unexpected structure. First verse:`, firstVerse);
-                throw new Error(`KJV JSON data (${filePath}) has an unexpected verse structure.`);
+                console.error(`[KJV] JSON data (${filePath}) - first verse object has an unexpected structure. First verse:`, firstVerse);
+                throw new Error(`[KJV] JSON data (${filePath}) has an unexpected verse structure.`);
             }
         }
         processedData = parseKJVData(rawVersesKJV);
@@ -268,18 +296,19 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
       
       if (processedData.size === 0) {
           console.warn(`Parsing for ${translation} from ${filePath} resulted in an empty dataset. Check the JSON file structure and the parsing logic for ${translation}.`);
+      } else {
+          console.log(`Successfully processed ${translation} data from ${filePath}. ${processedData.size} books loaded.`);
       }
 
       processedBibleCache.set(translation, processedData);
-      bibleDataPromiseCache.delete(translation); // Remove from promise cache once resolved
+      bibleDataPromiseCache.delete(translation);
       return processedData;
     })
     .catch(error => {
-      console.error(`Error loading or processing ${translation} Bible data from ${filePath}:`, error);
+      console.error(`Critical error loading or processing ${translation} Bible data from ${filePath}:`, error.message);
       bibleDataPromiseCache.delete(translation);
-      processedBibleCache.delete(translation); // Ensure cache is cleared on error
-      // Propagate a more specific error or a generic one
-      throw new Error(`Could not load or parse Bible data for ${translation}. ${error.message}`);
+      processedBibleCache.delete(translation); 
+      throw new Error(`Could not load or parse Bible data for ${translation}. Original error: ${error.message}`);
     });
 
   bibleDataPromiseCache.set(translation, promise);
@@ -295,8 +324,8 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
 export async function getBooks(translation: BibleTranslation): Promise<BibleBook[]> {
   const dataMap = await loadAndProcessBibleData(translation);
   if (dataMap.size === 0) {
-      console.warn(`No books found for ${translation}. The data file might be empty or parsing failed to produce data.`);
-      return []; // Return empty array if no data was processed
+      console.warn(`No books found for ${translation}. The data file might be empty, parsing failed, or the file was not found.`);
+      return [];
   }
   return Array.from(dataMap.values()).map((book) => ({
     id: book.bookName,
@@ -315,11 +344,11 @@ export async function getChaptersForBook(translation: BibleTranslation, bookId: 
   const dataMap = await loadAndProcessBibleData(translation);
   const book = dataMap.get(bookId);
   if (!book) {
-    if (dataMap.size === 0) { // Check if the entire dataset for the translation was empty
+    if (dataMap.size === 0) { 
         console.warn(`Book "${bookId}" not found for ${translation}, and the dataset for this translation appears empty or unparsed.`);
         return [];
     }
-    throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
+    throw new Error(`Book not found: ${bookId} in ${translation} translation. Available books: ${Array.from(dataMap.keys()).join(', ')}`);
   }
   return book.chapters.map(ch => ({
     id: ch.chapter,
@@ -340,14 +369,14 @@ export async function getChapterText(translation: BibleTranslation, bookId: stri
 
   if (!book) {
     if (dataMap.size === 0) {
-        return `<p>Chapter data for ${bookId} ${chapterNumber} (${translation}) is currently unavailable. The data file might be empty or parsing for ${translation} failed to produce data.</p>`;
+        return `<p>Chapter data for ${bookId} ${chapterNumber} (${translation}) is currently unavailable. The data file might be empty, not found, or parsing for ${translation} failed to produce data.</p>`;
     }
     throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
   }
 
   const chapterData = book.chapters.find(ch => ch.chapter === chapterNumber);
   if (!chapterData) {
-     if (book.chapters.length === 0 && dataMap.size > 0) { // Book exists but has no chapters after parsing
+     if (book.chapters.length === 0 && dataMap.size > 0) {
         return `<p>No chapters found for ${bookId} (${translation}) after parsing. Check data integrity for this book.</p>`;
     }
     throw new Error(`Chapter ${chapterNumber} not found in ${book.bookName} (${translation} translation).`);
@@ -373,7 +402,7 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
   const dataMap = await loadAndProcessBibleData(translation);
   const bookData = dataMap.get(bookName);
   if (!bookData) {
-    console.warn(`Book not found in ${translation} data: ${bookName}. The data file might be missing this book or parsing failed for this book.`);
+    console.warn(`Book not found in ${translation} data: ${bookName}. The data file might be missing this book, not found, or parsing failed for this book.`);
     return null;
   }
 
@@ -394,6 +423,7 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
     chapter: chapterNumber,
     verse: verseNumber,
     text: verseData.text,
-    translationContext: translation, // Ensure this is set
+    translationContext: translation, 
   };
 }
+
