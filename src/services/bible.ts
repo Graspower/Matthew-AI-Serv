@@ -7,6 +7,9 @@ export interface Verse {
   chapter: number;
   verse: number;
   text: string;
+  // Optional fields to track context for UI updates, not from kjv-bible.json
+  languageContext?: string; 
+  translationContext?: string;
 }
 
 /**
@@ -89,7 +92,7 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
       }
       return response.json();
     })
-    .then((jsonData: unknown) => { // Use unknown for better type checking initial json
+    .then((jsonData: unknown) => { 
       let rawVerses: KJVRawVerse[];
 
       if (Array.isArray(jsonData)) {
@@ -103,7 +106,6 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
       
       if (rawVerses.length === 0) {
         console.warn("KJV JSON data (public/kjv-bible.json) resulted in an empty list of verses. The 'verses' array in your JSON might be empty, or the file itself might represent an empty list.");
-        // Do not throw error here, allow empty dataset to be processed, subsequent functions will handle missing data.
       } else {
           const firstVerse = rawVerses[0];
           if (
@@ -145,7 +147,6 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
         });
       }
 
-      // Sort chapters and verses after processing all raw verses
       for (const book of booksMap.values()) {
         book.chapters.sort((a, b) => a.chapter - b.chapter);
         for (const chap of book.chapters) {
@@ -158,7 +159,7 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
     })
     .catch(error => {
       console.error("Error loading or processing KJV Bible data from public/kjv-bible.json:", error);
-      bibleDataPromise = null; // Reset promise so it can be retried
+      bibleDataPromise = null; 
       processedBibleData = null;
       throw new Error(`Could not load Bible data. ${error.message}`);
     });
@@ -172,8 +173,6 @@ async function loadAndProcessKJVData(): Promise<Map<string, KJVInternalBookData>
  */
 export async function getBooks(): Promise<BibleBook[]> {
   const dataMap = await loadAndProcessKJVData();
-  // The order of books will be based on the insertion order into the Map,
-  // which depends on the order in the flat JSON file.
   return Array.from(dataMap.values()).map((book) => ({
     id: book.bookName,
     name: book.bookName,
@@ -192,7 +191,6 @@ export async function getChaptersForBook(bookId: string): Promise<BibleChapter[]
   if (!book) {
     throw new Error(`Book not found: ${bookId}`);
   }
-  // Chapters are sorted during loadAndProcessKJVData
   return book.chapters.map(ch => ({
     id: ch.chapter,
     name: `Chapter ${ch.chapter}`,
@@ -218,7 +216,6 @@ export async function getChapterText(bookId: string, chapterNumber: number): Pro
     throw new Error(`Chapter ${chapterNumber} not found in ${book.bookName}`);
   }
 
-  // Verses are sorted during loadAndProcessKJVData
   let formattedText = `<h3 class="text-lg font-semibold mb-2">${book.bookName} - Chapter ${chapterNumber}</h3>\n`;
   formattedText += chapterData.verses.map(v => `<p class="mb-1"><strong class="mr-1">${v.verse}</strong>${v.text.replace(/^\s*¶\s*/, '')}</p>`).join('\n');
   return formattedText;
@@ -256,5 +253,8 @@ export async function getVerse(bookName: string, chapterNumber: number, verseNum
     chapter: chapterNumber,
     verse: verseNumber,
     text: verseData.text,
+    // These fields are not part of kjv-bible.json but can be added by consuming components
+    // languageContext: undefined, 
+    // translationContext: undefined,
   };
 }

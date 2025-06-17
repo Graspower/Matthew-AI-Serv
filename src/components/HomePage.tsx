@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Loader2 } from 'lucide-react';
 import { generateEncouragement } from '@/ai/flows/generateEncouragementFlow';
 import { useToast } from '@/hooks/use-toast';
-import { useSettings } from '@/contexts/SettingsContext';
+import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
 
 interface DailyEncouragement {
   message: string;
@@ -15,8 +15,8 @@ interface DailyEncouragement {
   bibleVerseReference: string;
   bibleVerseText: string;
   date: string; // YYYY-MM-DD
-  language: string;
-  translation: string;
+  language: Language;
+  translation: BibleTranslation;
 }
 
 export function HomePage() {
@@ -26,7 +26,9 @@ export function HomePage() {
   const { toast } = useToast();
   const { language, bibleTranslation } = useSettings();
 
-  const fetchAndStoreEncouragement = useCallback(async (currentLanguage: string, currentTranslation: string) => {
+  const getStorageKey = (lang: Language, transl: BibleTranslation) => `dailyEncouragement-${lang}-${transl}`;
+
+  const fetchAndStoreEncouragement = useCallback(async (currentLanguage: Language, currentTranslation: BibleTranslation) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -44,7 +46,9 @@ export function HomePage() {
         language: currentLanguage,
         translation: currentTranslation,
       };
-      localStorage.setItem('dailyEncouragement', JSON.stringify(newEncouragement));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(getStorageKey(currentLanguage, currentTranslation), JSON.stringify(newEncouragement));
+      }
       setEncouragementData(newEncouragement);
     } catch (err: any) {
       console.error('Failed to generate encouragement:', err);
@@ -63,20 +67,27 @@ export function HomePage() {
 
   useEffect(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const storedData = localStorage.getItem('dailyEncouragement');
+    let storedData = null;
+    if (typeof window !== 'undefined') {
+      storedData = localStorage.getItem(getStorageKey(language, bibleTranslation));
+    }
 
     if (storedData) {
       try {
         const parsedData: DailyEncouragement = JSON.parse(storedData);
+        // Check date, language, and translation for a match
         if (parsedData.date === todayStr && parsedData.language === language && parsedData.translation === bibleTranslation) {
           setEncouragementData(parsedData);
           setIsLoading(false);
         } else {
+          // If any of date, language, or translation mismatch, fetch new one
           fetchAndStoreEncouragement(language, bibleTranslation);
         }
       } catch (e) {
         console.error("Failed to parse stored encouragement data:", e);
-        localStorage.removeItem('dailyEncouragement');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(getStorageKey(language, bibleTranslation));
+        }
         fetchAndStoreEncouragement(language, bibleTranslation);
       }
     } else {
