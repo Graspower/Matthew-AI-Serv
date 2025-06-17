@@ -222,7 +222,15 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
   const promise = fetch(filePath)
     .then(response => {
       if (!response.ok) {
-        throw new Error(`Failed to fetch ${filePath}: ${response.statusText}. Ensure the file exists in the 'public' folder.`);
+        let detailedErrorMessage = `Failed to fetch ${filePath} (Status: ${response.status}).`;
+        if (response.statusText) {
+          detailedErrorMessage += ` Message: ${response.statusText}.`;
+        } else {
+          detailedErrorMessage += ` (No status text from server).`;
+        }
+        detailedErrorMessage += ` Please ensure the file exists in the 'public' folder and is accessible.`;
+        console.error(detailedErrorMessage); // Log it for server-side debugging too
+        throw new Error(detailedErrorMessage);
       }
       return response.json();
     })
@@ -389,5 +397,3 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
     translationContext: translation, // Ensure this is set
   };
 }
-
-    
