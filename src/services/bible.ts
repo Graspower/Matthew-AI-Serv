@@ -39,15 +39,21 @@ export interface BibleChapter {
   name: string; // e.g. "Chapter 1"
 }
 
-// --- Generic Raw Data Structures (example for KJV, adapt for others) ---
-interface RawVerseBase {
-  book_name: string; // Common field used for KJV, adapt if different for others
+// --- Raw Data Structures ---
+// KJV specific raw verse structure
+interface KJVRawVerse {
+  book_name: string;
   chapter: number;
   verse: number;
   text: string;
 }
 
-// --- Internal Processed Data Structures ---
+// Generic structure for ESV, NIV, NRSV from user description
+// { BookName: { ChapterNumStr: { VerseNumStr: VerseTextStr } } }
+type GenericRawBibleData = Record<string, Record<string, Record<string, string>>>;
+
+
+// --- Internal Processed Data Structures (common for all translations after parsing) ---
 interface ProcessedVerseData {
   verse: number;
   text: string;
@@ -78,9 +84,9 @@ const translationFileMap: Record<BibleTranslation, string> = {
 };
 
 /**
- * Parses KJV-specific raw verse data into the common ProcessedBookData structure.
+ * Parses KJV-specific raw verse data (array of verses) into the common ProcessedBookData structure.
  */
-function parseKJVData(rawVerses: RawVerseBase[]): Map<string, ProcessedBookData> {
+function parseKJVData(rawVerses: KJVRawVerse[]): Map<string, ProcessedBookData> {
   const booksMap = new Map<string, ProcessedBookData>();
   for (const rawVerse of rawVerses) {
     if (!booksMap.has(rawVerse.book_name)) {
@@ -114,43 +120,83 @@ function parseKJVData(rawVerses: RawVerseBase[]): Map<string, ProcessedBookData>
 }
 
 /**
- * Placeholder parser for ESV data.
- * YOU MUST IMPLEMENT THIS based on the structure of your esv-bible.json.
- * It should take the raw JSON data from esv-bible.json and transform it
- * into a Map<string, ProcessedBookData> similar to what parseKJVData does.
+ * Parses generic Bible data (nested object: Book -> Chapter -> Verse -> Text)
+ * into the common ProcessedBookData structure.
+ * Used for ESV, NIV, NRSV based on the provided format.
  */
-function parseESVData(jsonData: any): Map<string, ProcessedBookData> {
-  console.warn("ESV parsing not implemented. Using dummy data for ESV. Please implement parseESVData in src/services/bible.ts");
-  // TODO: Implement actual ESV parsing logic here.
-  // Example: Assuming ESV JSON is an array of objects like: { book: "Genesis", chapter: 1, verse: 1, text: "..." }
-  // const rawVerses: RawVerseBase[] = jsonData.map((item: any) => ({
-  //   book_name: item.book,
-  //   chapter: item.chapter,
-  //   verse: item.verse,
-  //   text: item.text,
-  // }));
-  // return parseKJVData(rawVerses); // Or a more direct conversion to ProcessedBookData
-  return new Map<string, ProcessedBookData>(); // Return empty map as placeholder
+function parseGenericBibleData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
+  const booksMap = new Map<string, ProcessedBookData>();
+
+  for (const bookName in jsonData) {
+    if (Object.prototype.hasOwnProperty.call(jsonData, bookName)) {
+      const rawBookData = jsonData[bookName];
+      const processedChapters: ProcessedChapterData[] = [];
+
+      for (const chapterNumberStr in rawBookData) {
+        if (Object.prototype.hasOwnProperty.call(rawBookData, chapterNumberStr)) {
+          const rawChapterData = rawBookData[chapterNumberStr];
+          const chapterNumber = parseInt(chapterNumberStr, 10);
+          if (isNaN(chapterNumber)) {
+            console.warn(`Skipping invalid chapter number: ${chapterNumberStr} in book ${bookName}`);
+            continue;
+          }
+
+          const processedVerses: ProcessedVerseData[] = [];
+          for (const verseNumberStr in rawChapterData) {
+            if (Object.prototype.hasOwnProperty.call(rawChapterData, verseNumberStr)) {
+              const verseText = rawChapterData[verseNumberStr];
+              const verseNumber = parseInt(verseNumberStr, 10);
+              if (isNaN(verseNumber)) {
+                console.warn(`Skipping invalid verse number: ${verseNumberStr} in book ${bookName}, chapter ${chapterNumber}`);
+                continue;
+              }
+              processedVerses.push({
+                verse: verseNumber,
+                text: verseText,
+              });
+            }
+          }
+          // Sort verses
+          processedVerses.sort((a, b) => a.verse - b.verse);
+          processedChapters.push({
+            chapter: chapterNumber,
+            verses: processedVerses,
+          });
+        }
+      }
+      // Sort chapters
+      processedChapters.sort((a, b) => a.chapter - b.chapter);
+      booksMap.set(bookName, {
+        bookName: bookName,
+        chapters: processedChapters,
+      });
+    }
+  }
+  return booksMap;
 }
 
 /**
- * Placeholder parser for NIV data.
- * YOU MUST IMPLEMENT THIS based on the structure of your niv-bible.json.
+ * Parser for ESV data. Calls the generic parser.
  */
-function parseNIVData(jsonData: any): Map<string, ProcessedBookData> {
-  console.warn("NIV parsing not implemented. Using dummy data for NIV. Please implement parseNIVData in src/services/bible.ts");
-  // TODO: Implement actual NIV parsing logic here.
-  return new Map<string, ProcessedBookData>();
+function parseESVData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
+  console.log("Parsing ESV data...");
+  return parseGenericBibleData(jsonData);
 }
 
 /**
- * Placeholder parser for NRSV data.
- * YOU MUST IMPLEMENT THIS based on the structure of your nrsv-bible.json.
+ * Parser for NIV data. Calls the generic parser.
  */
-function parseNRSVData(jsonData: any): Map<string, ProcessedBookData> {
-  console.warn("NRSV parsing not implemented. Using dummy data for NRSV. Please implement parseNRSVData in src/services/bible.ts");
-  // TODO: Implement actual NRSV parsing logic here.
-  return new Map<string, ProcessedBookData>();
+function parseNIVData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
+  console.log("Parsing NIV data...");
+  return parseGenericBibleData(jsonData);
+}
+
+/**
+ * Parser for NRSV data. Calls the generic parser.
+ */
+function parseNRSVData(jsonData: GenericRawBibleData): Map<string, ProcessedBookData> {
+  console.log("Parsing NRSV data...");
+  return parseGenericBibleData(jsonData);
 }
 
 
@@ -182,18 +228,18 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
     })
     .then((jsonData: any) => {
       let processedData: Map<string, ProcessedBookData>;
-      // Validate top-level structure for KJV, others will need their own validation in their parsers
+      
       if (translation === 'KJV') {
-        let rawVersesKJV: RawVerseBase[];
-         if (Array.isArray(jsonData)) {
-            rawVersesKJV = jsonData as RawVerseBase[];
-        } else if (jsonData && typeof jsonData === 'object' && jsonData !== null && 'verses' in jsonData && Array.isArray((jsonData as { verses: unknown }).verses)) {
-            rawVersesKJV = (jsonData as { verses: RawVerseBase[] }).verses;
+        let rawVersesKJV: KJVRawVerse[];
+         if (Array.isArray(jsonData)) { // Handles direct array of verses
+            rawVersesKJV = jsonData as KJVRawVerse[];
+        } else if (jsonData && typeof jsonData === 'object' && jsonData !== null && 'verses' in jsonData && Array.isArray((jsonData as { verses: unknown }).verses)) { // Handles object with a 'verses' array property
+            rawVersesKJV = (jsonData as { verses: KJVRawVerse[] }).verses;
         } else {
             console.error(`KJV JSON data (${filePath}) is not in the expected format. Expected an array of verses or an object with a 'verses' property. Received:`, jsonData);
             throw new Error(`KJV JSON data (${filePath}) has an unexpected root structure.`);
         }
-        if (rawVersesKJV.length > 0) {
+        if (rawVersesKJV.length > 0) { // Basic validation of KJV verse structure
             const firstVerse = rawVersesKJV[0];
             if ( typeof firstVerse?.book_name !== 'string' || typeof firstVerse?.chapter !== 'number' || typeof firstVerse?.verse !== 'number' || typeof firstVerse?.text !== 'string') {
                 console.error(`KJV JSON data (${filePath}) - first verse object has an unexpected structure. First verse:`, firstVerse);
@@ -202,23 +248,30 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
         }
         processedData = parseKJVData(rawVersesKJV);
       } else if (translation === 'ESV') {
-        processedData = parseESVData(jsonData); // YOU WILL NEED TO IMPLEMENT parseESVData
+        processedData = parseESVData(jsonData as GenericRawBibleData);
       } else if (translation === 'NIV') {
-        processedData = parseNIVData(jsonData); // YOU WILL NEED TO IMPLEMENT parseNIVData
+        processedData = parseNIVData(jsonData as GenericRawBibleData);
       } else if (translation === 'NRSV') {
-        processedData = parseNRSVData(jsonData); // YOU WILL NEED TO IMPLEMENT parseNRSVData
+        processedData = parseNRSVData(jsonData as GenericRawBibleData);
       } else {
+        console.error(`Unsupported translation for parsing: ${translation}`);
         throw new Error(`Unsupported translation for parsing: ${translation}`);
       }
       
+      if (processedData.size === 0) {
+          console.warn(`Parsing for ${translation} from ${filePath} resulted in an empty dataset. Check the JSON file structure and the parsing logic for ${translation}.`);
+      }
+
       processedBibleCache.set(translation, processedData);
+      bibleDataPromiseCache.delete(translation); // Remove from promise cache once resolved
       return processedData;
     })
     .catch(error => {
       console.error(`Error loading or processing ${translation} Bible data from ${filePath}:`, error);
       bibleDataPromiseCache.delete(translation);
-      processedBibleCache.delete(translation);
-      throw new Error(`Could not load Bible data for ${translation}. ${error.message}`);
+      processedBibleCache.delete(translation); // Ensure cache is cleared on error
+      // Propagate a more specific error or a generic one
+      throw new Error(`Could not load or parse Bible data for ${translation}. ${error.message}`);
     });
 
   bibleDataPromiseCache.set(translation, promise);
@@ -233,8 +286,9 @@ async function loadAndProcessBibleData(translation: BibleTranslation): Promise<M
  */
 export async function getBooks(translation: BibleTranslation): Promise<BibleBook[]> {
   const dataMap = await loadAndProcessBibleData(translation);
-  if (dataMap.size === 0 && (translation === 'ESV' || translation === 'NIV' || translation === 'NRSV')) {
-      console.warn(`No books found for ${translation}. This might be because its parsing function (e.g., parse${translation}Data) is not yet implemented or returned empty data.`);
+  if (dataMap.size === 0) {
+      console.warn(`No books found for ${translation}. The data file might be empty or parsing failed to produce data.`);
+      return []; // Return empty array if no data was processed
   }
   return Array.from(dataMap.values()).map((book) => ({
     id: book.bookName,
@@ -253,9 +307,8 @@ export async function getChaptersForBook(translation: BibleTranslation, bookId: 
   const dataMap = await loadAndProcessBibleData(translation);
   const book = dataMap.get(bookId);
   if (!book) {
-    // Provide a more graceful fallback if parsing for this translation is not yet complete
-    if (dataMap.size === 0 && (translation === 'ESV' || translation === 'NIV' || translation === 'NRSV')) {
-        console.warn(`Book "${bookId}" not found for ${translation}, and parsing for this translation might be incomplete.`);
+    if (dataMap.size === 0) { // Check if the entire dataset for the translation was empty
+        console.warn(`Book "${bookId}" not found for ${translation}, and the dataset for this translation appears empty or unparsed.`);
         return [];
     }
     throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
@@ -278,21 +331,21 @@ export async function getChapterText(translation: BibleTranslation, bookId: stri
   const book = dataMap.get(bookId);
 
   if (!book) {
-    if (dataMap.size === 0 && (translation === 'ESV' || translation === 'NIV' || translation === 'NRSV')) {
-        return `<p>Chapter data for ${bookId} ${chapterNumber} (${translation}) is currently unavailable. The parsing logic for ${translation} might need to be implemented in src/services/bible.ts.</p>`;
+    if (dataMap.size === 0) {
+        return `<p>Chapter data for ${bookId} ${chapterNumber} (${translation}) is currently unavailable. The data file might be empty or parsing for ${translation} failed to produce data.</p>`;
     }
     throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
   }
 
   const chapterData = book.chapters.find(ch => ch.chapter === chapterNumber);
   if (!chapterData) {
-     if (dataMap.size === 0 && (translation === 'ESV' || translation === 'NIV' || translation === 'NRSV')) {
-        return `<p>Chapter data for ${bookId} ${chapterNumber} (${translation}) is currently unavailable. The parsing logic for ${translation} might need to be implemented in src/services/bible.ts.</p>`;
+     if (book.chapters.length === 0 && dataMap.size > 0) { // Book exists but has no chapters after parsing
+        return `<p>No chapters found for ${bookId} (${translation}) after parsing. Check data integrity for this book.</p>`;
     }
     throw new Error(`Chapter ${chapterNumber} not found in ${book.bookName} (${translation} translation).`);
   }
-  if (chapterData.verses.length === 0 && (translation === 'ESV' || translation === 'NIV' || translation === 'NRSV')) {
-     return `<p>No verses found for ${bookId} ${chapterNumber} (${translation}). This might indicate incomplete parsing for ${translation}.</p>`;
+  if (chapterData.verses.length === 0) {
+     return `<p class="text-center py-4">No verses found for ${bookId} ${chapterNumber} (${translation}). This might indicate an empty chapter in the data file or a parsing issue.</p>`;
   }
 
   let formattedText = `<h3 class="text-lg font-semibold mb-2">${book.bookName} - Chapter ${chapterNumber} (${translation})</h3>\n`;
@@ -312,7 +365,7 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
   const dataMap = await loadAndProcessBibleData(translation);
   const bookData = dataMap.get(bookName);
   if (!bookData) {
-    console.warn(`Book not found in ${translation} data: ${bookName}. Parsing for ${translation} might be incomplete.`);
+    console.warn(`Book not found in ${translation} data: ${bookName}. The data file might be missing this book or parsing failed for this book.`);
     return null;
   }
 
@@ -333,7 +386,7 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
     chapter: chapterNumber,
     verse: verseNumber,
     text: verseData.text,
-    translationContext: translation,
+    translationContext: translation, // Ensure this is set
   };
 }
 
