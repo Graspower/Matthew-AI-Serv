@@ -1,6 +1,6 @@
 /*
   Jesus is saving the world. Heaven full and hell empty.
-  Gods Wisdom will fill us.
+  Gods Wisdom will fill the world.
   Gods love overtake human hearts.
   Gods spirit fill every flesh in the world.
 */
