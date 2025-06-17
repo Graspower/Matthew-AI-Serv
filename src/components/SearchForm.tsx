@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, {type ChangeEvent, useState, useEffect, useRef} from 'react';
+import React, {type ChangeEvent, useState, useEffect, useRef, useCallback} from 'react';
 import {useToast} from "@/hooks/use-toast";
 import {interpretBibleVerseSearch} from "@/ai/flows/interpret-bible-verse-search";
 import type {Verse, VerseReference} from "@/services/bible";
@@ -18,7 +18,7 @@ import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
 import {Loader2, Mic, Volume2, VolumeX } from "lucide-react";
-import { useSettings } from '@/contexts/SettingsContext';
+import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
 
 
 interface SearchFormProps {
@@ -185,11 +185,22 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
       });
       const verseReferences = result.verseReferences || [];
       
+      // For each reference, fetch the KJV text using getVerse
       const fetchedVersesPromises = verseReferences.map(ref =>
         getVerse(ref.book, ref.chapter, ref.verse) 
       );
       const fetchedVersesData = await Promise.all(fetchedVersesPromises);
-      const successfullyFetchedVerses = fetchedVersesData.filter(v => v !== null) as Verse[];
+
+      // Filter out any null results (if a verse wasn't found in KJV data)
+      // And ensure they are of Verse type, now including KJV text and context
+      const successfullyFetchedVerses = fetchedVersesData
+        .filter(v => v !== null)
+        .map(v => ({
+            ...v,
+            languageContext: language, // Store the language setting used for this search
+            translationContext: bibleTranslation // Store the translation setting used
+        })) as Verse[];
+
 
       setDisplayedVerses(successfullyFetchedVerses);
       onSearchResults(query, successfullyFetchedVerses);
@@ -206,39 +217,36 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [language, bibleTranslation, onSearchResults, toast]);
+  }, [language, bibleTranslation, onSearchResults, toast]); // Added toast to dependencies
 
    useEffect(() => {
-    // This effect handles auto-search and re-searching when settings change with an active query
-    if (!autoSearch && searchTerm === formQuery) { // If not auto-search, only re-search if settings change for the *current* displayed search term
-         // Avoid re-searching if query hasn't changed from what's displayed, unless settings changed
-        if(formQuery && (language !== displayedVerses[0]?.languageContext || bibleTranslation !== displayedVerses[0]?.translationContext)){
-             if (formQuery.trim()) {
-                searchAndFetchVerses(formQuery);
-             }
-        }
-       // return; // No auto search and query is same as current search, do nothing unless settings changed
-    }
+    const currentFormQuery = getValues('query');
+    const hasActiveQuery = currentFormQuery && currentFormQuery.trim();
+    const lastSearchUsedLanguage = displayedVerses[0]?.languageContext;
+    const lastSearchUsedTranslation = displayedVerses[0]?.translationContext;
+    const settingsChanged = language !== lastSearchUsedLanguage || bibleTranslation !== lastSearchUsedTranslation;
 
-
-    const handler = setTimeout(() => {
-      const currentFormQuery = getValues('query');
-      if (currentFormQuery && currentFormQuery.trim()) {
-        // For auto-search, or if settings changed with an active query
-        if (autoSearch || searchTerm !== currentFormQuery || (currentFormQuery === searchTerm && (language !== (displayedVerses[0] as any)?.languageContext || bibleTranslation !== (displayedVerses[0] as any)?.translationContext))) {
-             searchAndFetchVerses(currentFormQuery);
-        }
-      } else if (autoSearch || !currentFormQuery.trim()) { // Clear results if query is cleared (for auto-search or manual clear)
+    if (autoSearch || (hasActiveQuery && settingsChanged)) {
+        const handler = setTimeout(() => {
+            if (getValues('query')?.trim()) { // Check again inside timeout in case it was cleared
+                searchAndFetchVerses(getValues('query'));
+            } else if (autoSearch && !getValues('query')?.trim()){ // Clear if auto-search and query is now empty
+                 setDisplayedVerses([]);
+                 setSearchTerm('');
+                 onSearchResults('', []);
+            }
+        }, 500);
+        return () => clearTimeout(handler);
+    } else if (!autoSearch && !hasActiveQuery) {
+        // If not auto-searching and query is empty, ensure results are cleared
+        // This handles manual clearing of the input field when autoSearch is off
         setDisplayedVerses([]);
         setSearchTerm('');
         onSearchResults('', []);
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [formQuery, autoSearch, getValues, onSearchResults, language, bibleTranslation, searchAndFetchVerses, searchTerm, displayedVerses]);
+    }
+    // If !autoSearch and hasActiveQuery but settings haven't changed, do nothing automatically
+    // Manual search button will handle it.
+  }, [formQuery, autoSearch, getValues, onSearchResults, language, bibleTranslation, searchAndFetchVerses, displayedVerses]);
 
 
   useEffect(() => {
@@ -271,8 +279,8 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             setValue('query', finalTranscript, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
             // searchAndFetchVerses will be triggered by formQuery change in the other useEffect if autoSearch is on
             // or by onSubmit if autoSearch is off.
-             if (autoSearch) { // If autoSearch is on, the main useEffect will pick this up
-                // searchAndFetchVerses(finalTranscript); // No longer needed here, handled by formQuery watcher
+             if (autoSearch) { 
+                // The main useEffect watching formQuery and autoSearch will pick this up.
              }
           }
         };
@@ -281,13 +289,11 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           console.log('Voice search ended');
           setIsVoiceSearch(false);
           setVoiceSearchText('');
-          const finalTranscribedText = getValues('query'); // formQuery will update, triggering useEffect
+          const finalTranscribedText = getValues('query'); 
 
-          // If not auto-searching, and a final transcript was set, trigger search
           if (!autoSearch && finalTranscribedText && finalTranscribedText.trim()) {
               searchAndFetchVerses(finalTranscribedText);
           } else if (!autoSearch && (!finalTranscribedText || !finalTranscribedText.trim())) {
-             // If not auto-searching and query is empty, clear results
              setDisplayedVerses([]);
              setSearchTerm('');
              onSearchResults('', []);
@@ -354,7 +360,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
 
   const onSubmit = (data: { query: string }) => {
-     if (!autoSearch) { // Only trigger manual search if autoSearch is off
+     if (!autoSearch) { 
         searchAndFetchVerses(data.query);
      }
   };
@@ -374,7 +380,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
   const toggleAutoSearch = () => {
     setAutoSearch((prev) => {
         const newAutoSearchState = !prev;
-        if (newAutoSearchState && getValues('query')?.trim()) { // If turning autoSearch ON and there's a query
+        if (newAutoSearchState && getValues('query')?.trim()) { 
             searchAndFetchVerses(getValues('query'));
         }
         return newAutoSearchState;
@@ -383,13 +389,12 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
      const newQuery = e.target.value;
-     // If autoSearch is off, and the input is cleared, then clear results
+     setValue('query', newQuery, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
      if (!autoSearch && !newQuery.trim()) {
         setDisplayedVerses([]);
         setSearchTerm('');
         onSearchResults('', []);
      }
-     // formQuery watcher will handle search if autoSearch is on
   };
 
     const isJohn316KJV = (verse: Verse) => {
@@ -398,7 +403,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
 
 
   const renderVerseText = (text: string, verseIndex: number, verse: Verse) => {
-    if (isVoiceReaderEnabled && isJohn316KJV(verse)) { // Check specifically for John 3:16 KJV
+    if (isVoiceReaderEnabled && isJohn316KJV(verse)) { 
         const words = text.split(/(\s+|\b)/).filter(word => word.trim().length > 0);
         return words.map((word, wordIdx) => (
           <span
@@ -423,11 +428,9 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     return text.split('\n').map((line, i) => <React.Fragment key={i}>{line}{i < text.split('\n').length - 1 && <br/>}</React.Fragment>);
   };
 
-  // Add a type to the Verse interface if it's not already there to include languageContext and translationContext
-  // This is just for the SearchForm's internal logic to track what settings were used for the current display
   interface DisplayedVerse extends Verse {
-    languageContext?: string;
-    translationContext?: string;
+    languageContext?: Language;
+    translationContext?: BibleTranslation;
   }
 
 
@@ -501,7 +504,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
             <div className="grid gap-4">
               {displayedVerses.map((verse, index) => (
                 <Card
-                  key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}-${language}-${bibleTranslation}`} // Add lang/translation to key
+                  key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}-${language}-${bibleTranslation}`} 
                   className="shadow-md rounded-lg overflow-hidden cursor-pointer transition-colors hover:bg-muted/10"
                   onClick={() => onVerseSelect && onVerseSelect(verse)}
                   tabIndex={0}
@@ -509,7 +512,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
                   aria-label={`Verse ${verse.book} ${verse.chapter}:${verse.verse}`}
                 >
                   <CardHeader className="bg-secondary/70 p-3 flex flex-row justify-between items-center">
-                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} ({bibleTranslation})</CardTitle>
+                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} (KJV)</CardTitle>
                      {isVoiceReaderEnabled && isJohn316KJV(verse) && ( 
                       <Button
                         variant="outline"
@@ -546,7 +549,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           ) : (
              <Card className="shadow-md rounded-lg">
                 <CardContent className="p-4 text-center text-muted-foreground">
-                  <p>No matching {bibleTranslation} verses found for your query, or unable to fetch verse details. Please try another search.</p>
+                  <p>No matching KJV verses found for your query in the selected language ({language.toUpperCase()}) and context ({bibleTranslation}), or unable to fetch verse details. Please try another search.</p>
                 </CardContent>
              </Card>
           )}
@@ -555,3 +558,4 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     </div>
   );
 }
+
