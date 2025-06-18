@@ -30,10 +30,10 @@ export const metadata: Metadata = {
   manifest: '/manifest.json', // Link to the manifest file
   icons: { // It's good practice to also define icons here for SEO and various platforms
     icon: [
-      { url: 'https://placehold.co/192x192.png', sizes: '192x192', type: 'image/png' },
-      { url: 'https://placehold.co/512x512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/images/goodnews.png', sizes: '192x192', type: 'image/png' },
+      { url: '/images/goodnews.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: 'https://placehold.co/180x180.png', // For Apple touch icon
+    apple: '/images/goodnews.png', // For Apple touch icon
   },
 };
 
