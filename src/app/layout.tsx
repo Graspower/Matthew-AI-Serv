@@ -1,15 +1,16 @@
 /*
   Jesus is saving the world. Heaven full and hell empty.
-  Gods Wisdom will fill the world.
+  Gods Wisdom will fill us.
   Gods love overtake human hearts.
   Gods spirit fill every flesh in the world.
 */
 
-import type {Metadata} from 'next';
+import type {Metadata, Viewport} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google'; // Correct import location
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 import { SettingsProvider } from '@/contexts/SettingsContext'; // Import SettingsProvider
+import Script from 'next/script';
 
 // Initialize fonts correctly in the layout
 const geistSans = Geist({
@@ -26,6 +27,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Matthew AI App',
   description: 'Salvation to the World AI',
+  manifest: '/manifest.json', // Link to the manifest file
+  icons: { // It's good practice to also define icons here for SEO and various platforms
+    icon: [
+      { url: 'https://placehold.co/192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: 'https://placehold.co/512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: 'https://placehold.co/180x180.png', // For Apple touch icon
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#1043E0', // Matches theme_color in manifest.json
 };
 
 export default function RootLayout({
@@ -35,11 +48,36 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta name="application-name" content="Matthew AI App" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="MatthewAI" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="msapplication-TileColor" content="#1043E0" />
+        <meta name="msapplication-tap-highlight" content="no" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SettingsProvider>
           {children}
           <Toaster />
         </SettingsProvider>
+        <Script id="sw-registration" strategy="lazyOnload">
+          {`
+            if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                  .then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                  })
+                  .catch(error => {
+                    console.log('ServiceWorker registration failed: ', error);
+                  });
+              });
+            }
+          `}
+        </Script>
       </body>
     </html>
   );
