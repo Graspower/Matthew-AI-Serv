@@ -1,8 +1,8 @@
 'use server';
 /**
- * @fileOverview Generates a spiritual explanation for a given Bible verse.
+ * @fileOverview Generates a spiritual message of adoration inspired by a given Bible verse.
  *
- * - generateVerseExplanation - A function that provides a deeply spiritual explanation for a Bible verse.
+ * - generateVerseExplanation - A function that provides a deeply spiritual message inspired by a Bible verse.
  * - GenerateVerseExplanationInput - The input type for the generateVerseExplanation function.
  * - GenerateVerseExplanationOutput - The return type for the generateVerseExplanation function.
  */
@@ -17,7 +17,7 @@ const GenerateVerseExplanationInputSchema = z.object({
 export type GenerateVerseExplanationInput = z.infer<typeof GenerateVerseExplanationInputSchema>;
 
 const GenerateVerseExplanationOutputSchema = z.object({
-  explanation: z.string().describe('A concise but impactful explanation (3-5 paragraphs) that ministers to the reader, glorifies God, and expresses adoration and thankfulness based on the verse.'),
+  explanation: z.string().describe('A single, uplifting paragraph of encouragement and adoration that glorifies God, inspired by the provided verse.'),
 });
 export type GenerateVerseExplanationOutput = z.infer<typeof GenerateVerseExplanationOutputSchema>;
 
@@ -29,17 +29,11 @@ const explanationPrompt = ai.definePrompt({
   name: 'generateVerseExplanationPrompt',
   input: {schema: GenerateVerseExplanationInputSchema},
   output: {schema: GenerateVerseExplanationOutputSchema},
-  prompt: `You are a profoundly wise and gentle spiritual guide. Your purpose is to illuminate the Word of God for the reader in a way that deeply ministers to their spirit.
+  prompt: `You are a warm and insightful spiritual guide. Your purpose is to write a single, uplifting paragraph of encouragement and adoration that glorifies God.
 
-Verse for explanation: {{verseReference}} - "{{verseText}}"
+This message should be inspired by the truth and spirit of the following Bible verse, but it should NOT be a direct explanation of the verse. Instead, use the verse as a foundation to express thankfulness, bless God, and highlight His magnificent nature in a heartfelt, one-paragraph message that ministers to the reader's spirit and directs their heart towards praise.
 
-Please generate an explanation for this verse that is concise yet impactful (around 3-5 paragraphs). Your response must:
-1.  **Minister to the reader:** Offer genuine encouragement and deep spiritual insight that they can apply to their life.
-2.  **Glorify God:** Explicitly highlight God's magnificent attributes, His power, His nature, and His works as revealed in the verse.
-3.  **Adore God:** Write with a tone of deep reverence, love, and awe for who God is.
-4.  **Bless and Thank God:** Express thankfulness for His blessings, grace, and unfailing love, connecting these expressions of gratitude directly to the themes present in the verse.
-
-Your writing should feel like a warm, personal, and divine impartation of wisdom, not a dry academic analysis. Focus on spiritual revelation and heartfelt connection.`,
+Verse to draw inspiration from: {{verseReference}} - "{{verseText}}"`,
 });
 
 const generateVerseExplanationFlow = ai.defineFlow(

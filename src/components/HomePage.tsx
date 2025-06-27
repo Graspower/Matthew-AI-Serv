@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,6 +49,7 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
 
 export function HomePage() {
   const [dailyVerses, setDailyVerses] = useState<DailyVerse[]>([]);
+  const [visibleVerses, setVisibleVerses] = useState<DailyVerse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -95,10 +96,30 @@ export function HomePage() {
     fetchDailyVerses();
   }, [fetchDailyVerses]);
 
+  useEffect(() => {
+    // This effect runs only on the client after the component mounts and when dailyVerses are populated.
+    // It determines which of the fetched verses should be visible based on the current time.
+    if (dailyVerses.length > 0) {
+      const hour = new Date().getHours();
+      const nowVisible: DailyVerse[] = [];
+
+      const morning = dailyVerses.find(v => v.timeOfDay === 'Morning');
+      const afternoon = dailyVerses.find(v => v.timeOfDay === 'Afternoon');
+      const evening = dailyVerses.find(v => v.timeOfDay === 'Evening');
+      
+      // Verses for the current and past time periods are visible.
+      if (hour >= 0 && morning) nowVisible.push(morning);
+      if (hour >= 12 && afternoon) nowVisible.push(afternoon);
+      if (hour >= 18 && evening) nowVisible.push(evening);
+      
+      setVisibleVerses(nowVisible);
+    }
+  }, [dailyVerses]);
+
   const renderVerseCard = (item: DailyVerse) => (
     <Card key={item.timeOfDay} className="w-full shadow-lg rounded-xl flex flex-col">
       <CardHeader>
-        <CardTitle className="text-xl font-semibold">{item.timeOfDay} Verse</CardTitle>
+        <CardTitle className="text-xl font-semibold">{item.timeOfDay} Inspiration</CardTitle>
         <CardDescription>{`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col gap-4">
@@ -106,9 +127,7 @@ export function HomePage() {
           <p className="text-lg font-medium italic">"{item.verse.text}"</p>
         </blockquote>
         <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground whitespace-pre-wrap">
-          {item.explanation.split('\n').map((paragraph, index) => (
-            <p key={index} className={index > 0 ? 'mt-2' : ''}>{paragraph}</p>
-          ))}
+            <p>{item.explanation}</p>
         </div>
       </CardContent>
     </Card>
@@ -141,7 +160,7 @@ export function HomePage() {
            </div>
           <Button onClick={fetchDailyVerses} disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh Daily Verses
+            Refresh Verses
           </Button>
         </div>
 
@@ -159,10 +178,18 @@ export function HomePage() {
           </div>
         )}
 
-        {!isLoading && !error && dailyVerses.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {dailyVerses.map(renderVerseCard)}
-          </div>
+        {!isLoading && !error && (
+            <>
+                {visibleVerses.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {visibleVerses.map(renderVerseCard)}
+                    </div>
+                ) : (
+                    <div className="text-center py-10">
+                        <p className="text-muted-foreground">Your first inspiration for the day is being prepared. Please check back shortly.</p>
+                    </div>
+                )}
+            </>
         )}
       </div>
     </div>
