@@ -184,15 +184,21 @@ export function HomePage() {
     >
       <Card className="w-full shadow-lg rounded-xl flex flex-col min-h-[400px]">
         <CardHeader>
-          <CardTitle className="text-xl font-semibold">{item.timeOfDay} Inspiration</CardTitle>
-          <CardDescription>{`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}</CardDescription>
+          <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
+          <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
+            {`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex-grow flex flex-col gap-4">
-          <blockquote className="p-4 bg-secondary/30 rounded-md border-l-4 border-primary">
-            <p className="text-xl font-medium italic">"{item.verse.text}"</p>
-          </blockquote>
-          <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground whitespace-pre-wrap">
-              <p>{item.explanation}</p>
+        <CardContent className="flex-grow flex flex-col gap-6 justify-center">
+          <div className="text-center px-4">
+            <p className="text-2xl font-bold text-foreground leading-relaxed">
+              "{item.verse.text}"
+            </p>
+          </div>
+          <div className="p-4 mx-4 bg-muted/20 rounded-md border-l-4 border-primary">
+            <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
+              {item.explanation}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -203,15 +209,18 @@ export function HomePage() {
       <div key={key} className="w-full flex-shrink-0 snap-center p-1 md:p-2">
         <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
             <CardHeader>
-                <Skeleton className="h-6 w-1/2" />
-                <Skeleton className="h-4 w-1/4 mt-1" />
+                <Skeleton className="h-6 w-1/2 mx-auto" />
+                <Skeleton className="h-4 w-1/4 mx-auto mt-2" />
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-                <Skeleton className="h-16 w-full" />
-                <div className="space-y-2">
+            <CardContent className="flex flex-col gap-6 justify-center">
+                <div className="px-4 space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-3/4 mx-auto" />
+                </div>
+                <div className="mx-4 p-4">
                     <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-full mt-2" />
+                    <Skeleton className="h-4 w-5/6 mt-2" />
                 </div>
             </CardContent>
         </Card>
