@@ -124,7 +124,7 @@ export function HomePage() {
       </CardHeader>
       <CardContent className="flex-grow flex flex-col gap-4">
         <blockquote className="p-4 bg-secondary/30 rounded-md border-l-4 border-primary">
-          <p className="text-lg font-medium italic">"{item.verse.text}"</p>
+          <p className="text-xl font-medium italic">"{item.verse.text}"</p>
         </blockquote>
         <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground whitespace-pre-wrap">
             <p>{item.explanation}</p>
