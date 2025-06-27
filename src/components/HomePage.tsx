@@ -1,10 +1,10 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,13 +46,15 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
   return shuffled.slice(0, num);
 }
 
-
 export function HomePage() {
   const [dailyVerses, setDailyVerses] = useState<DailyVerse[]>([]);
-  const [visibleVerses, setVisibleVerses] = useState<DailyVerse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const { toast } = useToast();
+  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const generateAndStoreVerses = useCallback(async () => {
     setIsLoading(true);
@@ -121,98 +123,158 @@ export function HomePage() {
     generateAndStoreVerses();
   }, [generateAndStoreVerses]);
 
-  useEffect(() => {
-    if (dailyVerses.length > 0) {
-      const hour = new Date().getHours();
-      const nowVisible: DailyVerse[] = [];
-
-      const morning = dailyVerses.find(v => v.timeOfDay === 'Morning');
-      const afternoon = dailyVerses.find(v => v.timeOfDay === 'Afternoon');
-      const evening = dailyVerses.find(v => v.timeOfDay === 'Evening');
-      
-      if (hour >= 0 && morning) nowVisible.push(morning);
-      if (hour >= 12 && afternoon) nowVisible.push(afternoon);
-      if (hour >= 18 && evening) nowVisible.push(evening);
-      
-      setVisibleVerses(nowVisible);
+  const scrollToCard = useCallback((index: number) => {
+    if (cardRefs.current[index]) {
+      cardRefs.current[index]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
     }
-  }, [dailyVerses]);
+  }, []);
 
-  const renderVerseCard = (item: DailyVerse) => (
-    <Card key={item.timeOfDay} className="w-full shadow-lg rounded-xl flex flex-col">
-      <CardHeader>
-        <CardTitle className="text-xl font-semibold">{item.timeOfDay} Inspiration</CardTitle>
-        <CardDescription>{`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex-grow flex flex-col gap-4">
-        <blockquote className="p-4 bg-secondary/30 rounded-md border-l-4 border-primary">
-          <p className="text-xl font-medium italic">"{item.verse.text}"</p>
-        </blockquote>
-        <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground whitespace-pre-wrap">
-            <p>{item.explanation}</p>
-        </div>
-      </CardContent>
-    </Card>
+  useEffect(() => {
+    if (!isLoading && dailyVerses.length > 0) {
+      const hour = new Date().getHours();
+      let initialIndex = 0;
+      if (hour >= 18) { // 6 PM or later
+        initialIndex = 2;
+      } else if (hour >= 12) { // 12 PM or later
+        initialIndex = 1;
+      }
+      setActiveIndex(initialIndex);
+      // Use a timeout to scroll after the component has rendered
+      setTimeout(() => scrollToCard(initialIndex), 100);
+    }
+  }, [isLoading, dailyVerses, scrollToCard]);
+
+  const handlePrev = () => {
+    const newIndex = activeIndex > 0 ? activeIndex - 1 : 0;
+    setActiveIndex(newIndex);
+    scrollToCard(newIndex);
+  };
+
+  const handleNext = () => {
+    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex + 1 : dailyVerses.length - 1;
+    setActiveIndex(newIndex);
+    scrollToCard(newIndex);
+  };
+
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const handleScroll = () => {
+    if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+    }
+    scrollTimeout.current = setTimeout(() => {
+        if(scrollContainerRef.current) {
+            const { scrollLeft, clientWidth } = scrollContainerRef.current;
+            const newIndex = Math.round(scrollLeft / clientWidth);
+            if (isFinite(newIndex)) {
+              setActiveIndex(newIndex);
+            }
+        }
+    }, 150);
+  };
+
+  const renderVerseCard = (item: DailyVerse, index: number) => (
+    <div
+      key={item.timeOfDay}
+      ref={el => cardRefs.current[index] = el}
+      className="w-full flex-shrink-0 snap-center p-1 md:p-2"
+    >
+      <Card className="w-full shadow-lg rounded-xl flex flex-col min-h-[400px]">
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold">{item.timeOfDay} Inspiration</CardTitle>
+          <CardDescription>{`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow flex flex-col gap-4">
+          <blockquote className="p-4 bg-secondary/30 rounded-md border-l-4 border-primary">
+            <p className="text-xl font-medium italic">"{item.verse.text}"</p>
+          </blockquote>
+          <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground whitespace-pre-wrap">
+              <p>{item.explanation}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 
   const renderSkeletonCard = (key: string) => (
-      <Card key={key} className="w-full shadow-lg rounded-xl">
-          <CardHeader>
-              <Skeleton className="h-6 w-1/2" />
-              <Skeleton className="h-4 w-1/4 mt-1" />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-              <Skeleton className="h-16 w-full" />
-              <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-              </div>
-          </CardContent>
-      </Card>
+      <div key={key} className="w-full flex-shrink-0 snap-center p-1 md:p-2">
+        <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
+            <CardHeader>
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-4 w-1/4 mt-1" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+                <Skeleton className="h-16 w-full" />
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                </div>
+            </CardContent>
+        </Card>
+      </div>
   );
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-4 md:p-6">
-      <div className="w-full max-w-5xl">
-        <div className="flex justify-between items-center mb-6">
-           <div className="text-left">
-              <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
-              <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
-           </div>
-          <Button onClick={generateAndStoreVerses} disabled={isLoading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh Verses
-          </Button>
+    <div className="flex flex-col items-center justify-center h-full p-2 md:p-6 w-full">
+      <div className="w-full max-w-2xl text-center mb-4">
+        <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
+        <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
+      </div>
+
+      <div className="w-full max-w-2xl flex items-center justify-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handlePrev}
+          disabled={isLoading || activeIndex === 0}
+          className="h-10 w-10 rounded-full flex-shrink-0"
+        >
+          <ChevronLeft className="h-6 w-6" />
+          <span className="sr-only">Previous Inspiration</span>
+        </Button>
+
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-grow flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+        >
+            {isLoading ? (
+              [...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`))
+            ) : error ? (
+              <div className="w-full flex-shrink-0 snap-center p-1">
+                  <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
+                      <CardContent className="p-6 text-center flex items-center justify-center">
+                          <p className="text-destructive">{error}</p>
+                      </CardContent>
+                  </Card>
+              </div>
+            ) : dailyVerses.length > 0 ? (
+                dailyVerses.map(renderVerseCard)
+            ) : (
+              <div className="w-full flex-shrink-0 snap-center p-1">
+                 <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
+                      <CardContent className="p-6 text-center flex items-center justify-center">
+                          <p className="text-muted-foreground">Your daily inspiration is being prepared.</p>
+                      </CardContent>
+                  </Card>
+              </div>
+            )}
         </div>
 
-        {isLoading && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {renderSkeletonCard("sk-morning")}
-            {renderSkeletonCard("sk-afternoon")}
-            {renderSkeletonCard("sk-evening")}
-          </div>
-        )}
-
-        {error && !isLoading && (
-          <div className="text-center py-10">
-            <p className="text-destructive mb-4">{error}</p>
-          </div>
-        )}
-
-        {!isLoading && !error && (
-            <>
-                {visibleVerses.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {visibleVerses.map(renderVerseCard)}
-                    </div>
-                ) : (
-                    <div className="text-center py-10">
-                        <p className="text-muted-foreground">Your first inspiration for the day is being prepared. Please check back shortly.</p>
-                    </div>
-                )}
-            </>
-        )}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleNext}
+          disabled={isLoading || activeIndex >= dailyVerses.length - 1}
+          className="h-10 w-10 rounded-full flex-shrink-0"
+        >
+          <ChevronRight className="h-6 w-6" />
+          <span className="sr-only">Next Inspiration</span>
+        </Button>
       </div>
     </div>
   );
