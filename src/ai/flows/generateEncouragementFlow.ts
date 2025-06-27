@@ -12,18 +12,10 @@ import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
 
 const spiritualTopics = [
-  "Faith",
-  "Love",
-  "Prayer",
-  "Giving",
-  "God's plan for prosperity",
-  "The Rapture",
-  "Hope",
-  "Forgiveness",
-  "Grace",
-  "Strength in God",
-  "Peace",
-  "Joy"
+  "Thanksgiving",
+  "Adoration",
+  "Count Your Blessings",
+ 
 ];
 
 const GenerateEncouragementInputSchema = z.object({

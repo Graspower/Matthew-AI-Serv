@@ -469,7 +469,7 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
           <Input
             id="bible-search-input"
             type="text"
-            placeholder={isVoiceSearch ? voiceSearchText : "Search Bible topics..."}
+            placeholder={isVoiceSearch ? voiceSearchText : "Search Bible topics, questions ..."}
             {...register('query')}
             aria-label="Bible verse search"
             onChange={handleInputChange}
