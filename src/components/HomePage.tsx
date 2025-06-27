@@ -54,7 +54,7 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchDailyVerses = useCallback(async () => {
+  const generateAndStoreVerses = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -75,6 +75,10 @@ export function HomePage() {
         { timeOfDay: 'Evening', verse: selectedVerses[2], explanation: explanations[2].explanation },
       ];
 
+      if (typeof window !== 'undefined') {
+          const today = new Date().toISOString().split('T')[0];
+          localStorage.setItem('dailyInspiration', JSON.stringify({ date: today, verses: newDailyVerses }));
+      }
       setDailyVerses(newDailyVerses);
 
     } catch (err: any) {
@@ -91,14 +95,33 @@ export function HomePage() {
       setIsLoading(false);
     }
   }, [toast]);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+        setIsLoading(false);
+        return;
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const storedData = localStorage.getItem('dailyInspiration');
+    
+    if (storedData) {
+      try {
+        const { date, verses } = JSON.parse(storedData);
+        if (date === today && Array.isArray(verses) && verses.length === 3) {
+          setDailyVerses(verses);
+          setIsLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to parse daily inspiration from local storage", e);
+      }
+    }
+    
+    generateAndStoreVerses();
+  }, [generateAndStoreVerses]);
 
   useEffect(() => {
-    fetchDailyVerses();
-  }, [fetchDailyVerses]);
-
-  useEffect(() => {
-    // This effect runs only on the client after the component mounts and when dailyVerses are populated.
-    // It determines which of the fetched verses should be visible based on the current time.
     if (dailyVerses.length > 0) {
       const hour = new Date().getHours();
       const nowVisible: DailyVerse[] = [];
@@ -107,7 +130,6 @@ export function HomePage() {
       const afternoon = dailyVerses.find(v => v.timeOfDay === 'Afternoon');
       const evening = dailyVerses.find(v => v.timeOfDay === 'Evening');
       
-      // Verses for the current and past time periods are visible.
       if (hour >= 0 && morning) nowVisible.push(morning);
       if (hour >= 12 && afternoon) nowVisible.push(afternoon);
       if (hour >= 18 && evening) nowVisible.push(evening);
@@ -158,7 +180,7 @@ export function HomePage() {
               <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
               <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
            </div>
-          <Button onClick={fetchDailyVerses} disabled={isLoading}>
+          <Button onClick={generateAndStoreVerses} disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh Verses
           </Button>
