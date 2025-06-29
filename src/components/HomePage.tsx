@@ -186,19 +186,19 @@ export function HomePage() {
       className="w-full flex-shrink-0 snap-center p-1 md:p-2"
     >
       <Card className="w-full shadow-lg rounded-xl flex flex-col min-h-[400px]">
-        <CardHeader>
+        <CardHeader className="p-4">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
           <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
             {`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex-grow flex flex-col gap-6 justify-center">
-          <div className="text-center px-4">
+        <CardContent className="flex-grow flex flex-col gap-4 justify-center p-4 pt-0">
+          <div className="text-center">
             <p className="text-2xl font-bold text-foreground leading-relaxed">
               "{item.verse.text}"
             </p>
           </div>
-          <div className="p-4 mx-4 bg-muted/20 rounded-md border-l-4 border-primary">
+          <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
             <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
               {item.explanation}
             </p>
@@ -269,13 +269,13 @@ export function HomePage() {
   );
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-2 md:p-6 w-full">
-      <div className="w-full max-w-2xl text-center mb-4">
+    <div className="flex flex-col items-center justify-center h-full p-2 md:p-4 w-full">
+      <div className="w-full max-w-4xl text-center mb-4">
         <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
       </div>
 
-      <div className="w-full max-w-2xl flex items-center justify-center gap-2">
+      <div className="w-full max-w-4xl flex items-center justify-center gap-2">
         <Button
           variant="outline"
           size="icon"
@@ -361,5 +361,3 @@ export function HomePage() {
     </div>
   );
 }
-
-    
