@@ -50,7 +50,7 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
 
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '... (Read More)';
+  return text.slice(0, maxLength) + '...';
 };
 
 export function HomePage() {
@@ -229,7 +229,7 @@ export function HomePage() {
 
   const handleNext = () => {
     stopSpeaking();
-    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex + 1 : dailyVerses.length - 1;
+    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex - 1 : dailyVerses.length - 1;
     setActiveIndex(newIndex);
     scrollToCard(newIndex);
   };
@@ -253,7 +253,6 @@ export function HomePage() {
   };
 
   const handleCardClick = (item: DailyVerse) => {
-    stopSpeaking();
     setSelectedInspiration(item);
     setIsDialogOpen(true);
   }
@@ -293,6 +292,7 @@ export function HomePage() {
           <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
             <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
               {truncateText(item.explanation, 120)}
+              {item.explanation.length > 120 && <span className="text-primary font-semibold"> Read More</span>}
             </p>
           </div>
         </CardContent>
@@ -421,14 +421,18 @@ export function HomePage() {
 
       {selectedInspiration && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl text-center">{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
-              <DialogDescription className="text-primary font-semibold text-lg text-center pt-2">
-                {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
-              </DialogDescription>
+          <DialogContent className="p-0 w-screen h-screen sm:max-w-3xl sm:h-auto sm:max-h-[90vh] flex flex-col gap-0">
+            <DialogHeader className="flex flex-row items-center justify-between p-4 border-b sticky top-0 bg-background z-10">
+                <Button variant="ghost" size="icon" onClick={() => setIsDialogOpen(false)} className="rounded-full">
+                    <ChevronLeft className="h-5 w-5" />
+                    <span className="sr-only">Back</span>
+                </Button>
+                <DialogTitle className="text-xl text-center flex-grow -ml-8">{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
             </DialogHeader>
-            <div className="py-4 px-2 space-y-6">
+            <div className="py-6 px-4 space-y-6 overflow-y-auto flex-grow">
+                <DialogDescription className="text-primary font-semibold text-lg text-center">
+                    {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
+                </DialogDescription>
                 <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
                   "{selectedInspiration.verse.text}"
                 </p>
@@ -476,3 +480,4 @@ export function HomePage() {
     </div>
   );
 }
+
