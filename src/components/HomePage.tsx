@@ -5,7 +5,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,21 +48,89 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
   return shuffled.slice(0, num);
 }
 
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '... (Read More)';
+};
+
 export function HomePage() {
   const [dailyVerses, setDailyVerses] = useState<DailyVerse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [selectedInspiration, setSelectedInspiration] = useState<DailyVerse | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentlySpeakingIndex, setCurrentlySpeakingIndex] = useState<number | null>(null);
+
+  const synth = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-
   const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      synth.current = window.speechSynthesis;
+      // Cleanup on component unmount
+      return () => {
+        if (synth.current?.speaking) {
+          synth.current.cancel();
+        }
+      };
+    }
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    if (synth.current?.speaking) {
+      synth.current.cancel();
+    }
+    setIsSpeaking(false);
+    setCurrentlySpeakingIndex(null);
+  }, []);
+  
+  const speakInspiration = useCallback((item: DailyVerse, index: number) => {
+    if (!synth.current) return;
+    
+    if (isSpeaking && currentlySpeakingIndex === index) {
+      stopSpeaking();
+      return;
+    }
+  
+    // If another audio is playing, stop it first
+    if (synth.current.speaking) {
+      synth.current.cancel();
+    }
+  
+    const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.verse.book} chapter ${item.verse.chapter}, verse ${item.verse.verse}. ${item.verse.text}. Adoration: ${item.explanation}`;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      setCurrentlySpeakingIndex(index);
+    };
+  
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setCurrentlySpeakingIndex(null);
+    };
+  
+    utterance.onerror = (e) => {
+      console.error('SpeechSynthesis Error', e);
+      toast({ title: "Speech Error", description: "Could not play audio.", variant: "destructive" });
+      setIsSpeaking(false);
+      setCurrentlySpeakingIndex(null);
+    };
+  
+    synth.current.speak(utterance);
+  }, [isSpeaking, currentlySpeakingIndex, stopSpeaking, toast]);
 
   const generateAndStoreVerses = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    stopSpeaking();
+
     try {
       const selectedVerses = pickRandomItems(inspirationalVerses, 3);
       
@@ -99,7 +168,7 @@ export function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, stopSpeaking]);
   
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -152,12 +221,14 @@ export function HomePage() {
   }, [isLoading, dailyVerses, scrollToCard]);
 
   const handlePrev = () => {
+    stopSpeaking();
     const newIndex = activeIndex > 0 ? activeIndex - 1 : 0;
     setActiveIndex(newIndex);
     scrollToCard(newIndex);
   };
 
   const handleNext = () => {
+    stopSpeaking();
     const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex + 1 : dailyVerses.length - 1;
     setActiveIndex(newIndex);
     scrollToCard(newIndex);
@@ -165,32 +236,53 @@ export function HomePage() {
 
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const handleScroll = () => {
+    if (isSpeaking) stopSpeaking();
     if (scrollTimeout.current) {
         clearTimeout(scrollTimeout.current);
     }
     scrollTimeout.current = setTimeout(() => {
         if(scrollContainerRef.current) {
-            const { scrollLeft, clientWidth } = scrollContainerRef.current;
-            const newIndex = Math.round(scrollLeft / clientWidth);
-            if (isFinite(newIndex)) {
+            const { scrollLeft, scrollWidth } = scrollContainerRef.current;
+            const cardWidth = scrollWidth / dailyVerses.length;
+            const newIndex = Math.round(scrollLeft / cardWidth);
+            if (isFinite(newIndex) && newIndex !== activeIndex) {
               setActiveIndex(newIndex);
             }
         }
     }, 150);
   };
 
+  const handleCardClick = (item: DailyVerse) => {
+    stopSpeaking();
+    setSelectedInspiration(item);
+    setIsDialogOpen(true);
+  }
+
   const renderVerseCard = (item: DailyVerse, index: number) => (
     <div
       key={item.timeOfDay}
       ref={el => cardRefs.current[index] = el}
-      className="w-full flex-shrink-0 snap-center p-1 md:p-2"
+      className="w-full flex-shrink-0 snap-center p-1"
     >
-      <Card className="w-full shadow-lg rounded-xl flex flex-col min-h-[400px]">
-        <CardHeader className="p-4">
+      <Card
+        onClick={() => handleCardClick(item)}
+        className="w-full shadow-lg rounded-xl flex flex-col min-h-[450px] cursor-pointer"
+      >
+        <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
           <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
             {`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}
           </CardDescription>
+           <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-2 right-2 rounded-full"
+            onClick={(e) => { e.stopPropagation(); speakInspiration(item, index); }}
+            disabled={isSpeaking && currentlySpeakingIndex !== index}
+          >
+            {isSpeaking && currentlySpeakingIndex === index ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            <span className="sr-only">Speak inspiration</span>
+          </Button>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4 justify-center p-4 pt-0">
           <div className="text-center">
@@ -200,7 +292,7 @@ export function HomePage() {
           </div>
           <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
             <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
-              {item.explanation}
+              {truncateText(item.explanation, 120)}
             </p>
           </div>
         </CardContent>
@@ -209,8 +301,8 @@ export function HomePage() {
   );
 
   const renderSkeletonCard = (key: string) => (
-      <div key={key} className="w-full flex-shrink-0 snap-center p-1 md:p-2">
-        <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
+      <div key={key} className="w-full flex-shrink-0 snap-center p-1">
+        <Card className="w-full shadow-lg rounded-xl min-h-[450px]">
             <CardHeader>
                 <Skeleton className="h-6 w-1/2 mx-auto" />
                 <Skeleton className="h-4 w-1/4 mx-auto mt-2" />
@@ -275,13 +367,13 @@ export function HomePage() {
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
       </div>
 
-      <div className="w-full max-w-4xl flex items-center justify-center gap-2">
+      <div className="w-full max-w-lg flex items-center justify-center gap-2">
         <Button
           variant="outline"
           size="icon"
           onClick={handlePrev}
           disabled={isLoading || activeIndex === 0}
-          className="h-10 w-10 rounded-full flex-shrink-0"
+          className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex"
         >
           <ChevronLeft className="h-6 w-6" />
           <span className="sr-only">Previous Inspiration</span>
@@ -296,7 +388,7 @@ export function HomePage() {
               [...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`))
             ) : error ? (
               <div className="w-full flex-shrink-0 snap-center p-1">
-                  <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
+                  <Card className="w-full shadow-lg rounded-xl min-h-[450px]">
                       <CardContent className="p-6 text-center flex items-center justify-center">
                           <p className="text-destructive">{error}</p>
                       </CardContent>
@@ -306,7 +398,7 @@ export function HomePage() {
                 dailyVerses.map(renderVerseCard)
             ) : (
               <div className="w-full flex-shrink-0 snap-center p-1">
-                 <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
+                 <Card className="w-full shadow-lg rounded-xl min-h-[450px]">
                       <CardContent className="p-6 text-center flex items-center justify-center">
                           <p className="text-muted-foreground">Your daily inspiration is being prepared.</p>
                       </CardContent>
@@ -320,14 +412,37 @@ export function HomePage() {
           size="icon"
           onClick={handleNext}
           disabled={isLoading || activeIndex >= dailyVerses.length - 1}
-          className="h-10 w-10 rounded-full flex-shrink-0"
+          className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex"
         >
           <ChevronRight className="h-6 w-6" />
           <span className="sr-only">Next Inspiration</span>
         </Button>
       </div>
 
-      <div className="w-full max-w-6xl mx-auto mt-16 text-center">
+      {selectedInspiration && (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-2xl text-center">{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
+              <DialogDescription className="text-primary font-semibold text-lg text-center pt-2">
+                {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 px-2 space-y-6">
+                <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
+                  "{selectedInspiration.verse.text}"
+                </p>
+              <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
+                <p className="text-lg font-normal text-muted-foreground text-left leading-relaxed">
+                  {selectedInspiration.explanation}
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <div className="w-full max-w-6xl mx-auto mt-8 text-center">
         <div className="flex justify-center gap-2 md:gap-4 mb-8 border-b pb-4">
           <Button variant={activeTab === 'testimonies' ? 'default' : 'outline'} onClick={() => setActiveTab('testimonies')} className="rounded-full px-6">
             Testimonies
