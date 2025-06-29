@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -55,6 +56,8 @@ export function HomePage() {
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
 
   const generateAndStoreVerses = useCallback(async () => {
     setIsLoading(true);
@@ -227,6 +230,44 @@ export function HomePage() {
       </div>
   );
 
+  const testimonyData = [
+    { name: 'Abraham', description: 'The father of faith, promised a nation through whom all the earth would be blessed.', imageSrc: 'https://placehold.co/600x400.png', hint: 'desert patriarch' },
+    { name: 'Joseph', description: 'From the pit to the palace, his integrity and wisdom saved nations from famine.', imageSrc: 'https://placehold.co/600x400.png', hint: 'egyptian vizier' },
+    { name: 'Paul', description: 'A persecutor transformed into a powerful apostle, spreading the Gospel to the Gentiles.', imageSrc: 'https://placehold.co/600x400.png', hint: 'roman apostle' },
+    { name: 'Jacob', description: 'Wrestled with God and was renamed Israel, fathering the twelve tribes.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient wrestler' },
+    { name: 'Matthew', description: 'A tax collector who left everything to follow Jesus and became an evangelist.', imageSrc: 'https://placehold.co/600x400.png', hint: 'disciple writing' },
+    { name: 'Mary Magdalene', description: 'A devoted follower and the first to witness the resurrection of Jesus.', imageSrc: 'https://placehold.co/600x400.png', hint: 'woman at tomb' },
+  ];
+
+  const prayerData = [
+    { name: 'For Family', description: "Prayers for unity, protection, and God's love to fill your home.", imageSrc: 'https://placehold.co/600x400.png', hint: 'family praying' },
+    { name: 'For Health', description: 'Seeking divine healing, strength, and wellness for body, mind, and spirit.', imageSrc: 'https://placehold.co/600x400.png', hint: 'healing light' },
+    { name: 'For the Nation', description: 'Prayers for wisdom for leaders, peace in the land, and spiritual revival.', imageSrc: 'https://placehold.co/600x400.png', hint: 'praying over map' },
+  ];
+
+  const teachingData = [
+    { name: 'On Marriage', description: 'Biblical principles for building a strong, Christ-centered, and loving marriage.', imageSrc: 'https://placehold.co/600x400.png', hint: 'couple holding hands' },
+    { name: 'On Love', description: 'Understanding the greatest commandment and how to practice selfless, agape love.', imageSrc: 'https://placehold.co/600x400.png', hint: 'glowing heart' },
+    { name: 'On Faith', description: 'Learning to live by faith, trust in God\'s promises, and move mountains.', imageSrc: 'https://placehold.co/600x400.png', hint: 'mustard seed plant' },
+    { name: 'On Prosperity', description: 'God\'s perspective on biblical prosperity, stewardship, and generous living.', imageSrc: 'https://placehold.co/600x400.png', hint: 'overflowing harvest' },
+    { name: 'On Healing', description: 'Exploring the scriptural basis for divine healing and how to receive it.', imageSrc: 'https://placehold.co/600x400.png', hint: 'healing hands light' },
+    { name: 'On Time Management', description: 'Redeeming the time with purpose, wisdom, and eternal perspective.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient hourglass' },
+  ];
+  
+  const ContentCard = ({ item }: { item: { name: string; description: string; imageSrc: string; hint: string; } }) => (
+    <Card className="w-full shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer">
+      <div className="relative h-40 w-full">
+        <Image src={item.imageSrc} alt={item.name} fill className="object-cover" data-ai-hint={item.hint} />
+      </div>
+      <CardHeader>
+        <CardTitle>{item.name}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{item.description}</p>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="flex flex-col items-center justify-center h-full p-2 md:p-6 w-full">
       <div className="w-full max-w-2xl text-center mb-4">
@@ -285,6 +326,40 @@ export function HomePage() {
           <span className="sr-only">Next Inspiration</span>
         </Button>
       </div>
+
+      <div className="w-full max-w-6xl mx-auto mt-16 text-center">
+        <div className="flex justify-center gap-2 md:gap-4 mb-8 border-b pb-4">
+          <Button variant={activeTab === 'testimonies' ? 'default' : 'outline'} onClick={() => setActiveTab('testimonies')} className="rounded-full px-6">
+            Testimonies
+          </Button>
+          <Button variant={activeTab === 'prayers' ? 'default' : 'outline'} onClick={() => setActiveTab('prayers')} className="rounded-full px-6">
+            Prayers
+          </Button>
+          <Button variant={activeTab === 'teachings' ? 'default' : 'outline'} onClick={() => setActiveTab('teachings')} className="rounded-full px-6">
+            Teachings
+          </Button>
+        </div>
+
+        <div className="pt-4">
+          {activeTab === 'testimonies' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {testimonyData.map((item) => <ContentCard key={item.name} item={item} />)}
+            </div>
+          )}
+          {activeTab === 'prayers' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {prayerData.map((item) => <ContentCard key={item.name} item={item} />)}
+            </div>
+          )}
+          {activeTab === 'teachings' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {teachingData.map((item) => <ContentCard key={item.name} item={item} />)}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
+    
