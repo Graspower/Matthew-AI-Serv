@@ -1,3 +1,4 @@
+
 /*
   Jesus is saving the world. Heaven full and hell empty.
   Gods Wisdom will fill us.
@@ -73,7 +74,7 @@ export default function RootLayout({
           <SettingsProvider>
             {children}
             <Toaster />
-          </Settings-Provider>
+          </SettingsProvider>
         </ThemeProvider>
         <Script id="sw-registration" strategy="lazyOnload">
           {`
