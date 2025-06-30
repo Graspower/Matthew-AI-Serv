@@ -17,16 +17,17 @@ import {
 import {Label} from "@/components/ui/label";
 import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
-import {Loader2, Mic, Volume2, VolumeX } from "lucide-react";
+import {Loader2, Mic, Volume2, VolumeX, BookOpenText } from "lucide-react";
 import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
 
 
 interface SearchFormProps {
   onSearchResults: (query: string, verses: Verse[]) => void;
   onVerseSelect?: (verse: Verse) => void;
+  onReadInReaderRequest?: (verse: Verse) => void; // For "Read in Reader" button
 }
 
-export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) {
+export function SearchForm({ onSearchResults, onVerseSelect, onReadInReaderRequest }: SearchFormProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [displayedVerses, setDisplayedVerses] = useState<Verse[]>([]);
   const {toast} = useToast();
@@ -533,34 +534,46 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
               {displayedVerses.map((verse, index) => (
                 <Card
                   key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}-${verse.languageContext || language}-${verse.translationContext || bibleTranslation}`} 
-                  className="shadow-md rounded-lg overflow-hidden cursor-pointer transition-colors hover:bg-muted/10"
-                  onClick={() => onVerseSelect && onVerseSelect(verse)}
+                  className="shadow-md rounded-lg overflow-hidden transition-colors hover:bg-muted/10"
                   tabIndex={0}
                   role="article"
                   aria-label={`Verse ${verse.book} ${verse.chapter}:${verse.verse}`}
                 >
-                  <CardHeader className="bg-secondary/70 p-3 flex flex-row justify-between items-center">
+                  <CardHeader 
+                    className="bg-secondary/70 p-3 flex flex-row justify-between items-center cursor-pointer"
+                    onClick={() => onVerseSelect && onVerseSelect(verse)}
+                  >
                     <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} ({verse.translationContext || bibleTranslation})</CardTitle>
-                     {isVoiceReaderEnabled && isJohn316KJV(verse) && ( 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => speakVerse(verse.text, index, verse, e)}
-                        disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null}
-                        aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
-                        className="text-xs px-2 py-1 h-auto"
-                      >
-                        {isSpeaking && currentSpeakingVerseIndex === index ? (
-                            <>
-                                <VolumeX className="mr-1 h-3 w-3" /> Stop
-                            </>
-                         ) : (
-                            <>
-                                <Volume2 className="mr-1 h-3 w-3" /> Speak
-                            </>
-                         )}
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {isVoiceReaderEnabled && isJohn316KJV(verse) && ( 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); speakVerse(verse.text, index, verse, e); }}
+                          disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null}
+                          aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
+                        >
+                          {isSpeaking && currentSpeakingVerseIndex === index ? (
+                              <VolumeX className="h-4 w-4" />
+                          ) : (
+                              <Volume2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
+                      {onReadInReaderRequest && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); onReadInReaderRequest(verse); }}
+                          aria-label={`Read ${verse.book} ${verse.chapter}:${verse.verse} in Bible Reader`}
+                          title="Read in Bible Reader"
+                        >
+                          <BookOpenText className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent className="p-3">
                     <p
@@ -586,5 +599,3 @@ export function SearchForm({ onSearchResults, onVerseSelect }: SearchFormProps) 
     </div>
   );
 }
-
-    

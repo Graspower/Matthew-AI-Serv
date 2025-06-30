@@ -10,6 +10,7 @@ import {Geist, Geist_Mono} from 'next/font/google'; // Correct import location
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 import { SettingsProvider } from '@/contexts/SettingsContext'; // Import SettingsProvider
+import { ThemeProvider } from '@/contexts/ThemeContext'; // Import ThemeProvider
 import Script from 'next/script';
 
 // Initialize fonts correctly in the layout
@@ -47,7 +48,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="application-name" content="Matthew AI App" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -59,10 +60,15 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SettingsProvider>
-          {children}
-          <Toaster />
-        </SettingsProvider>
+        <ThemeProvider
+          defaultTheme="system"
+          storageKey="matthew-ai-theme"
+        >
+          <SettingsProvider>
+            {children}
+            <Toaster />
+          </SettingsProvider>
+        </ThemeProvider>
         <Script id="sw-registration" strategy="lazyOnload">
           {`
             if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {

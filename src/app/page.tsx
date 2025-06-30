@@ -21,9 +21,11 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { BookOpenText } from 'lucide-react';
+import { BookOpenText, Moon, Sun } from 'lucide-react';
 import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
@@ -32,12 +34,21 @@ export default function Home() {
   const [isTeachingLoading, setIsTeachingLoading] = useState(false);
   const [teachingError, setTeachingError] = useState<string | null>(null);
   const [teachingLength, setTeachingLength] = useState<'brief' | 'medium'>('medium');
+  const [activeTab, setActiveTab] = useState('home');
+  const [verseToRead, setVerseToRead] = useState<Verse | null>(null);
+
   const {toast} = useToast();
   const { language, setLanguage, bibleTranslation, setBibleTranslation } = useSettings();
+  const { theme, setTheme } = useTheme();
 
   const handleSearchResults = useCallback(async (query: string, versesWithKJVText: Verse[]) => {
     setCurrentQueryTopic(query);
     setCurrentVersesForTopic(versesWithKJVText);
+  }, []);
+
+  const handleReadVerseRequest = useCallback((verse: Verse) => {
+    setVerseToRead(verse);
+    setActiveTab('bibleReader');
   }, []);
 
   useEffect(() => {
@@ -89,37 +100,54 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Tabs defaultValue="home" className="flex flex-col flex-grow">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-grow">
         <div className="p-4 border-b">
             <header className="flex justify-between items-center">
               <div className="text-center flex-grow">
                 <h1 className="text-3xl font-bold">Matthew AI</h1>
                 <p className="text-muted-foreground">Salvation to the World AI</p>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <BookOpenText className="h-5 w-5" />
-                    <span className="sr-only">Open Settings</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end">
-                  <DropdownMenuLabel>Language</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Language)}>
-                    <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="fr">French</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="zh">Chinese</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Bible Translation</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup value={bibleTranslation} onValueChange={(value) => setBibleTranslation(value as BibleTranslation)}>
-                    <DropdownMenuRadioItem value="KJV">KJV</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="NIV">NIV</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="NRSV">NRSV</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="ESV">ESV</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                        <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                        <span className="sr-only">Toggle theme</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setTheme('light')}>Light</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme('dark')}>Dark</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme('system')}>System</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <BookOpenText className="h-5 w-5" />
+                      <span className="sr-only">Open Settings</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end">
+                    <DropdownMenuLabel>Language</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Language)}>
+                      <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="fr">French</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="zh">Chinese</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Bible Translation</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={bibleTranslation} onValueChange={(value) => setBibleTranslation(value as BibleTranslation)}>
+                      <DropdownMenuRadioItem value="KJV">KJV</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="NIV">NIV</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="NRSV">NRSV</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="ESV">ESV</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </header>
             <TabsList className="grid w-full grid-cols-3 mt-4 max-w-lg mx-auto">
               <TabsTrigger value="home">Home</TabsTrigger>
@@ -135,7 +163,7 @@ export default function Home() {
         <TabsContent value="matthewAI" className="flex-grow flex flex-col md:flex-row mt-0 data-[state=inactive]:hidden">
           <div className="md:w-2/5 p-4 flex flex-col md:ml-0 ml-2 border-r">
             <div className="flex-grow">
-               <SearchForm onSearchResults={handleSearchResults} />
+               <SearchForm onSearchResults={handleSearchResults} onReadInReaderRequest={handleReadVerseRequest} />
             </div>
             <div className="mt-6 p-4 border-t border-border">
               <Label className="text-md font-semibold mb-3 block text-center md:text-left">Teaching Length</Label>
@@ -169,7 +197,7 @@ export default function Home() {
         </TabsContent>
 
         <TabsContent value="bibleReader" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
-          <BibleReaderPage />
+          <BibleReaderPage verseToRead={verseToRead} onReadComplete={() => setVerseToRead(null)} />
         </TabsContent>
       </Tabs>
     </div>

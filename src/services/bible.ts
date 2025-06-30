@@ -361,9 +361,10 @@ export async function getChaptersForBook(translation: BibleTranslation, bookId: 
  * @param translation The BibleTranslation.
  * @param bookId The ID of the book (full book name).
  * @param chapterNumber The chapter number.
+ * @param highlightVerse The verse number to highlight.
  * @returns A promise that resolves to a string containing the chapter text (HTML formatted).
  */
-export async function getChapterText(translation: BibleTranslation, bookId: string, chapterNumber: number): Promise<string> {
+export async function getChapterText(translation: BibleTranslation, bookId: string, chapterNumber: number, highlightVerse?: number | null): Promise<string> {
   const dataMap = await loadAndProcessBibleData(translation);
   const book = dataMap.get(bookId);
 
@@ -386,7 +387,10 @@ export async function getChapterText(translation: BibleTranslation, bookId: stri
   }
 
   let formattedText = `<h3 class="text-lg font-semibold mb-2">${book.bookName} - Chapter ${chapterNumber} (${translation})</h3>\n`;
-  formattedText += chapterData.verses.map(v => `<p class="mb-1"><strong class="mr-1">${v.verse}</strong>${v.text.replace(/^\s*¶\s*/, '')}</p>`).join('\n');
+  formattedText += chapterData.verses.map(v => 
+    `<p class="mb-1 transition-colors duration-300 ${v.verse === highlightVerse ? 'bg-accent/30 rounded-md p-2' : 'p-2'}" ${v.verse === highlightVerse ? 'id="highlighted-verse"' : ''}>` +
+    `<strong class="mr-1">${v.verse}</strong>${v.text.replace(/^\s*¶\s*/, '')}</p>`
+  ).join('\n');
   return formattedText;
 }
 
@@ -426,4 +430,3 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
     translationContext: translation, 
   };
 }
-

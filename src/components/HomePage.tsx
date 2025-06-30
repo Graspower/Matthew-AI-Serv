@@ -50,7 +50,7 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
 
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
+  return text.slice(0, maxLength);
 };
 
 export function HomePage() {
@@ -229,7 +229,7 @@ export function HomePage() {
 
   const handleNext = () => {
     stopSpeaking();
-    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex - 1 : dailyVerses.length - 1;
+    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex + 1 : dailyVerses.length - 1;
     setActiveIndex(newIndex);
     scrollToCard(newIndex);
   };
@@ -253,6 +253,9 @@ export function HomePage() {
   };
 
   const handleCardClick = (item: DailyVerse) => {
+    if (window.getSelection()?.toString()) {
+      return; 
+    }
     setSelectedInspiration(item);
     setIsDialogOpen(true);
   }
@@ -264,8 +267,7 @@ export function HomePage() {
       className="w-full flex-shrink-0 snap-center p-1"
     >
       <Card
-        onClick={() => handleCardClick(item)}
-        className="w-full shadow-lg rounded-xl flex flex-col min-h-[450px] cursor-pointer"
+        className="w-full shadow-lg rounded-xl flex flex-col min-h-[450px]"
       >
         <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
@@ -292,7 +294,14 @@ export function HomePage() {
           <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
             <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
               {truncateText(item.explanation, 120)}
-              {item.explanation.length > 120 && <span className="text-primary font-semibold"> Read More</span>}
+              {item.explanation.length > 120 && (
+                <button 
+                  onClick={() => handleCardClick(item)} 
+                  className="text-primary font-semibold ml-1 hover:underline focus:outline-none"
+                >
+                  Read More
+                </button>
+              )}
             </p>
           </div>
         </CardContent>
@@ -480,4 +489,3 @@ export function HomePage() {
     </div>
   );
 }
-
