@@ -7,6 +7,7 @@
 
 import type {Metadata, Viewport} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google'; // Correct import location
+import { Source_Serif_4 } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 import { SettingsProvider } from '@/contexts/SettingsContext'; // Import SettingsProvider
@@ -21,6 +22,11 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
+  subsets: ['latin'],
+});
+
+const sourceSerif = Source_Serif_4({
+  variable: '--font-source-serif',
   subsets: ['latin'],
 });
 
@@ -59,7 +65,7 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#1043E0" />
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable} antialiased`}>
         <ThemeProvider
           defaultTheme="system"
           storageKey="matthew-ai-theme"
@@ -67,7 +73,7 @@ export default function RootLayout({
           <SettingsProvider>
             {children}
             <Toaster />
-          </SettingsProvider>
+          </Settings-Provider>
         </ThemeProvider>
         <Script id="sw-registration" strategy="lazyOnload">
           {`
