@@ -5,8 +5,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -93,12 +93,13 @@ export function HomePage() {
   const speakInspiration = useCallback((item: DailyVerse, index: number) => {
     if (!synth.current) return;
     
+    // If we click the button of the currently playing audio, stop it.
     if (isSpeaking && currentlySpeakingIndex === index) {
       stopSpeaking();
       return;
     }
   
-    // If another audio is playing, stop it first
+    // If another audio is playing, stop it before starting the new one.
     if (synth.current.speaking) {
       synth.current.cancel();
     }
@@ -229,7 +230,7 @@ export function HomePage() {
 
   const handleNext = () => {
     stopSpeaking();
-    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex - 1 : dailyVerses.length - 1;
+    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex + 1 : dailyVerses.length - 1;
     setActiveIndex(newIndex);
     scrollToCard(newIndex);
   };
@@ -257,6 +258,7 @@ export function HomePage() {
     if (window.getSelection()?.toString()) {
       return; 
     }
+    // Don't stop audio when opening the dialog
     setSelectedInspiration(item);
     setIsDialogOpen(true);
   }
@@ -339,6 +341,9 @@ export function HomePage() {
     { name: 'Jacob', description: 'Wrestled with God and was renamed Israel, fathering the twelve tribes.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient wrestler' },
     { name: 'Matthew', description: 'A tax collector who left everything to follow Jesus and became an evangelist.', imageSrc: 'https://placehold.co/600x400.png', hint: 'disciple writing' },
     { name: 'Mary Magdalene', description: 'A devoted follower and the first to witness the resurrection of Jesus.', imageSrc: 'https://placehold.co/600x400.png', hint: 'woman at tomb' },
+    { name: 'Esther', description: 'A courageous queen who risked her life to save her people from annihilation.', imageSrc: 'https://placehold.co/600x400.png', hint: 'persian queen' },
+    { name: 'Moses', description: 'Chosen by God to lead the Israelites out of slavery in Egypt and receive the Ten Commandments.', imageSrc: 'https://placehold.co/600x400.png', hint: 'parting sea' },
+    { name: 'Job', description: 'A righteous man who maintained his faith in God despite immense suffering and loss.', imageSrc: 'https://placehold.co/600x400.png', hint: 'suffering man' },
   ];
 
   const prayerData = [
@@ -437,6 +442,10 @@ export function HomePage() {
                 <DialogDescription className="text-primary font-semibold text-lg pt-2">
                     {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
                 </DialogDescription>
+                 <DialogClose className="absolute right-4 top-4 rounded-sm p-1 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
+                </DialogClose>
             </DialogHeader>
             <div className="p-6 pt-2 grid gap-4 overflow-y-auto">
                 <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
