@@ -229,7 +229,7 @@ export function HomePage() {
 
   const handleNext = () => {
     stopSpeaking();
-    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex + 1 : dailyVerses.length - 1;
+    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex - 1 : dailyVerses.length - 1;
     setActiveIndex(newIndex);
     scrollToCard(newIndex);
   };
@@ -253,6 +253,7 @@ export function HomePage() {
   };
 
   const handleCardClick = (item: DailyVerse) => {
+    // This allows text selection without opening the dialog
     if (window.getSelection()?.toString()) {
       return; 
     }
@@ -267,7 +268,8 @@ export function HomePage() {
       className="w-full flex-shrink-0 snap-center p-1"
     >
       <Card
-        className="w-full shadow-lg rounded-xl flex flex-col min-h-[450px]"
+        onClick={() => handleCardClick(item)}
+        className="w-full shadow-lg rounded-xl flex flex-col min-h-[480px] cursor-pointer"
       >
         <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
@@ -295,12 +297,11 @@ export function HomePage() {
             <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
               {truncateText(item.explanation, 120)}
               {item.explanation.length > 120 && (
-                <button 
-                  onClick={() => handleCardClick(item)} 
-                  className="text-primary font-semibold ml-1 hover:underline focus:outline-none"
+                <span 
+                  className="text-primary font-semibold ml-1"
                 >
                   Read More
-                </button>
+                </span>
               )}
             </p>
           </div>
@@ -311,7 +312,7 @@ export function HomePage() {
 
   const renderSkeletonCard = (key: string) => (
       <div key={key} className="w-full flex-shrink-0 snap-center p-1">
-        <Card className="w-full shadow-lg rounded-xl min-h-[450px]">
+        <Card className="w-full shadow-lg rounded-xl min-h-[480px]">
             <CardHeader>
                 <Skeleton className="h-6 w-1/2 mx-auto" />
                 <Skeleton className="h-4 w-1/4 mx-auto mt-2" />
@@ -376,7 +377,7 @@ export function HomePage() {
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
       </div>
 
-      <div className="w-full max-w-lg flex items-center justify-center gap-2">
+      <div className="w-full max-w-4xl flex items-center justify-center gap-2">
         <Button
           variant="outline"
           size="icon"
@@ -397,7 +398,7 @@ export function HomePage() {
               [...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`))
             ) : error ? (
               <div className="w-full flex-shrink-0 snap-center p-1">
-                  <Card className="w-full shadow-lg rounded-xl min-h-[450px]">
+                  <Card className="w-full shadow-lg rounded-xl min-h-[480px]">
                       <CardContent className="p-6 text-center flex items-center justify-center">
                           <p className="text-destructive">{error}</p>
                       </CardContent>
@@ -407,7 +408,7 @@ export function HomePage() {
                 dailyVerses.map(renderVerseCard)
             ) : (
               <div className="w-full flex-shrink-0 snap-center p-1">
-                 <Card className="w-full shadow-lg rounded-xl min-h-[450px]">
+                 <Card className="w-full shadow-lg rounded-xl min-h-[480px]">
                       <CardContent className="p-6 text-center flex items-center justify-center">
                           <p className="text-muted-foreground">Your daily inspiration is being prepared.</p>
                       </CardContent>
@@ -430,18 +431,14 @@ export function HomePage() {
 
       {selectedInspiration && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="p-0 w-screen h-screen sm:max-w-3xl sm:h-auto sm:max-h-[90vh] flex flex-col gap-0">
-            <DialogHeader className="flex flex-row items-center justify-between p-4 border-b sticky top-0 bg-background z-10">
-                <Button variant="ghost" size="icon" onClick={() => setIsDialogOpen(false)} className="rounded-full">
-                    <ChevronLeft className="h-5 w-5" />
-                    <span className="sr-only">Back</span>
-                </Button>
-                <DialogTitle className="text-xl text-center flex-grow -ml-8">{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
-            </DialogHeader>
-            <div className="py-6 px-4 space-y-6 overflow-y-auto flex-grow">
-                <DialogDescription className="text-primary font-semibold text-lg text-center">
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+            <DialogHeader className="p-6 pb-2 text-center">
+                <DialogTitle className="text-2xl">{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
+                <DialogDescription className="text-primary font-semibold text-lg pt-2">
                     {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
                 </DialogDescription>
+            </DialogHeader>
+            <div className="p-6 pt-2 grid gap-4 overflow-y-auto">
                 <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
                   "{selectedInspiration.verse.text}"
                 </p>
@@ -455,7 +452,7 @@ export function HomePage() {
         </Dialog>
       )}
 
-      <div className="w-full max-w-6xl mx-auto mt-8 text-center">
+      <div className="w-full max-w-6xl mx-auto mt-4 text-center">
         <div className="flex justify-center gap-2 md:gap-4 mb-8 border-b pb-4">
           <Button variant={activeTab === 'testimonies' ? 'default' : 'outline'} onClick={() => setActiveTab('testimonies')} className="rounded-full px-6">
             Testimonies
