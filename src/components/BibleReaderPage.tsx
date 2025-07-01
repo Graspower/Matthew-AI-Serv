@@ -223,7 +223,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
         {chapterText ? (
             <div 
               className={cn(
-                "prose prose-sm sm:prose-base max-w-none leading-relaxed transition-all", 
+                "prose prose-sm sm:prose-base max-w-none leading-relaxed transition-all dark:prose-invert",
                 fontSizes[fontSizeIndex], 
                 fontFamilies[fontFamilyIndex]
               )} 
