@@ -222,17 +222,6 @@ const Sidebar = React.forwardRef<
         data-variant={variant}
         data-side={side}
       >
-        {/* This is what handles the sidebar gap on desktop */}
-        {variant === "sidebar" && (
-          <div
-            className={cn(
-              "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
-              "group-data-[collapsible=offcanvas]:w-0",
-              "group-data-[side=right]:rotate-180",
-              "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
-            )}
-          />
-        )}
         <div
           className={cn(
             "duration-200 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
@@ -324,15 +313,17 @@ const SidebarInset = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex min-h-svh flex-1 flex-col bg-background transition-[margin] duration-200 ease-linear",
-        // Base styles for the "inset" card-like appearance.
-        // It gets margin on all sides, and we override the side the sidebar is on.
+        // Default sidebar variant margins
+        "md:peer-data-[side=left]:peer-data-[state=expanded]:ml-[var(--sidebar-width)]",
+        "md:peer-data-[side=left]:peer-data-[state=collapsed]:peer-data-[collapsible=icon]:ml-[var(--sidebar-width-icon)]",
+        "md:peer-data-[side=right]:peer-data-[state=expanded]:mr-[var(--sidebar-width)]",
+        "md:peer-data-[side=right]:peer-data-[state=collapsed]:peer-data-[collapsible=icon]:mr-[var(--sidebar-width-icon)]",
+        // Inset variant styles, which override the margins above and add other styles
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
-        // Correctly set margin for a LEFT sidebar
-        "md:peer-data-[side=left][data-state=expanded]:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width)_+_0.5rem)]",
-        "md:peer-data-[side=left][data-state=collapsed]:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width-icon)_+_0.5rem)]",
-        // Correctly set margin for a RIGHT sidebar
-        "md:peer-data-[side=right][data-state=expanded]:peer-data-[variant=inset]:mr-[calc(var(--sidebar-width)_+_0.5rem)]",
-        "md:peer-data-[side=right][data-state=collapsed]:peer-data-[variant=inset]:mr-[calc(var(--sidebar-width-icon)_+_0.5rem)]",
+        "md:peer-data-[variant=inset]:peer-data-[side=left][data-state=expanded]:ml-[calc(var(--sidebar-width)_+_0.5rem)]",
+        "md:peer-data-[variant=inset]:peer-data-[side=left][data-state=collapsed]:ml-[calc(var(--sidebar-width-icon)_+_0.5rem)]",
+        "md:peer-data-[variant=inset]:peer-data-[side=right][data-state=expanded]:mr-[calc(var(--sidebar-width)_+_0.5rem)]",
+        "md:peer-data-[variant=inset]:peer-data-[side=right][data-state=collapsed]:mr-[calc(var(--sidebar-width-icon)_+_0.5rem)]",
         className
       )}
       {...props}
