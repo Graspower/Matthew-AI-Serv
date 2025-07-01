@@ -112,11 +112,11 @@ export default function Home() {
       } catch (error: any)
       {
         console.error('Failed to generate teaching:', error);
-        const errorMessage = `Failed to generate teaching for "${currentQueryTopic}". ${error.message || 'Please try again.'}`;
+        const errorMessage = "Something went wrong. Please try again later.";
         setTeachingError(errorMessage);
         toast({
-          title: 'Error Generating Teaching',
-          description: errorMessage,
+          title: 'Error',
+          description: 'Failed to generate teaching.',
           variant: 'destructive',
         });
       } finally {
@@ -185,13 +185,13 @@ export default function Home() {
             </TabsList>
         </div>
 
-        <TabsContent value="home" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
+        <TabsContent value="home" className="flex-grow mt-0 data-[state=inactive]:hidden">
           <HomePage />
         </TabsContent>
 
         <TabsContent value="matthewAI" className="flex-grow flex flex-col md:flex-row mt-0 data-[state=inactive]:hidden">
-          <div className="md:w-2/5 p-4 flex flex-col border-r">
-            <div className="flex-grow">
+          <div className="md:w-2/5 flex flex-col border-r">
+            <div className="flex-grow p-4">
                <SearchForm onSearchResults={handleSearchResults} onReadInReaderRequest={handleReadVerseRequest} />
             </div>
             <div className="mt-6 p-4 border-t border-border">

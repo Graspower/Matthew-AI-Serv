@@ -250,13 +250,17 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
                     Adjust the text size for readability.
                   </p>
                 </div>
-                <Slider
-                  min={0}
-                  max={fontSizes.length - 1}
-                  step={1}
-                  value={[fontSizeIndex]}
-                  onValueChange={(value) => setFontSizeIndex(value[0])}
-                />
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">A</span>
+                  <Slider
+                    min={0}
+                    max={fontSizes.length - 1}
+                    step={1}
+                    value={[fontSizeIndex]}
+                    onValueChange={(value) => setFontSizeIndex(value[0])}
+                  />
+                  <span className="text-xl font-medium">A</span>
+                </div>
               </div>
             </PopoverContent>
           </Popover>

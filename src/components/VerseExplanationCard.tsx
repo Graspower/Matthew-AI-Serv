@@ -76,7 +76,7 @@ export function TeachingDisplayCard({queryTopic, teachingText, isLoading, error,
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = (e: SpeechSynthesisErrorEvent) => {
       console.error('SpeechSynthesis Error:', e.error);
-      toast({ title: "Speech Error", description: `Could not play audio. Reason: ${e.error}`, variant: "destructive" });
+      toast({ title: "Speech Error", description: `Could not play audio. Reason: ${e.error || 'Unknown'}`, variant: "destructive" });
       setIsSpeaking(false);
     };
     synth.current.speak(utterance);
@@ -124,7 +124,7 @@ export function TeachingDisplayCard({queryTopic, teachingText, isLoading, error,
           )}
         </CardHeader>
         <CardContent className="flex-grow flex items-center justify-center">
-          <p className="text-destructive text-center">{error}</p>
+          <p className="text-sm text-muted-foreground text-center">{error}</p>
         </CardContent>
       </Card>
     );
