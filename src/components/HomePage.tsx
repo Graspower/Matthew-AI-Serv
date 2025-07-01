@@ -257,9 +257,6 @@ export function HomePage() {
   };
 
   const handleCardClick = (item: DailyVerse) => {
-    if (window.getSelection()?.toString()) {
-      return; 
-    }
     setSelectedInspiration(item);
     setIsDialogOpen(true);
   }
@@ -331,7 +328,7 @@ export function HomePage() {
   );
 
   const testimonyData = [
-    { name: 'Abraham', description: 'The father of faith, promised a nation through whom all the earth would be blessed.', imageSrc: 'https://placehold.co/600x400.png', hint: 'desert patriarch' },
+    { name: 'Abraham', description: 'The father of faith, promised a nation through whom all the earth would be blessed.', imageSrc: '/images/abrahamtestimony.png', hint: 'desert patriarch' },
     { name: 'Joseph', description: 'From the pit to the palace, his integrity and wisdom saved nations from famine.', imageSrc: 'https://placehold.co/600x400.png', hint: 'egyptian vizier' },
     { name: 'Paul', description: 'A persecutor transformed into a powerful apostle, spreading the Gospel to the Gentiles.', imageSrc: 'https://placehold.co/600x400.png', hint: 'roman apostle' },
     { name: 'Jacob', description: 'Wrestled with God and was renamed Israel, fathering the twelve tribes.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient wrestler' },

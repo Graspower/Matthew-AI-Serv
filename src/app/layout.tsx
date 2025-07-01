@@ -38,10 +38,10 @@ export const metadata: Metadata = {
   manifest: '/manifest.json', // Link to the manifest file
   icons: { // It's good practice to also define icons here for SEO and various platforms
     icon: [
-      { url: '/images/goodnews.png', sizes: '192x192', type: 'image/png' },
-      { url: '/images/goodnews.png', sizes: '512x512', type: 'image/png' },
+      { url: '/images/Jesussavesicon.png', sizes: '192x192', type: 'image/png' },
+      { url: '/images/Jesussavesicon.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: '/images/goodnews.png', // For Apple touch icon
+    apple: '/images/Jesussavesicon.png', // For Apple touch icon
   },
 };
 
