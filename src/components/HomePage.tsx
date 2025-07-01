@@ -339,13 +339,13 @@ export function HomePage() {
   ];
 
   const prayerData = [
-    { name: 'For Family', description: "Prayers for unity, protection, and God's love to fill your home.", imageSrc: 'https://placehold.co/600x400.png', hint: 'family praying' },
+    { name: 'For Family', description: "Prayers for unity, protection, and God's love to fill your home.", imageSrc: '/images/prayeronmarriage.jpg', hint: 'family praying' },
     { name: 'For Health', description: 'Seeking divine healing, strength, and wellness for body, mind, and spirit.', imageSrc: 'https://placehold.co/600x400.png', hint: 'healing light' },
     { name: 'For the Nation', description: 'Prayers for wisdom for leaders, peace in the land, and spiritual revival.', imageSrc: 'https://placehold.co/600x400.png', hint: 'praying over map' },
   ];
 
   const teachingData = [
-    { name: 'On Marriage', description: 'Biblical principles for building a strong, Christ-centered, and loving marriage.', imageSrc: 'https://placehold.co/600x400.png', hint: 'couple holding hands' },
+    { name: 'On Marriage', description: 'Biblical principles for building a strong, Christ-centered, and loving marriage.', imageSrc: '/images/marriagesonteaching.jpg', hint: 'couple holding hands' },
     { name: 'On Love', description: 'Understanding the greatest commandment and how to practice selfless, agape love.', imageSrc: 'https://placehold.co/600x400.png', hint: 'glowing heart' },
     { name: 'On Faith', description: 'Learning to live by faith, trust in God\'s promises, and move mountains.', imageSrc: 'https://placehold.co/600x400.png', hint: 'mustard seed plant' },
     { name: 'On Prosperity', description: 'God\'s perspective on biblical prosperity, stewardship, and generous living.', imageSrc: 'https://placehold.co/600x400.png', hint: 'overflowing harvest' },

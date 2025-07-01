@@ -49,10 +49,12 @@ export default function Home() {
       const cachedData = localStorage.getItem(TEACHING_CACHE_KEY);
       if (cachedData) {
         const { query, verses, teaching } = JSON.parse(cachedData);
-        if (query && verses && teaching) {
+        if (query && verses) { // No longer require teaching to be present
           setCurrentQueryTopic(query);
           setCurrentVersesForTopic(verses);
-          setTeachingText(teaching);
+          if (teaching) { // If teaching is present, load it
+            setTeachingText(teaching);
+          }
         }
       }
     } catch (error) {
@@ -64,8 +66,20 @@ export default function Home() {
   const handleSearchResults = useCallback(async (query: string, versesWithKJVText: Verse[]) => {
     setCurrentQueryTopic(query);
     setCurrentVersesForTopic(versesWithKJVText);
+
     if (!query) {
+      // Clear cache if the search is cleared
       localStorage.removeItem(TEACHING_CACHE_KEY);
+    } else {
+      try {
+        // Store the query and the verses. The teaching will be generated and cached separately.
+        localStorage.setItem(TEACHING_CACHE_KEY, JSON.stringify({
+          query: query,
+          verses: versesWithKJVText,
+        }));
+      } catch (error) {
+        console.error("Failed to save search to cache:", error);
+      }
     }
   }, []);
 
@@ -185,7 +199,7 @@ export default function Home() {
             </TabsList>
         </div>
 
-        <TabsContent value="home" className="flex-grow mt-0 data-[state=inactive]:hidden">
+        <TabsContent value="home" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
           <HomePage />
         </TabsContent>
 
