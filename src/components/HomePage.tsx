@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -355,16 +354,14 @@ export function HomePage() {
   ];
   
   const ContentCard = ({ item }: { item: { name: string; description: string; imageSrc: string; hint: string; } }) => (
-    <Card className="w-full shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer">
-      <div className="relative h-40 w-full">
+    <Card className="w-full h-96 flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer">
+      <div className="relative h-48 w-full flex-shrink-0">
         <Image src={item.imageSrc} alt={item.name} fill className="object-cover" data-ai-hint={item.hint} />
       </div>
-      <CardHeader>
-        <CardTitle>{item.name}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">{item.description}</p>
-      </CardContent>
+      <div className="flex flex-col flex-grow p-4 overflow-y-auto">
+        <h3 className="text-xl font-semibold">{item.name}</h3>
+        <p className="text-sm text-muted-foreground mt-2">{item.description}</p>
+      </div>
     </Card>
   );
 
