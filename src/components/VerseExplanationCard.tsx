@@ -62,7 +62,11 @@ export function TeachingDisplayCard({queryTopic, teachingText, isLoading, error,
     utterance.rate = 0.9;
     
     // Set language for the utterance for better voice selection
-    if (language && synth.current.getVoices().some(voice => voice.lang.startsWith(language))) {
+    const langCode = language === 'zh' ? 'zh-CN' : language;
+    if (language && synth.current.getVoices().some(voice => voice.lang.startsWith(langCode))) {
+      utterance.lang = langCode;
+    } else if (language && synth.current.getVoices().some(voice => voice.lang.startsWith(language))) {
+      // Fallback to the generic language code if the specific one is not found
       utterance.lang = language;
     } else {
       utterance.lang = 'en-US'; // Fallback to English

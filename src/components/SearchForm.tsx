@@ -96,9 +96,13 @@ export function SearchForm({ onSearchResults, onVerseSelect, onReadInReaderReque
     utterThis.pitch = 1.0;
     utterThis.rate = 0.9;
     
-    if (language && typeof window !== 'undefined' && synth.current && synth.current.getVoices().some(voice => voice.lang.startsWith(language))) {
+    const langCode = language === 'zh' ? 'zh-CN' : language;
+    if (language && typeof window !== 'undefined' && synth.current && synth.current.getVoices().some(voice => voice.lang.startsWith(langCode))) {
+        utterThis.lang = langCode;
+    } else if (language && typeof window !== 'undefined' && synth.current && synth.current.getVoices().some(voice => voice.lang.startsWith(language))) {
         utterThis.lang = language;
-    } else {
+    }
+     else {
         utterThis.lang = 'en-US'; 
     }
 

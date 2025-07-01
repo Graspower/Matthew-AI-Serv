@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
@@ -426,23 +426,17 @@ export function HomePage() {
 
       {selectedInspiration && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col p-0">
-            <DialogHeader className="p-4 flex-row items-center justify-between border-b">
-                <DialogTitle className="text-lg">
-                    {selectedInspiration.timeOfDay} Inspiration
-                </DialogTitle>
-                <DialogClose className="p-2 relative rounded-md opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                </DialogClose>
+          <DialogContent className="max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
+              <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
+                {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
+              </DialogDescription>
             </DialogHeader>
-            <div className="p-6 grid gap-4 overflow-y-auto">
-                <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
-                    {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
-                </DialogDescription>
-                <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
-                  "{selectedInspiration.verse.text}"
-                </p>
+            <div className="grid gap-4 overflow-y-auto px-6 pb-6">
+              <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
+                "{selectedInspiration.verse.text}"
+              </p>
               <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
                 <p className="text-lg font-normal text-muted-foreground text-left leading-relaxed">
                   {selectedInspiration.explanation}
