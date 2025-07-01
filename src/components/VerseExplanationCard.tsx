@@ -2,11 +2,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type {Verse} from '@/services/bible';
 import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {Loader2, Copy, Volume2, VolumeX} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import type { Language } from '@/contexts/SettingsContext';
 
 interface TeachingDisplayCardProps {
   queryTopic: string | null;
@@ -14,9 +14,10 @@ interface TeachingDisplayCardProps {
   isLoading: boolean;
   error: string | null;
   versesFoundCount?: number;
+  language: Language;
 }
 
-export function TeachingDisplayCard({queryTopic, teachingText, isLoading, error, versesFoundCount}: TeachingDisplayCardProps) {
+export function TeachingDisplayCard({queryTopic, teachingText, isLoading, error, versesFoundCount, language}: TeachingDisplayCardProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const synth = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
@@ -59,15 +60,23 @@ export function TeachingDisplayCard({queryTopic, teachingText, isLoading, error,
     const utterance = new SpeechSynthesisUtterance(teachingText);
     utterance.pitch = 1.0;
     utterance.rate = 0.9;
+    
+    // Set language for the utterance for better voice selection
+    if (language && synth.current.getVoices().some(voice => voice.lang.startsWith(language))) {
+      utterance.lang = language;
+    } else {
+      utterance.lang = 'en-US'; // Fallback to English
+    }
+
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = (e) => {
-      console.error('SpeechSynthesis Error', e);
-      toast({ title: "Speech Error", description: "Could not play audio.", variant: "destructive" });
+    utterance.onerror = (e: SpeechSynthesisErrorEvent) => {
+      console.error('SpeechSynthesis Error:', e.error);
+      toast({ title: "Speech Error", description: `Could not play audio. Reason: ${e.error}`, variant: "destructive" });
       setIsSpeaking(false);
     };
     synth.current.speak(utterance);
-  }, [teachingText, toast]);
+  }, [teachingText, toast, language]);
   
   useEffect(() => {
     // When the teaching text changes, stop any ongoing speech.

@@ -220,6 +220,7 @@ export default function Home() {
                 isLoading={isTeachingLoading}
                 error={teachingError}
                 versesFoundCount={currentVersesForTopic?.length}
+                language={language}
               />
             </div>
           </div>
