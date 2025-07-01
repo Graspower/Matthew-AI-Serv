@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter, type Verse } from '@/services/bible';
-import { Loader2, Search, Baseline, Type } from 'lucide-react';
+import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSettings, type BibleTranslation } from '@/contexts/SettingsContext';
 import { SearchForm } from '@/components/SearchForm';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,8 @@ interface BibleReaderPageProps {
 
 const fontSizes = ['text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl'];
 const fontFamilies = ['font-sans', 'font-serif'];
+const MIN_SWIPE_DISTANCE = 50;
+
 
 export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPageProps) {
   const { bibleTranslation } = useSettings();
@@ -60,6 +62,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
   const [fontFamilyIndex, setFontFamilyIndex] = useState(0); // 'font-sans'
 
   const chapterScrollAreaRef = useRef<HTMLDivElement>(null);
+  const touchStart = useRef<{ x: number, y: number } | null>(null);
 
   // --- Data Loading Effects ---
 
@@ -132,7 +135,6 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
       const highlightElement = document.getElementById('highlighted-verse');
       if (highlightElement) {
         highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setTimeout(() => setHighlightedVerse(null), 2000);
       }
     }
   }, [chapterText, highlightedVerse]);
@@ -150,6 +152,60 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     setHighlightedVerse(null);
     setIsChapterSelectorOpen(false);
   };
+
+  const handlePrevChapter = useCallback(() => {
+    if (!selectedBook || selectedChapter === null) return;
+    const currentChapterIndex = chapters.findIndex(c => c.id === selectedChapter);
+    if (currentChapterIndex > 0) {
+      const prevChapter = chapters[currentChapterIndex - 1];
+      handleChapterSelect(prevChapter.id);
+    }
+  }, [selectedBook, selectedChapter, chapters]);
+
+  const handleNextChapter = useCallback(() => {
+    if (!selectedBook || selectedChapter === null) return;
+    const currentChapterIndex = chapters.findIndex(c => c.id === selectedChapter);
+    if (currentChapterIndex > -1 && currentChapterIndex < chapters.length - 1) {
+      const nextChapter = chapters[currentChapterIndex + 1];
+      handleChapterSelect(nextChapter.id);
+    }
+  }, [selectedBook, selectedChapter, chapters]);
+  
+  const canGoToPrevChapter = useMemo(() => {
+    if (!selectedBook || selectedChapter === null || chapters.length === 0) return false;
+    return selectedChapter > 1;
+  }, [selectedBook, selectedChapter]);
+
+  const canGoToNextChapter = useMemo(() => {
+    if (!selectedBook || selectedChapter === null || chapters.length === 0) return false;
+    return selectedChapter < chapters.length;
+  }, [selectedBook, selectedChapter, chapters.length]);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart.current) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+
+    const deltaX = touchEndX - touchStart.current.x;
+    const deltaY = touchEndY - touchStart.current.y;
+    
+    touchStart.current = null; 
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) { // It's a horizontal swipe
+      if (Math.abs(deltaX) > MIN_SWIPE_DISTANCE) {
+        if (deltaX > 0) { // Right swipe
+          handlePrevChapter();
+        } else { // Left swipe
+          handleNextChapter();
+        }
+      }
+    }
+  };
   
   const toggleFontFamily = () => setFontFamilyIndex(i => (i + 1) % fontFamilies.length);
 
@@ -165,7 +221,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
 
 
   return (
-    <div className="w-full h-full flex flex-col gap-2">
+    <div className="w-full h-full flex flex-col gap-2 relative">
       {/* Header Bar */}
       <div className="flex items-center gap-2 p-2 border-b sticky top-0 bg-background z-10">
         <Button 
@@ -212,7 +268,12 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
       </div>
       
       {/* Reader Content */}
-      <ScrollArea ref={chapterScrollAreaRef} className="flex-grow p-2 md:p-4 relative">
+      <ScrollArea
+        ref={chapterScrollAreaRef}
+        className="flex-grow p-2 md:p-4 relative"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -238,13 +299,27 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
         )}
       </ScrollArea>
 
+      {/* Floating Navigation Buttons */}
+      {selectedBook && selectedChapter !== null && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 z-20">
+          <Button onClick={handlePrevChapter} disabled={!canGoToPrevChapter} variant="secondary" className="shadow-lg">
+            <ChevronLeft className="h-5 w-5 md:mr-2" />
+            <span className="hidden md:inline">Previous</span>
+          </Button>
+          <Button onClick={handleNextChapter} disabled={!canGoToNextChapter} variant="secondary" className="shadow-lg">
+            <span className="hidden md:inline">Next</span>
+            <ChevronRight className="h-5 w-5 md:ml-2" />
+          </Button>
+        </div>
+      )}
+
       {/* Search Dialog */}
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
         <DialogContent className="w-[90vw] max-w-xl h-[80vh] flex flex-col">
            <DialogHeader>
             <DialogTitle>Search the Bible</DialogTitle>
           </DialogHeader>
-          <div className="flex-grow overflow-hidden">
+          <div className="flex-grow overflow-hidden p-0">
             <SearchForm onSearchResults={() => {}} onVerseSelect={handleVerseSelect} />
           </div>
         </DialogContent>
@@ -309,3 +384,5 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     </div>
   );
 }
+
+    
