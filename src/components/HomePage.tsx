@@ -367,7 +367,7 @@ export function HomePage() {
   );
 
   return (
-    <div className="flex flex-col items-center justify-center w-full p-2 md:px-0">
+    <div className="flex flex-col items-center justify-center w-full">
       <div className="w-full max-w-4xl text-center mb-4">
         <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>

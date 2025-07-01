@@ -465,7 +465,7 @@ export function SearchForm({ onSearchResults, onVerseSelect, onReadInReaderReque
 
 
   return (
-    <div className="w-full h-full p-1 mx-auto flex flex-col">
+    <div className="w-full h-full flex flex-col">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="relative flex items-center">
           <Input
