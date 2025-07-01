@@ -19,6 +19,7 @@ import {Switch} from "@/components/ui/switch";
 import {useForm} from "react-hook-form";
 import {Loader2, Mic, Volume2, VolumeX, BookOpenText } from "lucide-react";
 import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface SearchFormProps {
@@ -464,7 +465,7 @@ export function SearchForm({ onSearchResults, onVerseSelect, onReadInReaderReque
 
 
   return (
-    <div className="w-full max-w-md p-4 mx-auto">
+    <div className="w-full h-full p-1 mx-auto flex flex-col">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="relative flex items-center">
           <Input
@@ -521,76 +522,78 @@ export function SearchForm({ onSearchResults, onVerseSelect, onReadInReaderReque
 
 
       {isLoading && (
-        <div className="mt-6 flex justify-center items-center h-20">
+        <div className="mt-6 flex flex-grow justify-center items-center">
           <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
       )}
 
       {!isLoading && searchTerm && (
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold mb-3 text-center">Results for "{searchTerm}" ({language.toUpperCase()}/{bibleTranslation})</h2>
+        <div className="mt-6 flex-grow overflow-hidden flex flex-col">
+          <h2 className="text-xl font-semibold mb-3 text-center flex-shrink-0">Results for "{searchTerm}"</h2>
           {displayedVerses.length > 0 ? (
-            <div className="grid gap-4">
-              {displayedVerses.map((verse, index) => (
-                <Card
-                  key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}-${verse.languageContext || language}-${verse.translationContext || bibleTranslation}`} 
-                  className="shadow-md rounded-lg overflow-hidden transition-colors hover:bg-muted/10"
-                  tabIndex={0}
-                  role="article"
-                  aria-label={`Verse ${verse.book} ${verse.chapter}:${verse.verse}`}
-                >
-                  <CardHeader 
-                    className="bg-secondary/70 p-3 flex flex-row justify-between items-center cursor-pointer"
-                    onClick={() => onVerseSelect && onVerseSelect(verse)}
-                  >
-                    <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} ({verse.translationContext || bibleTranslation})</CardTitle>
-                    <div className="flex items-center gap-1">
-                      {isVoiceReaderEnabled && isJohn316KJV(verse) && ( 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(e) => { e.stopPropagation(); speakVerse(verse.text, index, verse, e); }}
-                          disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null}
-                          aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
+            <ScrollArea className="flex-grow">
+                <div className="grid gap-4 pr-4">
+                {displayedVerses.map((verse, index) => (
+                    <Card
+                    key={`${verse.book}-${verse.chapter}-${verse.verse}-${index}-${verse.languageContext || language}-${verse.translationContext || bibleTranslation}`} 
+                    className="shadow-md rounded-lg overflow-hidden transition-colors hover:bg-muted/10"
+                    tabIndex={0}
+                    role="article"
+                    aria-label={`Verse ${verse.book} ${verse.chapter}:${verse.verse}`}
+                    >
+                    <CardHeader 
+                        className="bg-secondary/70 p-3 flex flex-row justify-between items-center cursor-pointer"
+                        onClick={() => onVerseSelect && onVerseSelect(verse)}
+                    >
+                        <CardTitle className="text-md font-semibold">{verse.book} {verse.chapter}:{verse.verse} ({verse.translationContext || bibleTranslation})</CardTitle>
+                        <div className="flex items-center gap-1">
+                        {isVoiceReaderEnabled && isJohn316KJV(verse) && ( 
+                            <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => { e.stopPropagation(); speakVerse(verse.text, index, verse, e); }}
+                            disabled={isSpeaking && currentSpeakingVerseIndex !== index && currentSpeakingVerseIndex !== null}
+                            aria-label={`Speak verse ${verse.book} ${verse.chapter}:${verse.verse}`}
+                            >
+                            {isSpeaking && currentSpeakingVerseIndex === index ? (
+                                <VolumeX className="h-4 w-4" />
+                            ) : (
+                                <Volume2 className="h-4 w-4" />
+                            )}
+                            </Button>
+                        )}
+                        {onReadInReaderRequest && (
+                            <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => { e.stopPropagation(); onReadInReaderRequest(verse); }}
+                            aria-label={`Read ${verse.book} ${verse.chapter}:${verse.verse} in Bible Reader`}
+                            title="Read in Bible Reader"
+                            >
+                            <BookOpenText className="h-4 w-4" />
+                            </Button>
+                        )}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                        <p
+                            ref={(el) => { verseTextRefs.current[index] = el; }}
+                            className="text-sm leading-relaxed"
+                            style={{ whiteSpace: 'pre-wrap' }}
                         >
-                          {isSpeaking && currentSpeakingVerseIndex === index ? (
-                              <VolumeX className="h-4 w-4" />
-                          ) : (
-                              <Volume2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
-                      {onReadInReaderRequest && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(e) => { e.stopPropagation(); onReadInReaderRequest(verse); }}
-                          aria-label={`Read ${verse.book} ${verse.chapter}:${verse.verse} in Bible Reader`}
-                          title="Read in Bible Reader"
-                        >
-                          <BookOpenText className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-3">
-                    <p
-                        ref={(el) => { verseTextRefs.current[index] = el; }}
-                        className="text-sm leading-relaxed"
-                        style={{ whiteSpace: 'pre-wrap' }}
-                      >
-                        {renderVerseText(verse.text, index, verse)}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                            {renderVerseText(verse.text, index, verse)}
+                        </p>
+                    </CardContent>
+                    </Card>
+                ))}
+                </div>
+            </ScrollArea>
           ) : (
-             <Card className="shadow-md rounded-lg">
+             <Card className="shadow-md rounded-lg mt-4">
                 <CardContent className="p-4 text-center text-muted-foreground">
-                  <p>No matching verses found for your query in the selected language ({language.toUpperCase()}) and translation ({bibleTranslation}), or unable to fetch verse details from local data for {bibleTranslation}. Ensure parsing for {bibleTranslation} is implemented in src/services/bible.ts if local data is expected.</p>
+                  <p>No matching verses found for your query in the selected language ({language.toUpperCase()}) and translation ({bibleTranslation}).</p>
                 </CardContent>
              </Card>
           )}

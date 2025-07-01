@@ -436,16 +436,12 @@ export function HomePage() {
 
       {selectedInspiration && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogContent className="max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col">
             <DialogHeader className="p-6 pb-2 text-center">
                 <DialogTitle className="text-2xl">{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
                 <DialogDescription className="text-primary font-semibold text-lg pt-2">
                     {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
                 </DialogDescription>
-                 <DialogClose className="absolute right-4 top-4 rounded-sm p-1 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                </DialogClose>
             </DialogHeader>
             <div className="p-6 pt-2 grid gap-4 overflow-y-auto">
                 <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
@@ -457,11 +453,15 @@ export function HomePage() {
                 </p>
               </div>
             </div>
+            <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+            </DialogClose>
           </DialogContent>
         </Dialog>
       )}
 
-      <div className="w-full max-w-6xl mx-auto mt-4 text-center">
+      <div className="w-full max-w-6xl mx-auto mt-8 text-center">
         <div className="flex justify-center gap-2 md:gap-4 mb-8 border-b pb-4">
           <Button variant={activeTab === 'testimonies' ? 'default' : 'outline'} onClick={() => setActiveTab('testimonies')} className="rounded-full px-6">
             Testimonies

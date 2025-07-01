@@ -15,8 +15,10 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter, type Verse } from '@/services/bible';
-import { Loader2, Search, Mic, Type, Minus, Plus, X } from 'lucide-react';
+import { Loader2, Search, Baseline, Type } from 'lucide-react';
 import { useSettings, type BibleTranslation } from '@/contexts/SettingsContext';
 import { SearchForm } from '@/components/SearchForm';
 import { cn } from '@/lib/utils';
@@ -35,7 +37,7 @@ interface BibleReaderPageProps {
   onReadComplete: () => void;
 }
 
-const fontSizes = ['text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl'];
+const fontSizes = ['text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl'];
 const fontFamilies = ['font-sans', 'font-serif'];
 
 export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPageProps) {
@@ -149,8 +151,6 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     setIsChapterSelectorOpen(false);
   };
   
-  const increaseFontSize = () => setFontSizeIndex(i => Math.min(i + 1, fontSizes.length - 1));
-  const decreaseFontSize = () => setFontSizeIndex(i => Math.max(i - 1, 0));
   const toggleFontFamily = () => setFontFamilyIndex(i => (i + 1) % fontFamilies.length);
 
   const filteredBooks = useMemo(() => {
@@ -179,12 +179,32 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
           <Button variant="outline" size="icon" onClick={() => setIsSearchOpen(true)}>
             <Search className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={decreaseFontSize}>
-            <Minus className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={increaseFontSize}>
-            <Plus className="h-4 w-4" />
-          </Button>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Baseline className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium leading-none">Font Size</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Adjust the text size for readability.
+                  </p>
+                </div>
+                <Slider
+                  min={0}
+                  max={fontSizes.length - 1}
+                  step={1}
+                  value={[fontSizeIndex]}
+                  onValueChange={(value) => setFontSizeIndex(value[0])}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+          
           <Button variant="outline" size="icon" onClick={toggleFontFamily}>
             <Type className="h-4 w-4" />
           </Button>
@@ -220,11 +240,13 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
 
       {/* Search Dialog */}
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
+        <DialogContent className="max-w-xl h-[80vh] flex flex-col">
+           <DialogHeader>
             <DialogTitle>Search the Bible</DialogTitle>
           </DialogHeader>
-          <SearchForm onSearchResults={() => {}} onVerseSelect={handleVerseSelect} />
+          <div className="flex-grow overflow-hidden">
+            <SearchForm onSearchResults={() => {}} onVerseSelect={handleVerseSelect} />
+          </div>
         </DialogContent>
       </Dialog>
 

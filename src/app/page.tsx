@@ -27,6 +27,8 @@ import { BookOpenText, Moon, Sun } from 'lucide-react';
 import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
+const TEACHING_CACHE_KEY = 'matthew-ai-teaching-cache';
+
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
   const [currentVersesForTopic, setCurrentVersesForTopic] = useState<Verse[] | null>(null);
@@ -41,9 +43,30 @@ export default function Home() {
   const { language, setLanguage, bibleTranslation, setBibleTranslation } = useSettings();
   const { theme, setTheme } = useTheme();
 
+  useEffect(() => {
+    // On initial load, try to restore state from localStorage
+    try {
+      const cachedData = localStorage.getItem(TEACHING_CACHE_KEY);
+      if (cachedData) {
+        const { query, verses, teaching } = JSON.parse(cachedData);
+        if (query && verses && teaching) {
+          setCurrentQueryTopic(query);
+          setCurrentVersesForTopic(verses);
+          setTeachingText(teaching);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load teaching from cache:", error);
+      localStorage.removeItem(TEACHING_CACHE_KEY);
+    }
+  }, []);
+
   const handleSearchResults = useCallback(async (query: string, versesWithKJVText: Verse[]) => {
     setCurrentQueryTopic(query);
     setCurrentVersesForTopic(versesWithKJVText);
+    if (!query) {
+      localStorage.removeItem(TEACHING_CACHE_KEY);
+    }
   }, []);
 
   const handleReadVerseRequest = useCallback((verse: Verse) => {
@@ -80,6 +103,12 @@ export default function Home() {
           bibleTranslation: bibleTranslation,
         });
         setTeachingText(result.teaching);
+        // Cache the successful result
+        localStorage.setItem(TEACHING_CACHE_KEY, JSON.stringify({
+          query: currentQueryTopic,
+          verses: currentVersesForTopic,
+          teaching: result.teaching
+        }));
       } catch (error: any)
       {
         console.error('Failed to generate teaching:', error);
