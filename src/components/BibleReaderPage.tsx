@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -240,7 +240,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
 
       {/* Search Dialog */}
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-        <DialogContent className="max-w-xl h-[80vh] flex flex-col">
+        <DialogContent className="w-[90vw] max-w-xl h-[80vh] flex flex-col">
            <DialogHeader>
             <DialogTitle>Search the Bible</DialogTitle>
           </DialogHeader>
