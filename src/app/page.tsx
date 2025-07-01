@@ -190,7 +190,7 @@ export default function Home() {
         </TabsContent>
 
         <TabsContent value="matthewAI" className="flex-grow flex flex-col md:flex-row mt-0 data-[state=inactive]:hidden">
-          <div className="md:w-2/5 p-4 flex flex-col md:ml-0 ml-2 border-r">
+          <div className="md:w-2/5 p-4 flex flex-col border-r">
             <div className="flex-grow">
                <SearchForm onSearchResults={handleSearchResults} onReadInReaderRequest={handleReadVerseRequest} />
             </div>
