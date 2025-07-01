@@ -93,8 +93,8 @@ export function SearchForm({ onSearchResults, onVerseSelect, onReadInReaderReque
     setIsSpeaking(true);
 
     const utterThis = new SpeechSynthesisUtterance(text);
-    utterThis.pitch = 0.9;
-    utterThis.rate = 1.0;
+    utterThis.pitch = 1.0;
+    utterThis.rate = 0.9;
     
     if (language && typeof window !== 'undefined' && synth.current && synth.current.getVoices().some(voice => voice.lang.startsWith(language))) {
         utterThis.lang = language;

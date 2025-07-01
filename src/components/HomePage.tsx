@@ -50,7 +50,8 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
 
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength);
+  const truncated = text.slice(0, maxLength);
+  return truncated.slice(0, truncated.lastIndexOf(' ')); // Avoid cutting words
 };
 
 export function HomePage() {
@@ -106,6 +107,8 @@ export function HomePage() {
   
     const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.verse.book} chapter ${item.verse.chapter}, verse ${item.verse.verse}. ${item.verse.text}. Adoration: ${item.explanation}`;
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.pitch = 1.0;
+    utterance.rate = 0.9;
     
     utterance.onstart = () => {
       setIsSpeaking(true);
@@ -254,11 +257,9 @@ export function HomePage() {
   };
 
   const handleCardClick = (item: DailyVerse) => {
-    // This allows text selection without opening the dialog
     if (window.getSelection()?.toString()) {
       return; 
     }
-    // Don't stop audio when opening the dialog
     setSelectedInspiration(item);
     setIsDialogOpen(true);
   }
@@ -283,7 +284,6 @@ export function HomePage() {
             size="icon" 
             className="absolute top-2 right-2 rounded-full"
             onClick={(e) => { e.stopPropagation(); speakInspiration(item, index); }}
-            disabled={isSpeaking && currentlySpeakingIndex !== index}
           >
             {isSpeaking && currentlySpeakingIndex === index ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
             <span className="sr-only">Speak inspiration</span>
@@ -296,15 +296,11 @@ export function HomePage() {
             </p>
           </div>
           <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
-            <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
-              {truncateText(item.explanation, 120)}
-              {item.explanation.length > 120 && (
-                <span 
-                  className="text-primary font-semibold ml-1"
-                >
-                  Read More
-                </span>
-              )}
+             <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
+              {truncateText(item.explanation, 120)}...
+              <span className="text-primary font-semibold ml-1">
+                Read More
+              </span>
             </p>
           </div>
         </CardContent>
@@ -376,7 +372,7 @@ export function HomePage() {
   );
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-2 md:p-4 w-full">
+    <div className="flex flex-col items-center justify-center w-full p-2 md:px-0">
       <div className="w-full max-w-4xl text-center mb-4">
         <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
@@ -436,14 +432,20 @@ export function HomePage() {
 
       {selectedInspiration && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col">
-            <DialogHeader className="p-6 pb-2 text-center">
-                <DialogTitle className="text-2xl">{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
-                <DialogDescription className="text-primary font-semibold text-lg pt-2">
+          <DialogContent className="max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col p-0">
+            <DialogHeader className="p-4 flex-row items-center justify-between border-b">
+                <DialogTitle className="text-lg">
+                    {selectedInspiration.timeOfDay} Inspiration
+                </DialogTitle>
+                <DialogClose className="p-2 relative rounded-md opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
+                </DialogClose>
+            </DialogHeader>
+            <div className="p-6 grid gap-4 overflow-y-auto">
+                <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
                     {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
                 </DialogDescription>
-            </DialogHeader>
-            <div className="p-6 pt-2 grid gap-4 overflow-y-auto">
                 <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
                   "{selectedInspiration.verse.text}"
                 </p>
@@ -453,10 +455,6 @@ export function HomePage() {
                 </p>
               </div>
             </div>
-            <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-            </DialogClose>
           </DialogContent>
         </Dialog>
       )}

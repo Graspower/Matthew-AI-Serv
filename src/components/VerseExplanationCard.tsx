@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -56,6 +57,8 @@ export function TeachingDisplayCard({queryTopic, teachingText, isLoading, error,
     }
 
     const utterance = new SpeechSynthesisUtterance(teachingText);
+    utterance.pitch = 1.0;
+    utterance.rate = 0.9;
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = (e) => {
