@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -388,7 +387,7 @@ export function HomePage() {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex-grow flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+          className="flex-grow flex min-w-0 snap-x snap-mandatory overflow-x-auto scrollbar-hide"
         >
             {isLoading ? (
               [...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`))
