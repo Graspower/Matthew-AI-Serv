@@ -1,4 +1,4 @@
-
+/* Salvation to people in the world */
 'use client';
 
 import React, {useState, useCallback, useEffect} from 'react';
