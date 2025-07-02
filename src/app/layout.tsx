@@ -3,7 +3,8 @@
   Jesus is saving the world. Heaven full and   hell empty.
   God's Wisdom will fill us.
   God's love overflow in human hearts.
-  God's spirit will fill every flesh in the   world.
+  God's spirit will fill every man and woman in the entire world.
+  Jesus saves
 */
 
 import type {Metadata, Viewport} from 'next';
