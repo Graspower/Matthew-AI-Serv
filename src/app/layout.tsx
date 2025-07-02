@@ -1,9 +1,9 @@
 
 /*
-  Jesus is saving the world. Heaven full and hell empty.
-  Gods Wisdom will fill us.
-  Gods love overtake human hearts.
-  Gods spirit fill every flesh in the world.
+  Jesus is saving the world. Heaven full and     hell empty.
+  God's Wisdom will fill us.
+  God's love overflow in human hearts.
+  God's spirit will fill every flesh in the world.
 */
 
 import type {Metadata, Viewport} from 'next';
