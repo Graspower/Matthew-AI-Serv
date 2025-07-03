@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -49,16 +48,14 @@ const inspirationalVerses: Verse[] = [
   { book: 'Revelation', chapter: 4, verse: 11, text: 'Thou art worthy, O Lord, to receive glory and honour and power: for thou hast created all things, and for thy pleasure they are and were created.'},
 ];
 
-const testimonyFormSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  imageFile: (typeof window === 'undefined')
-    ? z.any()
-    : z.instanceof(FileList).refine((files) => files?.length === 1, 'An image is required.'),
-  hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }),
+// Define a base schema and type that is safe for server-side rendering
+const testimonyFormSchemaForType = z.object({
+  name: z.string(),
+  description: z.string(),
+  imageFile: z.any(),
+  hint: z.string(),
 });
-
-type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
+type TestimonyFormData = z.infer<typeof testimonyFormSchemaForType>;
 
 
 // Helper to shuffle array and pick N items
@@ -94,6 +91,20 @@ export function HomePage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
+  
+  // Define the schema inside the component using useMemo to ensure it's only created on the client.
+  const testimonyFormSchema = React.useMemo(() => {
+    const imageFileSchema = (typeof window !== 'undefined' && window.FileList)
+      ? z.instanceof(FileList).refine(files => files?.length === 1, 'An image is required.')
+      : z.any();
+
+    return z.object({
+      name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+      description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
+      imageFile: imageFileSchema,
+      hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }),
+    });
+  }, []);
 
   const form = useForm<TestimonyFormData>({
     resolver: zodResolver(testimonyFormSchema),
