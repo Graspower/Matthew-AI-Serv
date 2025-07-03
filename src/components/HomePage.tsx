@@ -446,19 +446,27 @@ export function HomePage() {
     }
 
     return (
-      <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer min-h-[300px] text-white">
-        <div
-          className="relative w-full h-full flex flex-col justify-between items-center text-center p-6 bg-cover bg-center min-h-[300px]"
-          style={{ backgroundImage: `url(${backgroundImage})` }}
-          data-ai-hint={item.name.toLowerCase() === 'abraham' ? 'abraham bible' : 'abstract spiritual light'}
-        >
-          <div className="absolute inset-0 bg-black/50 z-0"></div>
-          <div className="relative z-10 flex flex-col justify-center items-center flex-grow">
-              <h3 className="text-3xl font-bold text-white" style={{ textShadow: '2px 2px 6px rgba(0, 0, 0, 0.8)' }}>
+      // The Card itself is now the container for the background image
+      <Card
+        className="w-full flex shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer min-h-[300px] text-white relative bg-cover bg-center"
+        style={{ backgroundImage: `url(${backgroundImage})` }}
+        data-ai-hint={item.name.toLowerCase() === 'abraham' ? 'abraham bible' : 'abstract spiritual light'}
+      >
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-black/50 z-0"></div>
+
+        {/* Content container, positioned above the overlay */}
+        <div className="relative z-10 w-full h-full flex flex-col justify-between items-center text-center p-6">
+          
+          {/* Hint text container, grows to fill space and centers content */}
+          <div className="flex-grow flex flex-col justify-center items-center">
+              <h3 className="text-3xl font-bold" style={{ textShadow: '2px 2px 6px rgba(0, 0, 0, 0.8)' }}>
                   {item.hint}
               </h3>
           </div>
-          <div className="relative z-10 w-full">
+
+          {/* Name and description container, at the bottom */}
+          <div className="w-full">
             <p className="font-semibold text-lg">{item.name}</p>
             <p className="text-sm opacity-90 mt-1">{item.description}</p>
           </div>
@@ -704,4 +712,3 @@ service cloud.firestore {
   );
 }
 
-    
