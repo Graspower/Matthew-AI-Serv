@@ -2,14 +2,19 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getTestimonies, type Testimony } from '@/services/testimonies';
+import { getTestimonies, addTestimony, type Testimony, type NewTestimony } from '@/services/testimonies';
 
 interface Verse {
   book: string;
@@ -42,6 +47,14 @@ const inspirationalVerses: Verse[] = [
   { book: 'Revelation', chapter: 4, verse: 11, text: 'Thou art worthy, O Lord, to receive glory and honour and power: for thou hast created all things, and for thy pleasure they are and were created.'},
 ];
 
+const testimonyFormSchema = z.object({
+  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
+  imageSrc: z.string().url({ message: 'Please enter a valid image URL.' }).startsWith('/images/', { message: 'Image path must start with /images/' }),
+  hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }),
+});
+
+
 // Helper to shuffle array and pick N items
 function pickRandomItems<T>(arr: T[], num: number): T[] {
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
@@ -66,6 +79,7 @@ export function HomePage() {
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [isLoadingTestimonies, setIsLoadingTestimonies] = useState(true);
   const [testimoniesError, setTestimoniesError] = useState<string | null>(null);
+  const [isAddTestimonyDialogOpen, setIsAddTestimonyDialogOpen] = useState(false);
 
 
   const synth = useRef<SpeechSynthesis | null>(null);
@@ -74,6 +88,16 @@ export function HomePage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
+
+  const form = useForm<NewTestimony>({
+    resolver: zodResolver(testimonyFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      imageSrc: '/images/',
+      hint: '',
+    },
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -203,22 +227,23 @@ export function HomePage() {
     generateAndStoreVerses();
   }, [generateAndStoreVerses]);
 
-  useEffect(() => {
-    async function fetchTestimonies() {
-      setIsLoadingTestimonies(true);
-      setTestimoniesError(null);
-      try {
-        const data = await getTestimonies();
-        setTestimonies(data);
-      } catch (error: any) {
-        console.error(error);
-        setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
-      } finally {
-        setIsLoadingTestimonies(false);
-      }
+  const fetchTestimonies = useCallback(async () => {
+    setIsLoadingTestimonies(true);
+    setTestimoniesError(null);
+    try {
+      const data = await getTestimonies();
+      setTestimonies(data);
+    } catch (error: any) {
+      console.error(error);
+      setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
+    } finally {
+      setIsLoadingTestimonies(false);
     }
-    fetchTestimonies();
   }, []);
+
+  useEffect(() => {
+    fetchTestimonies();
+  }, [fetchTestimonies]);
 
   const scrollToCard = useCallback((index: number) => {
     if (cardRefs.current[index]) {
@@ -281,6 +306,23 @@ export function HomePage() {
     setSelectedInspiration(item);
     setIsDialogOpen(true);
   }
+  
+  async function handleAddTestimony(data: NewTestimony) {
+    try {
+      await addTestimony(data);
+      toast({ title: 'Success!', description: 'Testimony added successfully.' });
+      setIsAddTestimonyDialogOpen(false);
+      fetchTestimonies();
+      form.reset();
+    } catch (error: any) {
+      toast({
+        title: 'Submission Error',
+        description: error.message || 'Failed to add testimony. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }
+
 
   const renderVerseCard = (item: DailyVerse, index: number) => (
     <div
@@ -492,14 +534,90 @@ export function HomePage() {
 
         <div className="pt-4">
           {activeTab === 'testimonies' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {isLoadingTestimonies ? (
-                [...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />)
-              ) : testimoniesError ? (
-                 <p className="text-destructive col-span-full">{testimoniesError}</p>
-              ) : (
-                 testimonies.map((item) => <ContentCard key={item.id} item={item} />)
-              )}
+            <div>
+                <div className="text-right mb-4">
+                    <Dialog open={isAddTestimonyDialogOpen} onOpenChange={setIsAddTestimonyDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>Add Testimony</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Add a New Testimony</DialogTitle>
+                                <DialogDescription>
+                                    Share a testimony to encourage others.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Form {...form}>
+                                <form onSubmit={form.handleSubmit(handleAddTestimony)} className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Name</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g., Abraham" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="description"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Description</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="A brief description of the testimony" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="imageSrc"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Image Path</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="/images/your-image.png" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="hint"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>AI Hint</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g., desert patriarch" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                                        {form.formState.isSubmitting ? 'Submitting...' : 'Submit Testimony'}
+                                    </Button>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {isLoadingTestimonies ? (
+                    [...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />)
+                ) : testimoniesError ? (
+                    <p className="text-destructive col-span-full">{testimoniesError}</p>
+                ) : (
+                    testimonies.map((item) => <ContentCard key={item.id} item={item} />)
+                )}
+                </div>
             </div>
           )}
           {activeTab === 'prayers' && (
