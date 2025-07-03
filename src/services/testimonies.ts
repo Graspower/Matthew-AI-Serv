@@ -45,7 +45,10 @@ export async function getTestimonies(): Promise<Testimony[]> {
     return testimonyList.sort((a, b) => a.name.localeCompare(b.name));
   } catch (error: any) {
     console.error("Error fetching testimonies: ", error);
+    if (error.code === 'permission-denied') {
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading testimonies. Please update your Firestore rules to allow 'read' access to the 'testimonies' collection.");
+    }
     // Re-throw the error with a more descriptive message to be caught by the UI component
-    throw new Error(`Failed to fetch testimonies. Please check security rules and network connection. Original error: ${error.code || error.message}`);
+    throw new Error(`Failed to fetch testimonies. Please check your network connection. Original error: ${error.code || error.message}`);
   }
 }
