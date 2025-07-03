@@ -86,6 +86,20 @@ const truncateText = (text: string, maxLength: number) => {
   return truncated.slice(0, truncated.lastIndexOf(' ')); // Avoid cutting words
 };
 
+// Default testimonies to show if the database is empty
+const defaultTestimonies: NewTestimony[] = [
+    { name: 'Abraham', description: "Became the father of many nations through faith.", hint: 'Test of Faith' },
+    { name: 'Esther', description: "Risked her life to save her people.", hint: 'Courageous Queen' },
+    { name: 'Jacob', description: "Received a new name after wrestling with God.", hint: 'Wrestled with God' },
+    { name: 'Job', description: "Remained faithful to God despite immense loss.", hint: 'Unwavering Faith' },
+    { name: 'Joseph', description: "From a prison to a palace, he saved many.", hint: 'Dreamer to Ruler' },
+    { name: 'Mary Magdalene', description: "The first to see the risen Christ.", hint: 'Devoted Follower' },
+    { name: 'Matthew', description: "Left his tax booth to become an apostle.", hint: 'Followed Jesus' },
+    { name: 'Moses', description: "Led the Israelites out of slavery in Egypt.", hint: 'The Lawgiver' },
+    { name: 'Paul', description: "Transformed from persecutor to powerful apostle.", hint: 'Damascus Road' },
+];
+
+
 export function HomePage() {
   const [dailyVerses, setDailyVerses] = useState<DailyVerse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -250,10 +264,17 @@ export function HomePage() {
     setTestimoniesError(null);
     try {
       const data = await getTestimonies();
-      setTestimonies(data);
+      // Use default testimonies only if the fetch is successful but returns an empty array.
+      if (data.length > 0) {
+        setTestimonies(data);
+      } else {
+        setTestimonies(defaultTestimonies.map((t, i) => ({ ...t, id: `default-${i}` })));
+      }
     } catch (error: any) {
       console.error(error);
       setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
+      // On error, we want the error message to be displayed, so we clear any existing testimonies.
+      setTestimonies([]);
     } finally {
       setIsLoadingTestimonies(false);
     }
@@ -446,7 +467,7 @@ export function HomePage() {
       if (item.name.toLowerCase() === 'abraham') {
         return abrahamImage;
       }
-      // Create a simple hash from the testimony content to get a consistent "random" index.
+      // Create a deterministic "random" index based on the testimony content.
       // This ensures the same background is always chosen for the same testimony, avoiding hydration errors.
       const hash = item.name.length + item.description.length;
       const randomIndex = hash % testimonyBackgrounds.length;
