@@ -442,22 +442,16 @@ export function HomePage() {
   );
 
   const TestimonyContentCard = ({ item }: { item: Testimony }) => {
-    const [backgroundImage, setBackgroundImage] = useState('');
-
-    useEffect(() => {
-      // This logic now runs only on the client, preventing hydration mismatch
+    const backgroundImage = useMemo(() => {
       if (item.name.toLowerCase() === 'abraham') {
-        setBackgroundImage(abrahamImage);
-      } else {
-        const randomIndex = Math.floor(Math.random() * testimonyBackgrounds.length);
-        setBackgroundImage(testimonyBackgrounds[randomIndex]);
+        return abrahamImage;
       }
-    }, [item.name]);
-
-    if (!backgroundImage) {
-      // Render a skeleton or a placeholder while waiting for the client-side effect to run
-      return <ContentCardSkeleton />;
-    }
+      // Create a simple hash from the testimony content to get a consistent "random" index.
+      // This ensures the same background is always chosen for the same testimony, avoiding hydration errors.
+      const hash = item.name.length + item.description.length;
+      const randomIndex = hash % testimonyBackgrounds.length;
+      return testimonyBackgrounds[randomIndex];
+    }, [item]);
 
     return (
       // The Card itself is now the container for the background image
