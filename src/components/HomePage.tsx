@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -52,8 +53,8 @@ const inspirationalVerses: Verse[] = [
 const testimonyFormSchemaForType = z.object({
   name: z.string(),
   description: z.string(),
-  imageFile: z.any(),
-  hint: z.string(),
+  imageFile: z.any().optional(),
+  hint: z.string().optional(),
 });
 type TestimonyFormData = z.infer<typeof testimonyFormSchemaForType>;
 
@@ -96,14 +97,14 @@ export function HomePage() {
   const testimonyFormSchema = useMemo(() => {
     // This check ensures that `FileList` is only used on the client-side
     const imageFileSchema = typeof window !== 'undefined'
-      ? z.instanceof(FileList).refine(files => files?.length === 1, 'An image is required.')
-      : z.any();
+      ? z.instanceof(FileList).optional()
+      : z.any().optional();
 
     return z.object({
       name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
       description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
       imageFile: imageFileSchema,
-      hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }),
+      hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }).optional(),
     });
   }, []);
 
@@ -326,13 +327,16 @@ export function HomePage() {
   
   async function handleAddTestimony(data: TestimonyFormData) {
     try {
-      const imageFile = data.imageFile[0];
-      const imageUrl = await uploadTestimonyImage(imageFile);
+      let imageUrl = '';
+      if (data.imageFile && data.imageFile.length > 0) {
+        const imageFile = data.imageFile[0];
+        imageUrl = await uploadTestimonyImage(imageFile);
+      }
 
       const newTestimony: NewTestimony = {
         name: data.name,
         description: data.description,
-        hint: data.hint,
+        hint: data.hint || '',
         imageSrc: imageUrl,
       };
 
@@ -607,7 +611,7 @@ export function HomePage() {
                                         name="imageFile"
                                         render={({ field: { onChange, value, ...rest }}) => (
                                           <FormItem>
-                                            <FormLabel>Image</FormLabel>
+                                            <FormLabel>Image (Optional)</FormLabel>
                                             <FormControl>
                                               <Input 
                                                 type="file" 
@@ -627,7 +631,7 @@ export function HomePage() {
                                         name="hint"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>AI Hint</FormLabel>
+                                                <FormLabel>AI Hint (for image)</FormLabel>
                                                 <FormControl>
                                                     <Input placeholder="e.g., desert patriarch" {...field} />
                                                 </FormControl>
