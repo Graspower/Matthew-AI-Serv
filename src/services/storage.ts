@@ -16,6 +16,9 @@ export async function uploadTestimonyImage(imageFile: File): Promise<string> {
     return downloadURL;
   } catch (error: any) {
     console.error("Error uploading image: ", error);
-    throw new Error(`Failed to upload image. Original error: ${error.code || error.message}`);
+    if (error.code === 'storage/unauthorized') {
+      throw new Error("Image upload failed: Permission denied. Please check your Firebase Storage security rules.");
+    }
+    throw new Error(`Failed to upload image. Error: ${error.code || error.message}`);
   }
 }

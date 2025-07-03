@@ -20,6 +20,9 @@ export async function addTestimony(testimony: NewTestimony): Promise<void> {
     });
   } catch (error: any) {
     console.error("Error adding testimony: ", error);
+    if (error.code === 'permission-denied') {
+        throw new Error("Failed to add testimony: Permission denied. Please check your Firestore security rules.");
+    }
     throw new Error(`Failed to add testimony. Please check security rules and network connection. Original error: ${error.code || error.message}`);
   }
 }
