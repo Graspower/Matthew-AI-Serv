@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -54,7 +54,7 @@ const testimonyFormSchemaForType = z.object({
   name: z.string(),
   description: z.string(),
   imageFile: z.any().optional(),
-  hint: z.string().optional(),
+  hint: z.string(),
 });
 type TestimonyFormData = z.infer<typeof testimonyFormSchemaForType>;
 
@@ -103,8 +103,8 @@ export function HomePage() {
     return z.object({
       name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
       description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-      imageFile: imageFileSchema,
-      hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }).optional(),
+      imageFile: imageFileSchema.optional(),
+      hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(50, { message: 'Hint must be 50 characters or less.' }),
     });
   }, []);
 
@@ -336,7 +336,7 @@ export function HomePage() {
       const newTestimony: NewTestimony = {
         name: data.name,
         description: data.description,
-        hint: data.hint || '',
+        hint: data.hint,
         imageSrc: imageUrl,
       };
 
@@ -436,11 +436,17 @@ export function HomePage() {
     { name: 'On Time Management', description: 'Redeeming the time with purpose, wisdom, and eternal perspective.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient hourglass' },
   ];
   
-  const ContentCard = ({ item }: { item: { name: string; description: string; imageSrc: string; hint: string; } }) => (
-    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer">
-      <div className="relative w-full aspect-[3/2]">
-        <Image src={item.imageSrc} alt={item.name} layout="fill" className="object-cover" data-ai-hint={item.hint} />
-      </div>
+  const ContentCard = ({ item }: { item: { id?: string; name: string; description: string; imageSrc: string; hint: string; } }) => (
+    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer min-h-[300px]">
+      {item.id ? (
+        <div className="relative w-full aspect-[3/2] flex items-center justify-center p-4 bg-muted/50">
+          <p className="text-center font-semibold text-lg text-muted-foreground">{item.hint}</p>
+        </div>
+      ) : (
+        <div className="relative w-full aspect-[3/2]">
+          <Image src={item.imageSrc} alt={item.name} layout="fill" className="object-cover" data-ai-hint={item.hint} />
+        </div>
+      )}
       <div className="flex flex-col flex-grow p-4">
         <h3 className="text-xl font-semibold">{item.name}</h3>
         <p className="text-sm text-muted-foreground mt-2">{item.description}</p>
@@ -631,10 +637,13 @@ export function HomePage() {
                                         name="hint"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>AI Hint (for image)</FormLabel>
+                                                <FormLabel>Testimony Hint</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="e.g., desert patriarch" {...field} />
+                                                    <Input placeholder="e.g., Answered prayer for healing" {...field} />
                                                 </FormControl>
+                                                <FormDescription>
+                                                  A short phrase that will be displayed on the card.
+                                                </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
