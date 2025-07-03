@@ -16,7 +16,6 @@ import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTestimonies, addTestimony, type Testimony, type NewTestimony } from '@/services/testimonies';
-import { uploadTestimonyImage } from '@/services/storage';
 
 interface Verse {
   book: string;
@@ -49,14 +48,19 @@ const inspirationalVerses: Verse[] = [
   { book: 'Revelation', chapter: 4, verse: 11, text: 'Thou art worthy, O Lord, to receive glory and honour and power: for thou hast created all things, and for thy pleasure they are and were created.'},
 ];
 
-// Define a base schema and type that is safe for server-side rendering
-const testimonyFormSchemaForType = z.object({
-  name: z.string(),
-  description: z.string(),
-  imageFile: z.any().optional(),
-  hint: z.string(),
+// Define the schema for the testimony form.
+const testimonyFormSchema = z.object({
+  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
+  hint: z.string().min(2, { message: 'A hint is required.' }).max(100, { message: 'Hint must be 100 characters or less.' }),
 });
-type TestimonyFormData = z.infer<typeof testimonyFormSchemaForType>;
+type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
+
+// TODO: User should replace these placeholder paths.
+// Create a folder `public/images/testimonies` and add 15 images named testimony-1.jpg, testimony-2.jpg, etc.
+const testimonyBackgrounds = Array.from({ length: 15 }, (_, i) => `/images/testimonies/testimony-${i + 1}.jpg`);
+// TODO: User should add an image for Abraham at `public/images/abraham.jpg`
+const abrahamImage = '/images/abraham.jpg';
 
 
 // Helper to shuffle array and pick N items
@@ -93,21 +97,6 @@ export function HomePage() {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
   
-  // Define the schema inside the component using useMemo to ensure it's only created on the client.
-  const testimonyFormSchema = useMemo(() => {
-    // This check ensures that `FileList` is only used on the client-side
-    const imageFileSchema = typeof window !== 'undefined'
-      ? z.instanceof(FileList).optional()
-      : z.any().optional();
-
-    return z.object({
-      name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-      description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-      imageFile: imageFileSchema.optional(),
-      hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(50, { message: 'Hint must be 50 characters or less.' }),
-    });
-  }, []);
-
   const form = useForm<TestimonyFormData>({
     resolver: zodResolver(testimonyFormSchema),
     defaultValues: {
@@ -327,17 +316,10 @@ export function HomePage() {
   
   async function handleAddTestimony(data: TestimonyFormData) {
     try {
-      let imageUrl = '';
-      if (data.imageFile && data.imageFile.length > 0) {
-        const imageFile = data.imageFile[0];
-        imageUrl = await uploadTestimonyImage(imageFile);
-      }
-
       const newTestimony: NewTestimony = {
         name: data.name,
         description: data.description,
         hint: data.hint,
-        imageSrc: imageUrl,
       };
 
       await addTestimony(newTestimony);
@@ -435,18 +417,12 @@ export function HomePage() {
     { name: 'On Healing', description: 'Exploring the scriptural basis for divine healing and how to receive it.', imageSrc: 'https://placehold.co/600x400.png', hint: 'healing hands light' },
     { name: 'On Time Management', description: 'Redeeming the time with purpose, wisdom, and eternal perspective.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient hourglass' },
   ];
-  
-  const ContentCard = ({ item }: { item: { id?: string; name: string; description: string; imageSrc: string; hint: string; } }) => (
+
+  const ContentCard = ({ item }: { item: { name: string; description: string; imageSrc: string; hint: string; } }) => (
     <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer min-h-[300px]">
-      {item.id ? (
-        <div className="relative w-full aspect-[3/2] flex items-center justify-center p-4 bg-muted/50">
-          <p className="text-center font-semibold text-lg text-muted-foreground">{item.hint}</p>
-        </div>
-      ) : (
-        <div className="relative w-full aspect-[3/2]">
-          <Image src={item.imageSrc} alt={item.name} layout="fill" className="object-cover" data-ai-hint={item.hint} />
-        </div>
-      )}
+      <div className="relative w-full aspect-[3/2]">
+        <Image src={item.imageSrc} alt={item.name} layout="fill" className="object-cover" data-ai-hint={item.hint} />
+      </div>
       <div className="flex flex-col flex-grow p-4">
         <h3 className="text-xl font-semibold">{item.name}</h3>
         <p className="text-sm text-muted-foreground mt-2">{item.description}</p>
@@ -454,8 +430,48 @@ export function HomePage() {
     </Card>
   );
 
+  const TestimonyContentCard = ({ item }: { item: Testimony }) => {
+    const [backgroundImage, setBackgroundImage] = useState('');
+
+    useEffect(() => {
+      // This logic now runs only on the client, preventing hydration mismatch
+      if (item.name.toLowerCase() === 'abraham') {
+        setBackgroundImage(abrahamImage);
+      } else {
+        const randomIndex = Math.floor(Math.random() * testimonyBackgrounds.length);
+        setBackgroundImage(testimonyBackgrounds[randomIndex]);
+      }
+    }, [item.name]);
+
+    if (!backgroundImage) {
+      // Render a skeleton or a placeholder while waiting for the client-side effect to run
+      return <ContentCardSkeleton />;
+    }
+
+    return (
+      <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer min-h-[300px] text-white">
+        <div
+          className="relative w-full h-full flex flex-col justify-between items-center text-center p-6 bg-cover bg-center min-h-[300px]"
+          style={{ backgroundImage: `url(${backgroundImage})` }}
+          data-ai-hint={item.name.toLowerCase() === 'abraham' ? 'abraham bible' : 'abstract spiritual light'}
+        >
+          <div className="absolute inset-0 bg-black/50 z-0"></div>
+          <div className="relative z-10 flex flex-col justify-center items-center flex-grow">
+              <h3 className="text-2xl font-bold" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.7)' }}>
+                  {item.hint}
+              </h3>
+          </div>
+          <div className="relative z-10 w-full">
+            <p className="font-semibold text-lg">{item.name}</p>
+            <p className="text-sm opacity-90 mt-1">{item.description}</p>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+  
   const ContentCardSkeleton = () => (
-    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden">
+    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px]">
         <Skeleton className="w-full aspect-[3/2]" />
         <div className="flex flex-col flex-grow p-4 space-y-3">
             <Skeleton className="h-6 w-3/4" />
@@ -614,26 +630,6 @@ export function HomePage() {
                                     />
                                     <FormField
                                         control={form.control}
-                                        name="imageFile"
-                                        render={({ field: { onChange, value, ...rest }}) => (
-                                          <FormItem>
-                                            <FormLabel>Image (Optional)</FormLabel>
-                                            <FormControl>
-                                              <Input 
-                                                type="file" 
-                                                accept="image/*"
-                                                onChange={(e) => {
-                                                  onChange(e.target.files);
-                                                }}
-                                                {...rest}
-                                              />
-                                            </FormControl>
-                                            <FormMessage />
-                                          </FormItem>
-                                        )}
-                                      />
-                                    <FormField
-                                        control={form.control}
                                         name="hint"
                                         render={({ field }) => (
                                             <FormItem>
@@ -642,7 +638,7 @@ export function HomePage() {
                                                     <Input placeholder="e.g., Answered prayer for healing" {...field} />
                                                 </FormControl>
                                                 <FormDescription>
-                                                  A short phrase that will be displayed on the card.
+                                                  This text will be displayed on the card.
                                                 </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
@@ -690,7 +686,7 @@ service cloud.firestore {
                         </CardContent>
                     </Card>
                 ) : (
-                    testimonies.map((item) => <ContentCard key={item.id} item={{...item, imageSrc: item.imageSrc || 'https://placehold.co/600x400.png' }} />)
+                    testimonies.map((item) => <TestimonyContentCard key={item.id} item={item} />)
                 )}
                 </div>
             </div>

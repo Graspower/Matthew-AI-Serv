@@ -1,3 +1,4 @@
+
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 
@@ -5,7 +6,6 @@ export interface Testimony {
   id: string;
   name: string;
   description: string;
-  imageSrc: string;
   hint: string;
 }
 
