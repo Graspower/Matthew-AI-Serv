@@ -4,11 +4,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getTestimonies, type Testimony } from '@/services/testimonies';
 
 interface Verse {
   book: string;
@@ -62,6 +63,10 @@ export function HomePage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentlySpeakingIndex, setCurrentlySpeakingIndex] = useState<number | null>(null);
+  const [testimonies, setTestimonies] = useState<Testimony[]>([]);
+  const [isLoadingTestimonies, setIsLoadingTestimonies] = useState(true);
+  const [testimoniesError, setTestimoniesError] = useState<string | null>(null);
+
 
   const synth = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
@@ -198,6 +203,23 @@ export function HomePage() {
     generateAndStoreVerses();
   }, [generateAndStoreVerses]);
 
+  useEffect(() => {
+    async function fetchTestimonies() {
+      setIsLoadingTestimonies(true);
+      setTestimoniesError(null);
+      try {
+        const data = await getTestimonies();
+        setTestimonies(data);
+      } catch (error) {
+        console.error(error);
+        setTestimoniesError("Failed to load testimonies. Please check your connection and try again.");
+      } finally {
+        setIsLoadingTestimonies(false);
+      }
+    }
+    fetchTestimonies();
+  }, []);
+
   const scrollToCard = useCallback((index: number) => {
     if (cardRefs.current[index]) {
       cardRefs.current[index]?.scrollIntoView({
@@ -326,18 +348,6 @@ export function HomePage() {
       </div>
   );
 
-  const testimonyData = [
-    { name: 'Abraham', description: 'The father of faith, promised a nation through whom all the earth would be blessed.', imageSrc: '/images/abrahamtestimony.png', hint: 'desert patriarch' },
-    { name: 'Joseph', description: 'From the pit to the palace, his integrity and wisdom saved nations from famine.', imageSrc: 'https://placehold.co/600x400.png', hint: 'egyptian vizier' },
-    { name: 'Paul', description: 'A persecutor transformed into a powerful apostle, spreading the Gospel to the Gentiles.', imageSrc: 'https://placehold.co/600x400.png', hint: 'roman apostle' },
-    { name: 'Jacob', description: 'Wrestled with God and was renamed Israel, fathering the twelve tribes.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient wrestler' },
-    { name: 'Matthew', description: 'A tax collector who left everything to follow Jesus and became an evangelist.', imageSrc: 'https://placehold.co/600x400.png', hint: 'disciple writing' },
-    { name: 'Mary Magdalene', description: 'A devoted follower and the first to witness the resurrection of Jesus.', imageSrc: 'https://placehold.co/600x400.png', hint: 'woman at tomb' },
-    { name: 'Esther', description: 'A courageous queen who risked her life to save her people from annihilation.', imageSrc: 'https://placehold.co/600x400.png', hint: 'persian queen' },
-    { name: 'Moses', description: 'Chosen by God to lead the Israelites out of slavery in Egypt and receive the Ten Commandments.', imageSrc: 'https://placehold.co/600x400.png', hint: 'parting sea' },
-    { name: 'Job', description: 'A righteous man who maintained his faith in God despite immense suffering and loss.', imageSrc: 'https://placehold.co/600x400.png', hint: 'suffering man' },
-  ];
-
   const prayerData = [
     { name: 'For Family', description: "Prayers for unity, protection, and God's love to fill your home.", imageSrc: '/images/prayeronmarriage.jpg', hint: 'family praying' },
     { name: 'For Health', description: 'Seeking divine healing, strength, and wellness for body, mind, and spirit.', imageSrc: 'https://placehold.co/600x400.png', hint: 'healing light' },
@@ -365,8 +375,19 @@ export function HomePage() {
     </Card>
   );
 
+  const ContentCardSkeleton = () => (
+    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden">
+        <Skeleton className="w-full aspect-[3/2]" />
+        <div className="flex flex-col flex-grow p-4 space-y-3">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+        </div>
+    </Card>
+  );
+
   return (
-    <div className="flex flex-col items-center justify-center w-full">
+    <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center p-4 min-w-0">
       <div className="w-full max-w-4xl text-center mb-4">
         <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
@@ -426,14 +447,18 @@ export function HomePage() {
 
       {selectedInspiration && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col">
+          <DialogContent className="max-w-2xl w-[90vw] flex flex-col">
             <DialogHeader>
               <DialogTitle>{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
               <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
                 {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
               </DialogDescription>
+               <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
             </DialogHeader>
-            <div className="grid gap-4 overflow-y-auto px-6 pb-6">
+            <div className="grid gap-4 overflow-y-auto px-6 pb-6 max-h-[70vh]">
               <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
                 "{selectedInspiration.verse.text}"
               </p>
@@ -463,7 +488,13 @@ export function HomePage() {
         <div className="pt-4">
           {activeTab === 'testimonies' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {testimonyData.map((item) => <ContentCard key={item.name} item={item} />)}
+              {isLoadingTestimonies ? (
+                [...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />)
+              ) : testimoniesError ? (
+                 <p className="text-destructive col-span-full">{testimoniesError}</p>
+              ) : (
+                 testimonies.map((item) => <ContentCard key={item.id} item={item} />)
+              )}
             </div>
           )}
           {activeTab === 'prayers' && (
