@@ -56,7 +56,21 @@ const testimonyFormSchema = z.object({
 });
 type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
 
-const testimonyBackgrounds = Array.from({ length: 15 }, (_, i) => `/images/testimonies/testimony-${i + 1}.jpg`);
+const testimonyBackgrounds = [
+  '/images/testimonies/bg1.jpg',
+  '/images/testimonies/bg2.jpg',
+  '/images/testimonies/bg3.jpg',
+  '/images/testimonies/bg4.jpg',
+  '/images/testimonies/bg5.jpg',
+  '/images/testimonies/bg6.jpg',
+  '/images/testimonies/bg7.jpg',
+  '/images/testimonies/bg8.jpg',
+  '/images/testimonies/bg9.jpg',
+  '/images/testimonies/bg10.jpg',
+  '/images/testimonies/bg12.jpg',
+  '/images/testimonies/bg13.jpg',
+  '/images/testimonies/bg15.jpg',
+];
 const abrahamImage = '/images/abrahamtestimony.png';
 
 
@@ -711,4 +725,3 @@ service cloud.firestore {
     </div>
   );
 }
-
