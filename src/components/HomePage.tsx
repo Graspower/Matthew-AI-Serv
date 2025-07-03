@@ -210,9 +210,9 @@ export function HomePage() {
       try {
         const data = await getTestimonies();
         setTestimonies(data);
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        setTestimoniesError("Failed to load testimonies. Please check your connection and try again.");
+        setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
       } finally {
         setIsLoadingTestimonies(false);
       }
@@ -446,17 +446,18 @@ export function HomePage() {
       </div>
 
       {selectedInspiration && (
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+              stopSpeaking();
+          }
+          setIsDialogOpen(isOpen);
+        }}>
           <DialogContent className="max-w-2xl w-[90vw] flex flex-col">
             <DialogHeader>
               <DialogTitle>{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
               <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
                 {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
               </DialogDescription>
-               <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </DialogClose>
             </DialogHeader>
             <div className="grid gap-4 overflow-y-auto px-6 pb-6 max-h-[70vh]">
               <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
@@ -468,6 +469,10 @@ export function HomePage() {
                 </p>
               </div>
             </div>
+             <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+            </DialogClose>
           </DialogContent>
         </Dialog>
       )}

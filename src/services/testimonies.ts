@@ -27,9 +27,9 @@ export async function getTestimonies(): Promise<Testimony[]> {
     } as Testimony));
 
     return testimonyList;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching testimonies: ", error);
-    // In a real app, you might want to handle this error more gracefully
-    throw new Error("Failed to fetch testimonies from Firestore.");
+    // Re-throw the error with a more descriptive message to be caught by the UI component
+    throw new Error(`Failed to fetch testimonies. Please check security rules and network connection. Original error: ${error.code || error.message}`);
   }
 }
