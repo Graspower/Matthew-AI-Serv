@@ -56,11 +56,8 @@ const testimonyFormSchema = z.object({
 });
 type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
 
-// TODO: User should replace these placeholder paths.
-// Create a folder `public/images/testimonies` and add 15 images named testimony-1.jpg, testimony-2.jpg, etc.
 const testimonyBackgrounds = Array.from({ length: 15 }, (_, i) => `/images/testimonies/testimony-${i + 1}.jpg`);
-// TODO: User should add an image for Abraham at `public/images/abraham.jpg`
-const abrahamImage = '/images/abraham.jpg';
+const abrahamImage = '/images/abrahamtestimony.png';
 
 
 // Helper to shuffle array and pick N items
@@ -457,7 +454,7 @@ export function HomePage() {
         >
           <div className="absolute inset-0 bg-black/50 z-0"></div>
           <div className="relative z-10 flex flex-col justify-center items-center flex-grow">
-              <h3 className="text-2xl font-bold" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.7)' }}>
+              <h3 className="text-3xl font-bold text-white" style={{ textShadow: '2px 2px 6px rgba(0, 0, 0, 0.8)' }}>
                   {item.hint}
               </h3>
           </div>
@@ -706,3 +703,5 @@ service cloud.firestore {
     </div>
   );
 }
+
+    
