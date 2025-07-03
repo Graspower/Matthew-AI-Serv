@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -93,8 +93,9 @@ export function HomePage() {
   const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
   
   // Define the schema inside the component using useMemo to ensure it's only created on the client.
-  const testimonyFormSchema = React.useMemo(() => {
-    const imageFileSchema = (typeof window !== 'undefined' && window.FileList)
+  const testimonyFormSchema = useMemo(() => {
+    // This check ensures that `FileList` is only used on the client-side
+    const imageFileSchema = typeof window !== 'undefined'
       ? z.instanceof(FileList).refine(files => files?.length === 1, 'An image is required.')
       : z.any();
 
@@ -646,7 +647,35 @@ export function HomePage() {
                 {isLoadingTestimonies ? (
                     [...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />)
                 ) : testimoniesError ? (
-                    <p className="text-destructive col-span-full">{testimoniesError}</p>
+                    <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
+                        <CardHeader>
+                            <CardTitle className="text-destructive">Error Loading Testimonies</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p>The application encountered an error while trying to fetch data from the database.</p>
+                            <p className="font-semibold">Please check the following:</p>
+                            <ol className="list-decimal list-inside space-y-2 text-sm">
+                                <li>
+                                    In your <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Firebase Console</a>, ensure your Firestore collection is named exactly <strong>testimonies</strong> (all lowercase).
+                                </li>
+                                <li>
+                                    Under the <strong>Firestore Database &gt; Rules</strong> tab, ensure your rules match the following exactly:
+                                    <pre className="mt-2 p-2 bg-black/50 rounded-md text-white font-mono text-xs overflow-x-auto">
+                                        {`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /testimonies/{docId} {
+      allow read, create: if true;
+    }
+  }
+}`}
+                                    </pre>
+                                </li>
+                            </ol>
+                            <p className="font-semibold">The specific error message from the database is:</p>
+                            <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{testimoniesError}</p>
+                        </CardContent>
+                    </Card>
                 ) : (
                     testimonies.map((item) => <ContentCard key={item.id} item={{...item, imageSrc: item.imageSrc || 'https://placehold.co/600x400.png' }} />)
                 )}
