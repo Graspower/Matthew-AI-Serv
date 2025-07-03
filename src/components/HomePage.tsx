@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTestimonies, addTestimony, type Testimony, type NewTestimony } from '@/services/testimonies';
+import { uploadTestimonyImage } from '@/services/storage';
 
 interface Verse {
   book: string;
@@ -50,9 +51,11 @@ const inspirationalVerses: Verse[] = [
 const testimonyFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  imageSrc: z.string().url({ message: 'Please enter a valid image URL.' }).startsWith('/images/', { message: 'Image path must start with /images/' }),
+  imageFile: z.instanceof(FileList).refine(files => files?.length === 1, 'An image is required.'),
   hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }),
 });
+
+type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
 
 
 // Helper to shuffle array and pick N items
@@ -89,12 +92,11 @@ export function HomePage() {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
 
-  const form = useForm<NewTestimony>({
+  const form = useForm<TestimonyFormData>({
     resolver: zodResolver(testimonyFormSchema),
     defaultValues: {
       name: '',
       description: '',
-      imageSrc: '/images/',
       hint: '',
     },
   });
@@ -307,9 +309,19 @@ export function HomePage() {
     setIsDialogOpen(true);
   }
   
-  async function handleAddTestimony(data: NewTestimony) {
+  async function handleAddTestimony(data: TestimonyFormData) {
     try {
-      await addTestimony(data);
+      const imageFile = data.imageFile[0];
+      const imageUrl = await uploadTestimonyImage(imageFile);
+
+      const newTestimony: NewTestimony = {
+        name: data.name,
+        description: data.description,
+        hint: data.hint,
+        imageSrc: imageUrl,
+      };
+
+      await addTestimony(newTestimony);
       toast({ title: 'Success!', description: 'Testimony added successfully.' });
       setIsAddTestimonyDialogOpen(false);
       fetchTestimonies();
@@ -408,7 +420,7 @@ export function HomePage() {
   const ContentCard = ({ item }: { item: { name: string; description: string; imageSrc: string; hint: string; } }) => (
     <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer">
       <div className="relative w-full aspect-[3/2]">
-        <Image src={item.imageSrc} alt={item.name} fill className="object-cover" data-ai-hint={item.hint} />
+        <Image src={item.imageSrc} alt={item.name} layout="fill" className="object-cover" data-ai-hint={item.hint} />
       </div>
       <div className="flex flex-col flex-grow p-4">
         <h3 className="text-xl font-semibold">{item.name}</h3>
@@ -500,6 +512,10 @@ export function HomePage() {
               <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
                 {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
               </DialogDescription>
+               <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
+                </DialogClose>
             </DialogHeader>
             <div className="grid gap-4 overflow-y-auto px-6 pb-6 max-h-[70vh]">
               <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
@@ -511,10 +527,6 @@ export function HomePage() {
                 </p>
               </div>
             </div>
-             <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-            </DialogClose>
           </DialogContent>
         </Dialog>
       )}
@@ -577,17 +589,24 @@ export function HomePage() {
                                     />
                                     <FormField
                                         control={form.control}
-                                        name="imageSrc"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Image Path</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="/images/your-image.png" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
+                                        name="imageFile"
+                                        render={({ field: { onChange, value, ...rest }}) => (
+                                          <FormItem>
+                                            <FormLabel>Image</FormLabel>
+                                            <FormControl>
+                                              <Input 
+                                                type="file" 
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                  onChange(e.target.files);
+                                                }}
+                                                {...rest}
+                                              />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
                                         )}
-                                    />
+                                      />
                                     <FormField
                                         control={form.control}
                                         name="hint"
@@ -615,7 +634,7 @@ export function HomePage() {
                 ) : testimoniesError ? (
                     <p className="text-destructive col-span-full">{testimoniesError}</p>
                 ) : (
-                    testimonies.map((item) => <ContentCard key={item.id} item={item} />)
+                    testimonies.map((item) => <ContentCard key={item.id} item={{...item, imageSrc: item.imageSrc || 'https://placehold.co/600x400.png' }} />)
                 )}
                 </div>
             </div>
