@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, orderBy, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
 
 export interface Testimony {
   id: string;
@@ -14,8 +14,6 @@ export type NewTestimony = Omit<Testimony, 'id'>;
 export async function addTestimony(testimony: NewTestimony): Promise<void> {
   try {
     const testimoniesCol = collection(db, 'testimonies');
-    // The `name` field is added to the testimony document.
-    // We can also add an `orderBy` clause to sort testimonies by name.
     await addDoc(testimoniesCol, {
         ...testimony,
         // you might want to add a server timestamp here in a real app
@@ -30,9 +28,8 @@ export async function addTestimony(testimony: NewTestimony): Promise<void> {
 export async function getTestimonies(): Promise<Testimony[]> {
   try {
     const testimoniesCol = collection(db, 'testimonies');
-    // Optional: order by name, you can change this to a timestamp field later
-    const q = query(testimoniesCol, orderBy('name')); 
-    const testimonySnapshot = await getDocs(q);
+    // We fetch without server-side sorting to avoid needing a specific Firestore index for now.
+    const testimonySnapshot = await getDocs(testimoniesCol);
     
     if (testimonySnapshot.empty) {
         console.log('No matching documents in "testimonies" collection.');
@@ -44,7 +41,8 @@ export async function getTestimonies(): Promise<Testimony[]> {
       ...doc.data()
     } as Testimony));
 
-    return testimonyList;
+    // Sort the results on the client side after fetching.
+    return testimonyList.sort((a, b) => a.name.localeCompare(b.name));
   } catch (error: any) {
     console.error("Error fetching testimonies: ", error);
     // Re-throw the error with a more descriptive message to be caught by the UI component

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -51,7 +52,9 @@ const inspirationalVerses: Verse[] = [
 const testimonyFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  imageFile: z.instanceof(FileList).refine(files => files?.length === 1, 'An image is required.'),
+  imageFile: (typeof window === 'undefined')
+    ? z.any()
+    : z.instanceof(FileList).refine((files) => files?.length === 1, 'An image is required.'),
   hint: z.string().min(2, { message: 'Hint must be at least 2 characters.' }).max(20, { message: 'Hint must be 20 characters or less.' }),
 });
 
