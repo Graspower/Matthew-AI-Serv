@@ -319,7 +319,7 @@ export function TestimoniesSection() {
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
-          <SheetContent side="bottom" className="h-[85vh] flex flex-col">
+          <SheetContent side="bottom" className="max-h-[90vh] flex flex-col">
             <SheetHeader className="text-left">
               <SheetTitle>Comments on "{commentsModal.testimony?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
@@ -329,7 +329,7 @@ export function TestimoniesSection() {
         </Sheet>
       ) : (
         <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
-          <DialogContent className="max-w-2xl w-[90vw] h-[80vh] flex flex-col">
+          <DialogContent className="max-w-2xl w-[90vw] max-h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Comments on "{commentsModal.testimony?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
