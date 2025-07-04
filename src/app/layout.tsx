@@ -16,6 +16,7 @@ import { SettingsProvider } from '@/contexts/SettingsContext'; // Import Setting
 import { ThemeProvider } from '@/contexts/ThemeContext'; // Import ThemeProvider
 import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
 import Script from 'next/script';
+import { Header } from '@/components/Header';
 
 // Initialize fonts correctly in the layout
 const geistSans = Geist({
@@ -75,7 +76,10 @@ export default function RootLayout({
         >
           <AuthProvider>
             <SettingsProvider>
-              {children}
+              <div className="relative flex min-h-screen flex-col">
+                <Header />
+                <main className="flex-1">{children}</main>
+              </div>
               <Toaster />
             </SettingsProvider>
           </AuthProvider>

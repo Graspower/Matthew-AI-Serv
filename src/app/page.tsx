@@ -1,5 +1,4 @@
 
-/* Salvation to people in the world */
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -14,19 +13,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { HomePage } from '@/components/HomePage';
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { BookOpenText, Moon, Sun } from 'lucide-react';
-import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { TestimoniesSection } from '@/components/TestimoniesSection';
 import { PrayersSection } from '@/components/PrayersSection';
 import { TeachingsSection } from '@/components/TeachingsSection';
@@ -47,8 +34,7 @@ export default function Home() {
   const [activeHomeSection, setActiveHomeSection] = useState<HomeSection>('testimonies');
 
   const {toast} = useToast();
-  const { language, setLanguage, bibleTranslation, setBibleTranslation } = useSettings();
-  const { theme, setTheme } = useTheme();
+  const { language, bibleTranslation } = useSettings();
 
   useEffect(() => {
     try {
@@ -137,62 +123,17 @@ export default function Home() {
   }, [currentQueryTopic, currentVersesForTopic, teachingLength, toast, language, bibleTranslation]);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="container py-4">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-grow">
-        <div className="p-4 border-b">
-            <header className="flex justify-between items-center">
-              <div className="text-center flex-grow">
-                <h1 className="text-3xl font-bold">Matthew AI</h1>
-                <p className="text-muted-foreground">Salvation to the World AI</p>
-              </div>
-              <div className="flex items-center gap-2">
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon">
-                        <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                        <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                        <span className="sr-only">Toggle theme</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setTheme('light')}>Light</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setTheme('dark')}>Dark</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setTheme('system')}>System</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <BookOpenText className="h-5 w-5" />
-                      <span className="sr-only">Open Settings</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end">
-                    <DropdownMenuLabel>Language</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Language)}>
-                      <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="fr">French</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="zh">Chinese</DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Bible Translation</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={bibleTranslation} onValueChange={(value) => setBibleTranslation(value as BibleTranslation)}>
-                      <DropdownMenuRadioItem value="KJV">KJV</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="NIV">NIV</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="NRSV">NRSV</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="ESV">ESV</DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </header>
-            <TabsList className="w-full max-w-lg mx-auto mt-4 h-auto rounded-full bg-muted p-1.5 flex">
-              <TabsTrigger value="home" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Home</TabsTrigger>
-              <TabsTrigger value="matthewAI" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">AI Study</TabsTrigger>
-              <TabsTrigger value="bibleReader" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Bible Reader</TabsTrigger>
-            </TabsList>
+        <div className="text-center mb-4">
+            <h1 className="text-3xl font-bold">Matthew AI</h1>
+            <p className="text-muted-foreground">Salvation to the World AI</p>
         </div>
+        <TabsList className="w-full max-w-lg mx-auto h-auto rounded-full bg-muted p-1.5 flex">
+          <TabsTrigger value="home" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Home</TabsTrigger>
+          <TabsTrigger value="matthewAI" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">AI Study</TabsTrigger>
+          <TabsTrigger value="bibleReader" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Bible Reader</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="home" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
           <HomePage />
