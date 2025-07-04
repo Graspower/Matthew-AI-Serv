@@ -16,7 +16,14 @@ const requiredEnvVars = [
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
-    throw new Error(`Firebase configuration is missing or incomplete. Please ensure the following environment variables are set in your .env.local file: ${missingEnvVars.join(', ')}. After adding them, you MUST restart your development server.`);
+    throw new Error(`CRITICAL: Firebase environment variables are missing.
+
+1.  **Check your .env.local file:** Ensure it's in the project root and contains these variables:
+    ${missingEnvVars.join('\n    ')}
+
+2.  **Restart your server:** This is the most important step. Stop your development server (Ctrl+C) and run 'npm run dev' again.
+
+This error will persist until the server is restarted with the correct .env.local file.`);
 }
 
 
