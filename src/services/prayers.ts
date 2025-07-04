@@ -7,7 +7,7 @@ export interface Prayer {
   id: string;
   name: string;
   description: string;
-  hint: string;
+  category: string;
   comments: Comment[];
   reactions: Reactions;
 }
@@ -89,7 +89,7 @@ export async function getPrayers(): Promise<Prayer[]> {
         id: doc.id,
         name: data.name || 'Anonymous',
         description: data.description || '',
-        hint: data.hint || 'Prayer',
+        category: data.category || 'Prayer',
         reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
         comments: comments,
       } as Prayer;

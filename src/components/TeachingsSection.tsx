@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -26,7 +26,7 @@ import { getTeachings, addTeaching, addCommentToTeaching, addReactionToTeaching,
 const teachingFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  hint: z.string().min(2, { message: 'A hint is required.' }).max(40, { message: 'Hint must be 40 characters or less.' }),
+  category: z.string().min(2, { message: 'A category is required.' }).max(40, { message: 'Category must be 40 characters or less.' }),
 });
 type TeachingFormData = z.infer<typeof teachingFormSchema>;
 
@@ -36,10 +36,12 @@ const commentFormSchema = z.object({
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
+const teachingCategories = ['Faith', 'Love', 'Forgiveness', 'Parables', 'Discipleship', 'End Times', 'The Law', 'Grace', 'Prayer', 'Serving Others'];
+
 const defaultTeachings: Teaching[] = [
-    { id: 'default-1', name: 'Jesus', description: "A man had two sons...", hint: 'Prodigal Son', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-2', name: 'Jesus', description: "Blessed are the meek, for they will inherit the earth.", hint: 'The Beatitudes', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-3', name: 'Paul', description: "Love is patient, love is kind...", hint: 'The Way of Love', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-1', name: 'Jesus', description: "A man had two sons...", category: 'Prodigal Son', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-2', name: 'Jesus', description: "Blessed are the meek, for they will inherit the earth.", category: 'The Beatitudes', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-3', name: 'Paul', description: "Love is patient, love is kind...", category: 'The Way of Love', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
 const truncateText = (text: string, maxLength: number) => {
@@ -61,7 +63,7 @@ export function TeachingsSection() {
   
   const teachingForm = useForm<TeachingFormData>({
     resolver: zodResolver(teachingFormSchema),
-    defaultValues: { name: '', description: '', hint: '' },
+    defaultValues: { name: '', description: '', category: '' },
   });
 
   const commentForm = useForm<CommentFormData>({
@@ -137,10 +139,10 @@ export function TeachingsSection() {
     try {
       await addCommentToTeaching(commentsModal.teaching.id, newComment);
       commentForm.reset();
-      await fetchTeachings();
+      await fetchTeachings(); // Re-fetch to get the latest state including the new comment
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchTeachings();
+      await fetchTeachings(); // Re-fetch to revert optimistic update on failure
     }
   }
 
@@ -150,15 +152,25 @@ export function TeachingsSection() {
         className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
         onClick={() => setDetailsModal({isOpen: true, teaching: item})}
       >
-        <CardContent className="flex-grow flex flex-col p-6">
-          <h3 className="text-3xl font-serif font-bold text-primary text-center">
-            {item.hint}
-          </h3>
-          <div className="mt-auto text-center">
-            <p className="font-semibold text-lg">{item.name}</p>
-            <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
-          </div>
+        <CardContent className="flex-grow flex flex-col p-6 justify-center items-center">
+            <h3 className="text-primary font-semibold text-lg text-center mb-auto pt-4">
+                {item.category}
+            </h3>
+            <div className="mt-auto text-center">
+                <p className="font-semibold text-lg">{item.name}</p>
+                <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
+            </div>
         </CardContent>
+         <CardFooter className="p-2 border-t justify-end flex items-center gap-4">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Heart className="h-4 w-4" />
+                <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MessageSquare className="h-4 w-4" />
+                <span>{item.comments?.length || 0}</span>
+            </div>
+        </CardFooter>
       </Card>
     );
   };
@@ -224,8 +236,19 @@ export function TeachingsSection() {
                     <Form {...teachingForm}>
                         <form onSubmit={teachingForm.handleSubmit(handleAddTeaching)} className="space-y-4">
                             <FormField control={teachingForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Source/Speaker</FormLabel> <FormControl><Input placeholder="e.g., Jesus" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={teachingForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel> <FormControl><Input placeholder="A brief summary of the teaching" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={teachingForm.control} name="hint" render={({ field }) => ( <FormItem> <FormLabel>Teaching Hint</FormLabel> <FormControl><Input placeholder="e.g., The Beatitudes" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={teachingForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Teaching</FormLabel> <FormControl><Textarea placeholder="A detailed summary of the teaching" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={teachingForm.control} name="category" render={({ field }) => ( 
+                                <FormItem> 
+                                    <FormLabel>Teaching Category</FormLabel> 
+                                    <FormControl><Input placeholder="e.g., The Beatitudes" {...field} /></FormControl> 
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                        {teachingCategories.map(cat => (
+                                            <Button key={cat} type="button" variant="outline" size="sm" onClick={() => teachingForm.setValue('category', cat, { shouldValidate: true })}>{cat}</Button>
+                                        ))}
+                                    </div>
+                                    <FormMessage /> 
+                                </FormItem> 
+                            )}/>
                             <Button type="submit" disabled={teachingForm.formState.isSubmitting}>{teachingForm.formState.isSubmitting ? 'Submitting...' : 'Submit Teaching'}</Button>
                         </form>
                     </Form>
@@ -251,7 +274,7 @@ export function TeachingsSection() {
         <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, teaching: null })}>
           <DialogContent className="max-w-2xl w-[90vw]">
             <DialogHeader>
-              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.teaching.hint}</DialogTitle>
+              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.teaching.category}</DialogTitle>
               <DialogDescription className="pt-2 text-lg">By: {detailsModal.teaching.name}</DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[50vh] pr-4">
@@ -298,7 +321,7 @@ export function TeachingsSection() {
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>
           <SheetContent side="bottom" className="h-[85vh] flex flex-col">
             <SheetHeader className="text-left">
-              <SheetTitle>Comments on "{commentsModal.teaching?.hint}"</SheetTitle>
+              <SheetTitle>Comments on "{commentsModal.teaching?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
             {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} />}
@@ -308,7 +331,7 @@ export function TeachingsSection() {
         <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>
           <DialogContent className="max-w-2xl w-[90vw] h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Comments on "{commentsModal.teaching?.hint}"</DialogTitle>
+              <DialogTitle>Comments on "{commentsModal.teaching?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
              {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} />}

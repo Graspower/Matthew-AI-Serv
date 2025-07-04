@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -26,7 +26,7 @@ import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTesti
 const testimonyFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  hint: z.string().min(2, { message: 'A hint is required.' }).max(40, { message: 'Hint must be 40 characters or less.' }),
+  category: z.string().min(2, { message: 'A category is required.' }).max(40, { message: 'Category must be 40 characters or less.' }),
 });
 type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
 
@@ -36,16 +36,18 @@ const commentFormSchema = z.object({
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
+const testimonyCategories = ['Salvation', 'Business Breakthrough', 'Marriage Success', 'Job', 'Health', 'Baby', 'Healing', 'Deliverance', 'Financial Provision', 'Academic Success'];
+
 const defaultTestimonies: Testimony[] = [
-    { id: 'default-1', name: 'Abraham', description: "Became the father of many nations through faith.", hint: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-2', name: 'Esther', description: "Risked her life to save her people.", hint: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-3', name: 'Jacob', description: "Received a new name after wrestling with God.", hint: 'Wrestled God', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-4', name: 'Job', description: "Remained faithful to God despite immense loss.", hint: 'Unwavering Faith', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-5', name: 'Joseph', description: "From a prison to a palace, he saved many.", hint: 'Dreamer to Ruler', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-6', name: 'Mary Magdalene', description: "The first to see the risen Christ.", hint: 'Devoted Follower', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-7', name: 'Matthew', description: "Left his tax booth to become an apostle.", hint: 'Followed Jesus', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-8', name: 'Moses', description: "Led the Israelites out of slavery in Egypt.", hint: 'The Lawgiver', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-9', name: 'Paul', description: "Transformed from persecutor to powerful apostle.", hint: 'Damascus Road', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-1', name: 'Abraham', description: "Became the father of many nations through faith.", category: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-2', name: 'Esther', description: "Risked her life to save her people.", category: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-3', name: 'Jacob', description: "Received a new name after wrestling with God.", category: 'Wrestled God', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-4', name: 'Job', description: "Remained faithful to God despite immense loss.", category: 'Unwavering Faith', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-5', name: 'Joseph', description: "From a prison to a palace, he saved many.", category: 'Dreamer to Ruler', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-6', name: 'Mary Magdalene', description: "The first to see the risen Christ.", category: 'Devoted Follower', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-7', name: 'Matthew', description: "Left his tax booth to become an apostle.", category: 'Followed Jesus', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-8', name: 'Moses', description: "Led the Israelites out of slavery in Egypt.", category: 'The Lawgiver', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-9', name: 'Paul', description: "Transformed from persecutor to powerful apostle.", category: 'Damascus Road', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
 const truncateText = (text: string, maxLength: number) => {
@@ -67,7 +69,7 @@ export function TestimoniesSection() {
   
   const testimonyForm = useForm<TestimonyFormData>({
     resolver: zodResolver(testimonyFormSchema),
-    defaultValues: { name: '', description: '', hint: '' },
+    defaultValues: { name: '', description: '', category: '' },
   });
 
   const commentForm = useForm<CommentFormData>({
@@ -143,10 +145,10 @@ export function TestimoniesSection() {
     try {
       await addCommentToTestimony(commentsModal.testimony.id, newComment);
       commentForm.reset();
-      await fetchTestimonies();
+      await fetchTestimonies(); // Re-fetch to get the latest state including the new comment
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchTestimonies();
+      await fetchTestimonies(); // Re-fetch to revert optimistic update on failure
     }
   }
 
@@ -156,15 +158,25 @@ export function TestimoniesSection() {
         className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
         onClick={() => setDetailsModal({isOpen: true, testimony: item})}
       >
-        <CardContent className="flex-grow flex flex-col p-6">
-          <h3 className="text-3xl font-serif font-bold text-primary text-center">
-            {item.hint}
-          </h3>
-          <div className="mt-auto text-center">
-             <p className="font-semibold text-lg">{item.name}</p>
-             <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
-          </div>
+        <CardContent className="flex-grow flex flex-col p-6 justify-center items-center">
+            <h3 className="text-primary font-semibold text-lg text-center mb-auto pt-4">
+                {item.category}
+            </h3>
+            <div className="mt-auto text-center">
+                <p className="font-semibold text-lg">{item.name}</p>
+                <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
+            </div>
         </CardContent>
+        <CardFooter className="p-2 border-t justify-end flex items-center gap-4">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Heart className="h-4 w-4" />
+                <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MessageSquare className="h-4 w-4" />
+                <span>{item.comments?.length || 0}</span>
+            </div>
+        </CardFooter>
       </Card>
     );
   };
@@ -230,8 +242,19 @@ export function TestimoniesSection() {
                     <Form {...testimonyForm}>
                         <form onSubmit={testimonyForm.handleSubmit(handleAddTestimony)} className="space-y-4">
                             <FormField control={testimonyForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Abraham" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={testimonyForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel> <FormControl><Input placeholder="A brief description of the testimony" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={testimonyForm.control} name="hint" render={({ field }) => ( <FormItem> <FormLabel>Testimony Hint</FormLabel> <FormControl><Input placeholder="e.g., Father of Nations" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={testimonyForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Testimony</FormLabel> <FormControl><Textarea placeholder="A detailed description of the testimony" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={testimonyForm.control} name="category" render={({ field }) => (
+                                <FormItem> 
+                                    <FormLabel>Testimony Category</FormLabel> 
+                                    <FormControl><Input placeholder="e.g., Father of Nations" {...field} /></FormControl>
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                        {testimonyCategories.map(cat => (
+                                            <Button key={cat} type="button" variant="outline" size="sm" onClick={() => testimonyForm.setValue('category', cat, { shouldValidate: true })}>{cat}</Button>
+                                        ))}
+                                    </div>
+                                    <FormMessage /> 
+                                </FormItem> 
+                            )}/>
                             <Button type="submit" disabled={testimonyForm.formState.isSubmitting}>{testimonyForm.formState.isSubmitting ? 'Submitting...' : 'Submit Testimony'}</Button>
                         </form>
                     </Form>
@@ -257,7 +280,7 @@ export function TestimoniesSection() {
         <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, testimony: null })}>
           <DialogContent className="max-w-2xl w-[90vw]">
             <DialogHeader>
-              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.testimony.hint}</DialogTitle>
+              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.testimony.category}</DialogTitle>
               <DialogDescription className="pt-2 text-lg">By: {detailsModal.testimony.name}</DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[50vh] pr-4">
@@ -304,7 +327,7 @@ export function TestimoniesSection() {
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
           <SheetContent side="bottom" className="h-[85vh] flex flex-col">
             <SheetHeader className="text-left">
-              <SheetTitle>Comments on "{commentsModal.testimony?.hint}"</SheetTitle>
+              <SheetTitle>Comments on "{commentsModal.testimony?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
             {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}
@@ -314,7 +337,7 @@ export function TestimoniesSection() {
         <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
           <DialogContent className="max-w-2xl w-[90vw] h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Comments on "{commentsModal.testimony?.hint}"</DialogTitle>
+              <DialogTitle>Comments on "{commentsModal.testimony?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
              {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}

@@ -7,7 +7,7 @@ export interface Teaching {
   id: string;
   name: string;
   description: string;
-  hint: string;
+  category: string;
   comments: Comment[];
   reactions: Reactions;
 }
@@ -89,7 +89,7 @@ export async function getTeachings(): Promise<Teaching[]> {
         id: doc.id,
         name: data.name || 'Anonymous',
         description: data.description || '',
-        hint: data.hint || 'Teaching',
+        category: data.category || 'Teaching',
         reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
         comments: comments,
       } as Teaching;

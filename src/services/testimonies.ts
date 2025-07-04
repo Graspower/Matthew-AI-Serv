@@ -20,7 +20,7 @@ export interface Testimony {
   id: string;
   name: string;
   description: string;
-  hint: string;
+  category: string;
   comments: Comment[];
   reactions: Reactions;
 }
@@ -103,7 +103,7 @@ export async function getTestimonies(): Promise<Testimony[]> {
         id: doc.id,
         name: data.name || 'Anonymous',
         description: data.description || '',
-        hint: data.hint || 'Testimony',
+        category: data.category || 'Testimony',
         reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
         comments: comments,
       } as Testimony;

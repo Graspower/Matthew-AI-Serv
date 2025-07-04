@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -26,7 +26,7 @@ import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Pr
 const prayerFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  hint: z.string().min(2, { message: 'A hint is required.' }).max(40, { message: 'Hint must be 40 characters or less.' }),
+  category: z.string().min(2, { message: 'A category is required.' }).max(40, { message: 'Category must be 40 characters or less.' }),
 });
 type PrayerFormData = z.infer<typeof prayerFormSchema>;
 
@@ -36,10 +36,12 @@ const commentFormSchema = z.object({
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
+const prayerCategories = ['Health & Healing', 'Family', 'Guidance', 'Finances', 'Protection', 'Thanksgiving', 'Spiritual Growth', 'World & Leaders', 'Loss & Grief', 'Salvation'];
+
 const defaultPrayers: Prayer[] = [
-    { id: 'default-1', name: 'Anonymous', description: 'For strength to overcome daily challenges.', hint: 'Daily Strength', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-2', name: 'A Parent', description: 'For wisdom in guiding my children.', hint: 'Parental Wisdom', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-3', name: 'A Student', description: 'For focus and clarity during my studies.', hint: 'Clarity in Study', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-1', name: 'Anonymous', description: 'For strength to overcome daily challenges.', category: 'Daily Strength', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-2', name: 'A Parent', description: 'For wisdom in guiding my children.', category: 'Parental Wisdom', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-3', name: 'A Student', description: 'For focus and clarity during my studies.', category: 'Clarity in Study', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
 const truncateText = (text: string, maxLength: number) => {
@@ -61,7 +63,7 @@ export function PrayersSection() {
   
   const prayerForm = useForm<PrayerFormData>({
     resolver: zodResolver(prayerFormSchema),
-    defaultValues: { name: '', description: '', hint: '' },
+    defaultValues: { name: '', description: '', category: '' },
   });
 
   const commentForm = useForm<CommentFormData>({
@@ -137,10 +139,10 @@ export function PrayersSection() {
     try {
       await addCommentToPrayer(commentsModal.prayer.id, newComment);
       commentForm.reset();
-      await fetchPrayers();
+      await fetchPrayers(); // Re-fetch to get the latest state including the new comment
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchPrayers();
+      await fetchPrayers(); // Re-fetch to revert optimistic update on failure
     }
   }
 
@@ -150,15 +152,25 @@ export function PrayersSection() {
         className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
         onClick={() => setDetailsModal({isOpen: true, prayer: item})}
       >
-        <CardContent className="flex-grow flex flex-col p-6">
-          <h3 className="text-3xl font-serif font-bold text-primary text-center">
-            {item.hint}
-          </h3>
-          <div className="mt-auto text-center">
-            <p className="font-semibold text-lg">{item.name}</p>
-            <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
-          </div>
+        <CardContent className="flex-grow flex flex-col p-6 justify-center items-center">
+            <h3 className="text-primary font-semibold text-lg text-center mb-auto pt-4">
+                {item.category}
+            </h3>
+            <div className="mt-auto text-center">
+                <p className="font-semibold text-lg">{item.name}</p>
+                <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
+            </div>
         </CardContent>
+         <CardFooter className="p-2 border-t justify-end flex items-center gap-4">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Heart className="h-4 w-4" />
+                <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MessageSquare className="h-4 w-4" />
+                <span>{item.comments?.length || 0}</span>
+            </div>
+        </CardFooter>
       </Card>
     );
   };
@@ -224,8 +236,19 @@ export function PrayersSection() {
                     <Form {...prayerForm}>
                         <form onSubmit={prayerForm.handleSubmit(handleAddPrayer)} className="space-y-4">
                             <FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={prayerForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel> <FormControl><Input placeholder="A brief description of your prayer" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={prayerForm.control} name="hint" render={({ field }) => ( <FormItem> <FormLabel>Prayer Hint</FormLabel> <FormControl><Input placeholder="e.g., For Healing" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={prayerForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Prayer Request</FormLabel> <FormControl><Textarea placeholder="A detailed description of your prayer" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={prayerForm.control} name="category" render={({ field }) => ( 
+                                <FormItem> 
+                                    <FormLabel>Prayer Category</FormLabel> 
+                                    <FormControl><Input placeholder="e.g., For Healing" {...field} /></FormControl> 
+                                     <div className="flex flex-wrap gap-2 pt-2">
+                                        {prayerCategories.map(cat => (
+                                            <Button key={cat} type="button" variant="outline" size="sm" onClick={() => prayerForm.setValue('category', cat, { shouldValidate: true })}>{cat}</Button>
+                                        ))}
+                                    </div>
+                                    <FormMessage /> 
+                                </FormItem> 
+                            )}/>
                             <Button type="submit" disabled={prayerForm.formState.isSubmitting}>{prayerForm.formState.isSubmitting ? 'Submitting...' : 'Submit Prayer'}</Button>
                         </form>
                     </Form>
@@ -251,7 +274,7 @@ export function PrayersSection() {
         <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, prayer: null })}>
           <DialogContent className="max-w-2xl w-[90vw]">
             <DialogHeader>
-              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.prayer.hint}</DialogTitle>
+              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.prayer.category}</DialogTitle>
               <DialogDescription className="pt-2 text-lg">By: {detailsModal.prayer.name}</DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[50vh] pr-4">
@@ -298,7 +321,7 @@ export function PrayersSection() {
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
           <SheetContent side="bottom" className="h-[85vh] flex flex-col">
             <SheetHeader className="text-left">
-              <SheetTitle>Comments on "{commentsModal.prayer?.hint}"</SheetTitle>
+              <SheetTitle>Comments on "{commentsModal.prayer?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
             {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} />}
@@ -308,7 +331,7 @@ export function PrayersSection() {
         <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
           <DialogContent className="max-w-2xl w-[90vw] h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Comments on "{commentsModal.prayer?.hint}"</DialogTitle>
+              <DialogTitle>Comments on "{commentsModal.prayer?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
              {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} />}
