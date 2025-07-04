@@ -40,13 +40,14 @@ type BibleJson = Record<string, Record<string, Record<string, string>>>;
 const bibleCache: Map<BibleTranslation, BibleJson> = new Map();
 
 async function getTranslationData(translation: BibleTranslation): Promise<BibleJson> {
+    const lowerCaseTranslation = translation.toLowerCase();
     if (bibleCache.has(translation)) {
         return bibleCache.get(translation)!;
     }
 
     try {
-        // Construct the full path to the JSON file in the public directory
-        const filePath = path.join(process.cwd(), 'public', 'bibles', `${translation}.json`);
+        // Construct the full path to the JSON file in the public directory, using lowercase
+        const filePath = path.join(process.cwd(), 'public', 'bibles', `${lowerCaseTranslation}.json`);
         
         // Read the file from the filesystem since this is a server component
         const fileContent = await fs.readFile(filePath, 'utf-8');
@@ -61,7 +62,7 @@ async function getTranslationData(translation: BibleTranslation): Promise<BibleJ
         console.error(`Error loading or parsing Bible data for ${translation}:`, error);
         // Provide a more helpful error message
         if (error.code === 'ENOENT') {
-             throw new Error(`Could not load data for ${translation}. The file was not found at /public/bibles/${translation}.json. Please ensure the file exists and the filename is correct.`);
+             throw new Error(`Could not load data for ${translation}. The file was not found at /public/bibles/${lowerCaseTranslation}.json. Please ensure the file exists and the filename is correct.`);
         }
         throw new Error(`Could not load data for ${translation}. Make sure the file is valid JSON. Original error: ${error.message}`);
     }
