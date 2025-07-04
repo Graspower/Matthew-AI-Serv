@@ -23,6 +23,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTeachings, addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching, type NewTeaching, type Comment, type Reactions } from '@/services/teachings';
 
+const CACHE_KEY = 'matthew-ai-teachings-cache';
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
 const teachingFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
@@ -71,6 +74,12 @@ export function TeachingsSection() {
     try {
       const data = await getTeachings();
       setTeachings(data);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+            timestamp: Date.now(),
+            data: data,
+        }));
+      }
     } catch (error: any) {
       console.error(error);
       setTeachingsError(error.message || "Failed to load teachings. Please check your connection and try again.");
@@ -81,7 +90,22 @@ export function TeachingsSection() {
   }, []);
 
   useEffect(() => {
-    fetchTeachings();
+    if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            const { timestamp, data } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION_MS) {
+                setTeachings(data);
+                setIsLoadingTeachings(false);
+            } else {
+                fetchTeachings();
+            }
+        } else {
+            fetchTeachings();
+        }
+    } else {
+        fetchTeachings();
+    }
   }, [fetchTeachings]);
   
   async function handleAddTeaching(data: TeachingFormData) {
@@ -129,10 +153,10 @@ export function TeachingsSection() {
     try {
       await addCommentToTeaching(commentsModal.teaching.id, newComment);
       commentForm.reset();
-      await fetchTeachings(); // Re-fetch to get the latest state including the new comment
+      await fetchTeachings(); 
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchTeachings(); // Re-fetch to revert optimistic update on failure
+      await fetchTeachings();
     }
   }
 
@@ -338,5 +362,3 @@ export function TeachingsSection() {
     </div>
   );
 }
-
-    

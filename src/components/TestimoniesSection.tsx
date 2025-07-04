@@ -23,6 +23,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony, type Comment, type Reactions } from '@/services/testimonies';
 
+const CACHE_KEY = 'matthew-ai-testimonies-cache';
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
 const testimonyFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
@@ -42,12 +45,6 @@ const defaultTestimonies: Testimony[] = [
     { id: 'default-1', name: 'Abraham', description: "Became the father of many nations through faith.", category: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
     { id: 'default-2', name: 'Esther', description: "Risked her life to save her people.", category: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
     { id: 'default-3', name: 'Jacob', description: "Received a new name after wrestling with God.", category: 'Wrestled God', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-4', name: 'Job', description: "Remained faithful to God despite immense loss.", category: 'Unwavering Faith', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-5', name: 'Joseph', description: "From a prison to a palace, he saved many.", category: 'Dreamer to Ruler', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-6', name: 'Mary Magdalene', description: "The first to see the risen Christ.", category: 'Devoted Follower', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-7', name: 'Matthew', description: "Left his tax booth to become an apostle.", category: 'Followed Jesus', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-8', name: 'Moses', description: "Led the Israelites out of slavery in Egypt.", category: 'The Lawgiver', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-9', name: 'Paul', description: "Transformed from persecutor to powerful apostle.", category: 'Damascus Road', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
 const truncateText = (text: string, maxLength: number) => {
@@ -84,6 +81,13 @@ export function TestimoniesSection() {
       const data = await getTestimonies();
       if (data.length > 0) {
         setTestimonies(data);
+        // Save to cache
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                timestamp: Date.now(),
+                data: data,
+            }));
+        }
       } else {
         setTestimonies(defaultTestimonies);
       }
@@ -97,7 +101,22 @@ export function TestimoniesSection() {
   }, []);
 
   useEffect(() => {
-    fetchTestimonies();
+    if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            const { timestamp, data } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION_MS) {
+                setTestimonies(data);
+                setIsLoadingTestimonies(false);
+            } else {
+                fetchTestimonies();
+            }
+        } else {
+            fetchTestimonies();
+        }
+    } else {
+        fetchTestimonies();
+    }
   }, [fetchTestimonies]);
   
   async function handleAddTestimony(data: TestimonyFormData) {
@@ -145,10 +164,10 @@ export function TestimoniesSection() {
     try {
       await addCommentToTestimony(commentsModal.testimony.id, newComment);
       commentForm.reset();
-      await fetchTestimonies(); // Re-fetch to get the latest state including the new comment
+      await fetchTestimonies(); 
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchTestimonies(); // Re-fetch to revert optimistic update on failure
+      await fetchTestimonies(); 
     }
   }
 

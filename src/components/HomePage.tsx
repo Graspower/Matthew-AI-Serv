@@ -8,40 +8,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDe
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
+import { getInspirationalVerses, type InspirationVerse } from '@/services/inspirations';
 import { Skeleton } from '@/components/ui/skeleton';
-
-interface Verse {
-  book: string;
-  chapter: number;
-  verse: number;
-  text: string;
-}
 
 interface DailyVerse {
   timeOfDay: 'Morning' | 'Afternoon' | 'Evening';
-  verse: Verse;
+  verse: InspirationVerse;
   explanation: string;
 }
 
-const inspirationalVerses: Verse[] = [
-  { book: 'Psalm', chapter: 103, verse: 1, text: 'Bless the LORD, O my soul, and all that is within me, bless his holy name!' },
-  { book: 'Psalm', chapter: 103, verse: 2, text: 'Bless the LORD, O my soul, and forget not all his benefits.' },
-  { book: 'Psalm', chapter: 145, verse: 1, text: 'I will extol thee, my God, O king; and I will bless thy name for ever and ever.' },
-  { book: 'Psalm', chapter: 145, verse: 2, text: 'Every day will I bless thee; and I will praise thy name for ever and ever.' },
-  { book: 'Ephesians', chapter: 1, verse: 3, text: 'Blessed be the God and Father of our Lord Jesus Christ, who hath blessed us with all spiritual blessings in heavenly places in Christ.' },
-  { book: '1 Chronicles', chapter: 16, verse: 8, text: 'Give thanks unto the LORD, call upon his name, make known his deeds among the people.' },
-  { book: '1 Chronicles', chapter: 16, verse: 34, text: 'O give thanks unto the LORD; for he is good; for his mercy endureth for ever.' },
-  { book: 'Psalm', chapter: 95, verse: 2, text: 'Let us come before his presence with thanksgiving, and make a joyful noise unto him with psalms.' },
-  { book: 'Psalm', chapter: 107, verse: 1, text: 'O give thanks unto the LORD, for he is good: for his mercy endureth for ever.' },
-  { book: 'Colossians', chapter: 3, verse: 17, text: 'And whatsoever ye do in word or deed, do all in the name of the Lord Jesus, giving thanks to God and the Father by him.' },
-  { book: '1 Thessalonians', chapter: 5, verse: 18, text: 'In every thing give thanks: for this is the will of God in Christ Jesus concerning you.' },
-  { book: 'Hebrews', chapter: 13, verse: 15, text: 'By him therefore let us offer the sacrifice of praise to God continually, that is, the fruit of our lips giving thanks to his name.' },
-  { book: 'Psalm', chapter: 34, verse: 1, text: 'I will bless the LORD at all times: his praise shall continually be in my mouth.' },
-  { book: 'Jude', chapter: 1, verse: 25, text: 'To the only wise God our Saviour, be glory and majesty, dominion and power, both now and ever. Amen.'},
-  { book: 'Revelation', chapter: 4, verse: 11, text: 'Thou art worthy, O Lord, to receive glory and honour and power: for thou hast created all things, and for thy pleasure they are and were created.'},
-];
-
 function pickRandomItems<T>(arr: T[], num: number): T[] {
+  if (arr.length <= num) {
+    return arr;
+  }
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, num);
 }
@@ -49,9 +28,8 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
-  return truncated.slice(0, truncated.lastIndexOf(' ')); // Avoid cutting words
+  return truncated.slice(0, truncated.lastIndexOf(' '));
 };
-
 
 export function HomePage() {
   const [dailyVerses, setDailyVerses] = useState<DailyVerse[]>([]);
@@ -84,35 +62,17 @@ export function HomePage() {
     setCurrentlySpeakingIndex(null);
   }, []);
   
-  const speakInspiration = useCallback((item: DailyVerse, index: number) => {
-    if (!synth.current) return;
-    if (isSpeaking && currentlySpeakingIndex === index) {
-      stopSpeaking();
-      return;
-    }
-    if (synth.current.speaking) synth.current.cancel();
-  
-    const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.verse.book} chapter ${item.verse.chapter}, verse ${item.verse.verse}. ${item.verse.text}. Adoration: ${item.explanation}`;
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.pitch = 1.0;
-    utterance.rate = 0.9;
-    utterance.onstart = () => { setIsSpeaking(true); setCurrentlySpeakingIndex(index); };
-    utterance.onend = () => { setIsSpeaking(false); setCurrentlySpeakingIndex(null); };
-    utterance.onerror = (e) => {
-      console.error('SpeechSynthesis Error', e);
-      toast({ title: "Speech Error", description: "Could not play audio.", variant: "destructive" });
-      setIsSpeaking(false);
-      setCurrentlySpeakingIndex(null);
-    };
-    synth.current.speak(utterance);
-  }, [isSpeaking, currentlySpeakingIndex, stopSpeaking, toast]);
-
   const generateAndStoreVerses = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     stopSpeaking();
     try {
-      const selectedVerses = pickRandomItems(inspirationalVerses, 3);
+      const allInspirationalVerses = await getInspirationalVerses();
+      if (allInspirationalVerses.length < 3) {
+          throw new Error('Not enough inspirational verses in the database to display. Please add at least 3.');
+      }
+
+      const selectedVerses = pickRandomItems(allInspirationalVerses, 3);
       const explanationPromises = selectedVerses.map(verse => 
         generateVerseExplanation({
           verseReference: `${verse.book} ${verse.chapter}:${verse.verse}`,
@@ -161,6 +121,28 @@ export function HomePage() {
     generateAndStoreVerses();
   }, [generateAndStoreVerses]);
 
+  const speakInspiration = useCallback((item: DailyVerse, index: number) => {
+    if (!synth.current) return;
+    if (isSpeaking && currentlySpeakingIndex === index) {
+      stopSpeaking();
+      return;
+    }
+    if (synth.current.speaking) synth.current.cancel();
+  
+    const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.verse.book} chapter ${item.verse.chapter}, verse ${item.verse.verse}. ${item.verse.text}. Adoration: ${item.explanation}`;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.pitch = 1.0;
+    utterance.rate = 0.9;
+    utterance.onstart = () => { setIsSpeaking(true); setCurrentlySpeakingIndex(index); };
+    utterance.onend = () => { setIsSpeaking(false); setCurrentlySpeakingIndex(null); };
+    utterance.onerror = (e) => {
+      console.error('SpeechSynthesis Error', e);
+      toast({ title: "Speech Error", description: "Could not play audio.", variant: "destructive" });
+      setIsSpeaking(false);
+      setCurrentlySpeakingIndex(null);
+    };
+    synth.current.speak(utterance);
+  }, [isSpeaking, currentlySpeakingIndex, stopSpeaking, toast]);
 
   const scrollToCard = useCallback((index: number) => {
     if (cardRefs.current[index]) {
@@ -188,7 +170,7 @@ export function HomePage() {
 
   const handleNext = () => {
     stopSpeaking();
-    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex - 1 : dailyVerses.length - 1;
+    const newIndex = activeIndex < dailyVerses.length - 1 ? activeIndex + 1 : dailyVerses.length - 1;
     setActiveIndex(newIndex);
     scrollToCard(newIndex);
   };
@@ -214,7 +196,7 @@ export function HomePage() {
 
   const renderVerseCard = (item: DailyVerse, index: number) => (
     <div key={item.timeOfDay} ref={el => cardRefs.current[index] = el} className="w-full flex-shrink-0 snap-center p-1">
-      <Card onClick={() => handleCardClick(item)} className="w-full shadow-lg rounded-xl flex flex-col min-h-[420px] cursor-pointer">
+      <Card onClick={() => handleCardClick(item)} className="w-full shadow-lg rounded-xl flex flex-col min-h-[400px] cursor-pointer">
         <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
           <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
@@ -241,7 +223,7 @@ export function HomePage() {
 
   const renderSkeletonCard = (key: string) => (
       <div key={key} className="w-full flex-shrink-0 snap-center p-1">
-        <Card className="w-full shadow-lg rounded-xl min-h-[420px]">
+        <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
             <CardHeader> <Skeleton className="h-6 w-1/2 mx-auto" /> <Skeleton className="h-4 w-1/4 mx-auto mt-2" /> </CardHeader>
             <CardContent className="flex flex-col gap-6 justify-center">
                 <div className="px-4 space-y-2"> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-3/4 mx-auto" /> </div>
@@ -265,9 +247,9 @@ export function HomePage() {
         </Button>
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-grow flex min-w-0 snap-x snap-mandatory overflow-x-auto scrollbar-hide">
             {isLoading ? ([...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`)))
-            : error ? ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[420px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-destructive">{error}</p></CardContent></Card></div> )
+            : error ? ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[400px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-destructive">{error}</p></CardContent></Card></div> )
             : dailyVerses.length > 0 ? ( dailyVerses.map(renderVerseCard) )
-            : ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[420px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-muted-foreground">Your daily inspiration is being prepared.</p></CardContent></Card></div> )}
+            : ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[400px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-muted-foreground">Your daily inspiration is being prepared.</p></CardContent></Card></div> )}
         </div>
         <Button variant="outline" size="icon" onClick={handleNext} disabled={isLoading || activeIndex >= dailyVerses.length - 1} className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex">
           <ChevronRight className="h-6 w-6" /> <span className="sr-only">Next Inspiration</span>
