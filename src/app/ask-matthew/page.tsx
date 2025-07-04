@@ -1,13 +1,10 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Send, MessageSquare, User } from 'lucide-react';
 import { askMatthew } from '@/ai/flows/askMatthewFlow';
@@ -20,20 +17,12 @@ interface Message {
 }
 
 export default function AskMatthewPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
   const { toast } = useToast();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/');
-    }
-  }, [user, loading, router]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -72,14 +61,6 @@ export default function AskMatthewPage() {
       setIsLoading(false);
     }
   };
-
-  if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto h-[calc(100vh-4rem-1px)] flex justify-center items-center">
@@ -123,7 +104,6 @@ export default function AskMatthewPage() {
                   </div>
                   {message.role === 'user' && (
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.photoURL || ''} />
                       <AvatarFallback><User /></AvatarFallback>
                     </Avatar>
                   )}

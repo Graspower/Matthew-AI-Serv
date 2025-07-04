@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -123,7 +122,7 @@ export default function Home() {
   }, [currentQueryTopic, currentVersesForTopic, teachingLength, toast, language, bibleTranslation]);
 
   return (
-    <div className="container py-4">
+    <div className="container mx-auto py-4">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-grow">
         <div className="text-center mb-4">
             <h1 className="text-3xl font-bold">Matthew AI</h1>
