@@ -1,3 +1,4 @@
+
 /* Salvation to people in the world */
 'use client';
 
@@ -188,7 +189,7 @@ export default function Home() {
             </header>
             <TabsList className="w-full max-w-lg mx-auto mt-4 h-auto rounded-full bg-muted p-1.5 flex">
               <TabsTrigger value="home" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Home</TabsTrigger>
-              <TabsTrigger value="matthewAI" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Ask Matthew</TabsTrigger>
+              <TabsTrigger value="matthewAI" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">AI Study</TabsTrigger>
               <TabsTrigger value="bibleReader" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Bible Reader</TabsTrigger>
             </TabsList>
         </div>
