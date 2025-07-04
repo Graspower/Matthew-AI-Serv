@@ -32,6 +32,8 @@ import { TeachingsSection } from '@/components/TeachingsSection';
 
 const TEACHING_CACHE_KEY = 'matthew-ai-teaching-cache';
 
+type HomeSection = 'testimonies' | 'prayers' | 'teachings';
+
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
   const [currentVersesForTopic, setCurrentVersesForTopic] = useState<Verse[] | null>(null);
@@ -41,6 +43,7 @@ export default function Home() {
   const [teachingLength, setTeachingLength] = useState<'brief' | 'medium'>('medium');
   const [activeTab, setActiveTab] = useState('home');
   const [verseToRead, setVerseToRead] = useState<Verse | null>(null);
+  const [activeHomeSection, setActiveHomeSection] = useState<HomeSection>('testimonies');
 
   const {toast} = useToast();
   const { language, setLanguage, bibleTranslation, setBibleTranslation } = useSettings();
@@ -183,18 +186,46 @@ export default function Home() {
                 </DropdownMenu>
               </div>
             </header>
-            <TabsList className="grid w-full grid-cols-6 mt-4 max-w-4xl mx-auto">
+            <TabsList className="grid w-full grid-cols-3 mt-4 max-w-4xl mx-auto">
               <TabsTrigger value="home">Home</TabsTrigger>
               <TabsTrigger value="matthewAI">AI Teaching</TabsTrigger>
               <TabsTrigger value="bibleReader">Bible Reader</TabsTrigger>
-              <TabsTrigger value="testimonies">Testimonies</TabsTrigger>
-              <TabsTrigger value="prayers">Prayers</TabsTrigger>
-              <TabsTrigger value="teachings">Teachings</TabsTrigger>
             </TabsList>
         </div>
 
         <TabsContent value="home" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
           <HomePage />
+          <div className="my-8 flex justify-center items-center gap-2 rounded-full bg-muted p-1 max-w-sm mx-auto">
+            <Button
+              variant={activeHomeSection === 'testimonies' ? 'secondary' : 'ghost'}
+              onClick={() => setActiveHomeSection('testimonies')}
+              className="rounded-full flex-1 shadow-sm data-[state=active]:bg-background"
+              data-state={activeHomeSection === 'testimonies' ? 'active' : 'inactive'}
+            >
+              Testimonies
+            </Button>
+            <Button
+              variant={activeHomeSection === 'prayers' ? 'secondary' : 'ghost'}
+              onClick={() => setActiveHomeSection('prayers')}
+              className="rounded-full flex-1 shadow-sm data-[state=active]:bg-background"
+              data-state={activeHomeSection === 'prayers' ? 'active' : 'inactive'}
+            >
+              Prayers
+            </Button>
+            <Button
+              variant={activeHomeSection === 'teachings' ? 'secondary' : 'ghost'}
+              onClick={() => setActiveHomeSection('teachings')}
+              className="rounded-full flex-1 shadow-sm data-[state=active]:bg-background"
+              data-state={activeHomeSection === 'teachings' ? 'active' : 'inactive'}
+            >
+              Teachings
+            </Button>
+          </div>
+          <div className="px-4">
+            {activeHomeSection === 'testimonies' && <TestimoniesSection />}
+            {activeHomeSection === 'prayers' && <PrayersSection />}
+            {activeHomeSection === 'teachings' && <TeachingsSection />}
+          </div>
         </TabsContent>
 
         <TabsContent value="matthewAI" className="flex-grow flex flex-col md:flex-row mt-0 data-[state=inactive]:hidden">
@@ -236,18 +267,6 @@ export default function Home() {
 
         <TabsContent value="bibleReader" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
           <BibleReaderPage verseToRead={verseToRead} onReadComplete={() => setVerseToRead(null)} />
-        </TabsContent>
-        
-        <TabsContent value="testimonies" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
-          <TestimoniesSection />
-        </TabsContent>
-
-        <TabsContent value="prayers" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
-          <PrayersSection />
-        </TabsContent>
-
-        <TabsContent value="teachings" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
-          <TeachingsSection />
         </TabsContent>
 
       </Tabs>

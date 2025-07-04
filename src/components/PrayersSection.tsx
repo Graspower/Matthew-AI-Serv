@@ -141,7 +141,7 @@ export function PrayersSection() {
     return (
       <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card">
         <CardContent className="flex-grow flex flex-col p-6">
-          <h3 className="text-4xl font-bold text-primary text-center">
+          <h3 className="text-3xl font-serif font-normal text-primary text-center">
             {item.hint}
           </h3>
           <div className="mt-auto text-center">
