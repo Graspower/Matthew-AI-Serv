@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony, type Comment, type Reactions } from '@/services/testimonies';
@@ -36,7 +36,6 @@ const commentFormSchema = z.object({
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
-// Default testimonies to show if the database is empty
 const defaultTestimonies: Testimony[] = [
     { id: 'default-1', name: 'Abraham', description: "Became the father of many nations through faith.", hint: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
     { id: 'default-2', name: 'Esther', description: "Risked her life to save her people.", hint: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
@@ -49,6 +48,11 @@ const defaultTestimonies: Testimony[] = [
     { id: 'default-9', name: 'Paul', description: "Transformed from persecutor to powerful apostle.", hint: 'Damascus Road', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  const truncated = text.slice(0, maxLength);
+  return truncated.slice(0, truncated.lastIndexOf(' '));
+};
 
 export function TestimoniesSection() {
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
@@ -56,6 +60,7 @@ export function TestimoniesSection() {
   const [testimoniesError, setTestimoniesError] = useState<string | null>(null);
   const [isAddTestimonyDialogOpen, setIsAddTestimonyDialogOpen] = useState(false);
   const [commentsModal, setCommentsModal] = useState<{isOpen: boolean; testimony: Testimony | null}>({isOpen: false, testimony: null});
+  const [detailsModal, setDetailsModal] = useState<{isOpen: boolean; testimony: Testimony | null}>({isOpen: false, testimony: null});
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -106,18 +111,20 @@ export function TestimoniesSection() {
   }
 
   async function handleReaction(testimonyId: string, reactionType: keyof Reactions) {
-    // Optimistic update
     setTestimonies(prev => prev.map(t => {
         if (t.id === testimonyId) {
             return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
         }
         return t;
     }));
+    setDetailsModal(prev => prev.testimony?.id === testimonyId ? { ...prev, testimony: { ...prev.testimony, reactions: { ...prev.testimony.reactions, [reactionType]: (prev.testimony.reactions[reactionType] || 0) + 1 } } } : prev);
+    
     try {
         await addReactionToTestimony(testimonyId, reactionType);
+        await fetchTestimonies();
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        fetchTestimonies(); // Re-fetch to correct optimistic update
+        await fetchTestimonies();
     }
   }
 
@@ -131,66 +138,33 @@ export function TestimoniesSection() {
       createdAt: new Date().toISOString(),
     };
     
-    // Optimistic update for immediate UI feedback
     setCommentsModal(prev => prev.testimony ? { ...prev, testimony: { ...prev.testimony, comments: [...(prev.testimony.comments || []), newComment] } } : prev);
     
     try {
       await addCommentToTestimony(commentsModal.testimony.id, newComment);
       commentForm.reset();
-      // On success, refresh all data to ensure consistency.
       await fetchTestimonies();
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      // On failure, revert the optimistic update by re-fetching.
-      fetchTestimonies();
+      await fetchTestimonies();
     }
   }
 
   const TestimonyContentCard = ({ item }: { item: Testimony }) => {
     return (
-      <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card">
+      <Card 
+        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
+        onClick={() => setDetailsModal({isOpen: true, testimony: item})}
+      >
         <CardContent className="flex-grow flex flex-col p-6">
-          <h3 className="text-3xl font-serif font-normal text-primary text-center">
+          <h3 className="text-3xl font-serif font-bold text-primary text-center">
             {item.hint}
           </h3>
           <div className="mt-auto text-center">
-            <p className="font-semibold text-lg">{item.name}</p>
-            <p className="text-sm text-muted-foreground font-bold">{item.description}</p>
+             <p className="font-semibold text-lg">{item.name}</p>
+             <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
           </div>
         </CardContent>
-        <CardFooter className="p-2 pt-0 border-t">
-          <div className="flex items-center ml-auto">
-            <Popover>
-              <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1">
-                      <Heart className="h-4 w-4" />
-                      <span className="text-xs">{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-                  </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-1">
-                  <div className="flex gap-1">
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}>
-                          <Heart className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}>
-                          <Hand className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}>
-                          <ThumbsUp className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}>
-                          <ThumbsDown className="h-4 w-4" />
-                       </Button>
-                  </div>
-              </PopoverContent>
-            </Popover>
-            
-            <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, testimony: item })}>
-              <MessageSquare className="h-4 w-4" />
-              <span className="text-xs">{item.comments?.length || 0}</span>
-            </Button>
-          </div>
-        </CardFooter>
       </Card>
     );
   };
@@ -269,15 +243,62 @@ export function TestimoniesSection() {
         {isLoadingTestimonies ? ([...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />))
         : testimoniesError ? (
             <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                <CardHeader><CardTitle className="text-destructive">Error Loading Testimonies</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                    <p>The application encountered an error while trying to fetch data from the database.</p>
-                    <p className="font-semibold">The specific error message from the database is:</p>
-                    <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{testimoniesError}</p>
+                <CardContent className="p-6">
+                  <h3 className="text-destructive font-bold">Error Loading Testimonies</h3>
+                  <p>The application encountered an error while trying to fetch data.</p>
+                  <p className="font-semibold mt-2">Error Details:</p>
+                  <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{testimoniesError}</p>
                 </CardContent>
             </Card>
         ) : ( testimonies.map((item) => <TestimonyContentCard key={item.id} item={item} />) )}
         </div>
+        
+      {detailsModal.testimony && (
+        <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, testimony: null })}>
+          <DialogContent className="max-w-2xl w-[90vw]">
+            <DialogHeader>
+              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.testimony.hint}</DialogTitle>
+              <DialogDescription className="pt-2 text-lg">By: {detailsModal.testimony.name}</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[50vh] pr-4">
+              <p className="py-4 text-foreground/90 whitespace-pre-wrap">{detailsModal.testimony.description}</p>
+            </ScrollArea>
+            <div className="pt-4 border-t flex items-center">
+              <span className="text-sm text-muted-foreground">React or Comment:</span>
+              <div className="flex items-center ml-auto">
+                <Popover>
+                  <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                          <Heart className="h-4 w-4 text-red-500" />
+                          <span className="text-xs">{(detailsModal.testimony.reactions?.like || 0) + (detailsModal.testimony.reactions?.pray || 0) + (detailsModal.testimony.reactions?.claps || 0)}</span>
+                      </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-1">
+                      <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.testimony!.id, 'like')}>
+                              <Heart className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.testimony!.id, 'pray')}>
+                              <Hand className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.testimony!.id, 'claps')}>
+                              <ThumbsUp className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.testimony!.id, 'downlike')}>
+                              <ThumbsDown className="h-4 w-4" />
+                          </Button>
+                      </div>
+                  </PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, testimony: detailsModal.testimony })}>
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="text-xs">{detailsModal.testimony.comments?.length || 0}</span>
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>

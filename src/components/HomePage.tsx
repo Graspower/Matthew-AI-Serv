@@ -214,7 +214,7 @@ export function HomePage() {
 
   const renderVerseCard = (item: DailyVerse, index: number) => (
     <div key={item.timeOfDay} ref={el => cardRefs.current[index] = el} className="w-full flex-shrink-0 snap-center p-1">
-      <Card onClick={() => handleCardClick(item)} className="w-full shadow-lg rounded-xl flex flex-col min-h-[480px] cursor-pointer">
+      <Card onClick={() => handleCardClick(item)} className="w-full shadow-lg rounded-xl flex flex-col min-h-[420px] cursor-pointer">
         <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
           <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
@@ -241,7 +241,7 @@ export function HomePage() {
 
   const renderSkeletonCard = (key: string) => (
       <div key={key} className="w-full flex-shrink-0 snap-center p-1">
-        <Card className="w-full shadow-lg rounded-xl min-h-[480px]">
+        <Card className="w-full shadow-lg rounded-xl min-h-[420px]">
             <CardHeader> <Skeleton className="h-6 w-1/2 mx-auto" /> <Skeleton className="h-4 w-1/4 mx-auto mt-2" /> </CardHeader>
             <CardContent className="flex flex-col gap-6 justify-center">
                 <div className="px-4 space-y-2"> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-3/4 mx-auto" /> </div>
@@ -265,9 +265,9 @@ export function HomePage() {
         </Button>
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-grow flex min-w-0 snap-x snap-mandatory overflow-x-auto scrollbar-hide">
             {isLoading ? ([...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`)))
-            : error ? ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[480px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-destructive">{error}</p></CardContent></Card></div> )
+            : error ? ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[420px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-destructive">{error}</p></CardContent></Card></div> )
             : dailyVerses.length > 0 ? ( dailyVerses.map(renderVerseCard) )
-            : ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[480px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-muted-foreground">Your daily inspiration is being prepared.</p></CardContent></Card></div> )}
+            : ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[420px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-muted-foreground">Your daily inspiration is being prepared.</p></CardContent></Card></div> )}
         </div>
         <Button variant="outline" size="icon" onClick={handleNext} disabled={isLoading || activeIndex >= dailyVerses.length - 1} className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex">
           <ChevronRight className="h-6 w-6" /> <span className="sr-only">Next Inspiration</span>

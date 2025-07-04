@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer, type NewPrayer, type Comment, type Reactions } from '@/services/prayers';
@@ -36,13 +36,17 @@ const commentFormSchema = z.object({
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
-// Default prayers to show if the database is empty
 const defaultPrayers: Prayer[] = [
     { id: 'default-1', name: 'Anonymous', description: 'For strength to overcome daily challenges.', hint: 'Daily Strength', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
     { id: 'default-2', name: 'A Parent', description: 'For wisdom in guiding my children.', hint: 'Parental Wisdom', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
     { id: 'default-3', name: 'A Student', description: 'For focus and clarity during my studies.', hint: 'Clarity in Study', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  const truncated = text.slice(0, maxLength);
+  return truncated.slice(0, truncated.lastIndexOf(' '));
+};
 
 export function PrayersSection() {
   const [prayers, setPrayers] = useState<Prayer[]>([]);
@@ -50,6 +54,7 @@ export function PrayersSection() {
   const [prayersError, setPrayersError] = useState<string | null>(null);
   const [isAddPrayerDialogOpen, setIsAddPrayerDialogOpen] = useState(false);
   const [commentsModal, setCommentsModal] = useState<{isOpen: boolean; prayer: Prayer | null}>({isOpen: false, prayer: null});
+  const [detailsModal, setDetailsModal] = useState<{isOpen: boolean; prayer: Prayer | null}>({isOpen: false, prayer: null});
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -100,18 +105,20 @@ export function PrayersSection() {
   }
 
   async function handleReaction(prayerId: string, reactionType: keyof Reactions) {
-    // Optimistic update
     setPrayers(prev => prev.map(p => {
         if (p.id === prayerId) {
             return { ...p, reactions: { ...p.reactions, [reactionType]: (p.reactions[reactionType] || 0) + 1 } };
         }
         return p;
     }));
+    setDetailsModal(prev => prev.prayer?.id === prayerId ? { ...prev, prayer: { ...prev.prayer, reactions: { ...prev.prayer.reactions, [reactionType]: (prev.prayer.reactions[reactionType] || 0) + 1 } } } : prev);
+
     try {
         await addReactionToPrayer(prayerId, reactionType);
+        await fetchPrayers();
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        fetchPrayers(); // Re-fetch to correct optimistic update
+        await fetchPrayers();
     }
   }
 
@@ -133,55 +140,25 @@ export function PrayersSection() {
       await fetchPrayers();
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      fetchPrayers();
+      await fetchPrayers();
     }
   }
 
   const PrayerContentCard = ({ item }: { item: Prayer }) => {
     return (
-      <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card">
+      <Card 
+        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
+        onClick={() => setDetailsModal({isOpen: true, prayer: item})}
+      >
         <CardContent className="flex-grow flex flex-col p-6">
-          <h3 className="text-3xl font-serif font-normal text-primary text-center">
+          <h3 className="text-3xl font-serif font-bold text-primary text-center">
             {item.hint}
           </h3>
           <div className="mt-auto text-center">
             <p className="font-semibold text-lg">{item.name}</p>
-            <p className="text-sm text-muted-foreground font-bold">{item.description}</p>
+            <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
           </div>
         </CardContent>
-        <CardFooter className="p-2 pt-0 border-t">
-          <div className="flex items-center ml-auto">
-            <Popover>
-              <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1">
-                      <Heart className="h-4 w-4" />
-                      <span className="text-xs">{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-                  </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-1">
-                  <div className="flex gap-1">
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}>
-                          <Heart className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}>
-                          <Hand className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}>
-                          <ThumbsUp className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}>
-                          <ThumbsDown className="h-4 w-4" />
-                       </Button>
-                  </div>
-              </PopoverContent>
-            </Popover>
-            
-            <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, prayer: item })}>
-              <MessageSquare className="h-4 w-4" />
-              <span className="text-xs">{item.comments?.length || 0}</span>
-            </Button>
-          </div>
-        </CardFooter>
       </Card>
     );
   };
@@ -260,15 +237,62 @@ export function PrayersSection() {
         {isLoadingPrayers ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
         : prayersError ? (
             <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                <CardHeader><CardTitle className="text-destructive">Error Loading Prayers</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                    <p>The application encountered an error while trying to fetch data from the database.</p>
-                    <p className="font-semibold">The specific error message from the database is:</p>
+                <CardContent className="p-6">
+                    <h3 className="text-destructive font-bold">Error Loading Prayers</h3>
+                    <p>The application encountered an error while trying to fetch data.</p>
+                    <p className="font-semibold mt-2">Error Details:</p>
                     <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{prayersError}</p>
                 </CardContent>
             </Card>
         ) : ( prayers.map((item) => <PrayerContentCard key={item.id} item={item} />) )}
         </div>
+      
+      {detailsModal.prayer && (
+        <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, prayer: null })}>
+          <DialogContent className="max-w-2xl w-[90vw]">
+            <DialogHeader>
+              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.prayer.hint}</DialogTitle>
+              <DialogDescription className="pt-2 text-lg">By: {detailsModal.prayer.name}</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[50vh] pr-4">
+              <p className="py-4 text-foreground/90 whitespace-pre-wrap">{detailsModal.prayer.description}</p>
+            </ScrollArea>
+            <div className="pt-4 border-t flex items-center">
+              <span className="text-sm text-muted-foreground">React or Comment:</span>
+              <div className="flex items-center ml-auto">
+                <Popover>
+                  <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                          <Heart className="h-4 w-4 text-red-500" />
+                          <span className="text-xs">{(detailsModal.prayer.reactions?.like || 0) + (detailsModal.prayer.reactions?.pray || 0) + (detailsModal.prayer.reactions?.claps || 0)}</span>
+                      </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-1">
+                      <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'like')}>
+                              <Heart className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'pray')}>
+                              <Hand className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'claps')}>
+                              <ThumbsUp className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'downlike')}>
+                              <ThumbsDown className="h-4 w-4" />
+                          </Button>
+                      </div>
+                  </PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, prayer: detailsModal.prayer })}>
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="text-xs">{detailsModal.prayer.comments?.length || 0}</span>
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>

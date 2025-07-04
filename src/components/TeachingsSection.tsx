@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTeachings, addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching, type NewTeaching, type Comment, type Reactions } from '@/services/teachings';
@@ -36,13 +36,17 @@ const commentFormSchema = z.object({
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
-// Default teachings to show if the database is empty
 const defaultTeachings: Teaching[] = [
     { id: 'default-1', name: 'Jesus', description: "A man had two sons...", hint: 'Prodigal Son', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
     { id: 'default-2', name: 'Jesus', description: "Blessed are the meek, for they will inherit the earth.", hint: 'The Beatitudes', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
     { id: 'default-3', name: 'Paul', description: "Love is patient, love is kind...", hint: 'The Way of Love', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  const truncated = text.slice(0, maxLength);
+  return truncated.slice(0, truncated.lastIndexOf(' '));
+};
 
 export function TeachingsSection() {
   const [teachings, setTeachings] = useState<Teaching[]>([]);
@@ -50,6 +54,7 @@ export function TeachingsSection() {
   const [teachingsError, setTeachingsError] = useState<string | null>(null);
   const [isAddTeachingDialogOpen, setIsAddTeachingDialogOpen] = useState(false);
   const [commentsModal, setCommentsModal] = useState<{isOpen: boolean; teaching: Teaching | null}>({isOpen: false, teaching: null});
+  const [detailsModal, setDetailsModal] = useState<{isOpen: boolean; teaching: Teaching | null}>({isOpen: false, teaching: null});
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -100,18 +105,20 @@ export function TeachingsSection() {
   }
 
   async function handleReaction(teachingId: string, reactionType: keyof Reactions) {
-    // Optimistic update
     setTeachings(prev => prev.map(t => {
         if (t.id === teachingId) {
             return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
         }
         return t;
     }));
+    setDetailsModal(prev => prev.teaching?.id === teachingId ? { ...prev, teaching: { ...prev.teaching, reactions: { ...prev.teaching.reactions, [reactionType]: (prev.teaching.reactions[reactionType] || 0) + 1 } } } : prev);
+
     try {
         await addReactionToTeaching(teachingId, reactionType);
+        await fetchTeachings();
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        fetchTeachings(); // Re-fetch to correct optimistic update
+        await fetchTeachings();
     }
   }
 
@@ -133,55 +140,25 @@ export function TeachingsSection() {
       await fetchTeachings();
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      fetchTeachings();
+      await fetchTeachings();
     }
   }
 
   const TeachingContentCard = ({ item }: { item: Teaching }) => {
     return (
-      <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card">
+      <Card 
+        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
+        onClick={() => setDetailsModal({isOpen: true, teaching: item})}
+      >
         <CardContent className="flex-grow flex flex-col p-6">
-          <h3 className="text-3xl font-serif font-normal text-primary text-center">
+          <h3 className="text-3xl font-serif font-bold text-primary text-center">
             {item.hint}
           </h3>
           <div className="mt-auto text-center">
             <p className="font-semibold text-lg">{item.name}</p>
-            <p className="text-sm text-muted-foreground font-bold">{item.description}</p>
+            <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
           </div>
         </CardContent>
-        <CardFooter className="p-2 pt-0 border-t">
-          <div className="flex items-center ml-auto">
-            <Popover>
-              <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1">
-                      <Heart className="h-4 w-4" />
-                      <span className="text-xs">{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-                  </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-1">
-                  <div className="flex gap-1">
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}>
-                          <Heart className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}>
-                          <Hand className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}>
-                          <ThumbsUp className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}>
-                          <ThumbsDown className="h-4 w-4" />
-                       </Button>
-                  </div>
-              </PopoverContent>
-            </Popover>
-            
-            <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, teaching: item })}>
-              <MessageSquare className="h-4 w-4" />
-              <span className="text-xs">{item.comments?.length || 0}</span>
-            </Button>
-          </div>
-        </CardFooter>
       </Card>
     );
   };
@@ -260,15 +237,62 @@ export function TeachingsSection() {
         {isLoadingTeachings ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
         : teachingsError ? (
             <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                <CardHeader><CardTitle className="text-destructive">Error Loading Teachings</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                    <p>The application encountered an error while trying to fetch data from the database.</p>
-                    <p className="font-semibold">The specific error message from the database is:</p>
+                <CardContent className="p-6">
+                    <h3 className="text-destructive font-bold">Error Loading Teachings</h3>
+                    <p>The application encountered an error while trying to fetch data.</p>
+                    <p className="font-semibold mt-2">Error Details:</p>
                     <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{teachingsError}</p>
                 </CardContent>
             </Card>
         ) : ( teachings.map((item) => <TeachingContentCard key={item.id} item={item} />) )}
         </div>
+
+      {detailsModal.teaching && (
+        <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, teaching: null })}>
+          <DialogContent className="max-w-2xl w-[90vw]">
+            <DialogHeader>
+              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.teaching.hint}</DialogTitle>
+              <DialogDescription className="pt-2 text-lg">By: {detailsModal.teaching.name}</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[50vh] pr-4">
+              <p className="py-4 text-foreground/90 whitespace-pre-wrap">{detailsModal.teaching.description}</p>
+            </ScrollArea>
+            <div className="pt-4 border-t flex items-center">
+              <span className="text-sm text-muted-foreground">React or Comment:</span>
+              <div className="flex items-center ml-auto">
+                <Popover>
+                  <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                          <Heart className="h-4 w-4 text-red-500" />
+                          <span className="text-xs">{(detailsModal.teaching.reactions?.like || 0) + (detailsModal.teaching.reactions?.pray || 0) + (detailsModal.teaching.reactions?.claps || 0)}</span>
+                      </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-1">
+                      <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'like')}>
+                              <Heart className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'pray')}>
+                              <Hand className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'claps')}>
+                              <ThumbsUp className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'downlike')}>
+                              <ThumbsDown className="h-4 w-4" />
+                          </Button>
+                      </div>
+                  </PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, teaching: detailsModal.teaching })}>
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="text-xs">{detailsModal.teaching.comments?.length || 0}</span>
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>

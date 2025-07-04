@@ -188,7 +188,7 @@ export default function Home() {
             </header>
             <TabsList className="grid w-full grid-cols-3 mt-4 max-w-4xl mx-auto">
               <TabsTrigger value="home">Home</TabsTrigger>
-              <TabsTrigger value="matthewAI">AI Teaching</TabsTrigger>
+              <TabsTrigger value="matthewAI">Ask Matthew</TabsTrigger>
               <TabsTrigger value="bibleReader">Bible Reader</TabsTrigger>
             </TabsList>
         </div>
