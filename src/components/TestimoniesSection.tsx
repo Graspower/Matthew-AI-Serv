@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -144,7 +145,7 @@ export function TestimoniesSection() {
     return (
       <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card">
         <CardContent className="flex-grow flex flex-col justify-center items-center text-center p-6">
-          <h3 className="text-4xl font-extrabold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent" style={{ textShadow: '1px 1px 2px hsl(var(--background)/0.5)' }}>
+          <h3 className="text-4xl font-extrabold text-primary">
             {item.hint}
           </h3>
           <p className="text-sm text-muted-foreground mt-4">{item.description}</p>
@@ -160,13 +161,13 @@ export function TestimoniesSection() {
             </PopoverTrigger>
             <PopoverContent className="w-auto p-1">
                 <div className="flex gap-1">
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReaction(item.id, 'pray')}>
+                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}>
                         <Hand className="h-4 w-4" />
                      </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReaction(item.id, 'claps')}>
+                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}>
                         <ThumbsUp className="h-4 w-4" />
                      </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReaction(item.id, 'downlike')}>
+                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}>
                         <ThumbsDown className="h-4 w-4" />
                      </Button>
                 </div>
