@@ -21,14 +21,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony, type Comment, type Reactions } from '@/services/testimonies';
+import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer, type NewPrayer, type Comment, type Reactions } from '@/services/prayers';
 
-const testimonyFormSchema = z.object({
+const prayerFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
   hint: z.string().min(2, { message: 'A hint is required.' }).max(40, { message: 'Hint must be 40 characters or less.' }),
 });
-type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
+type PrayerFormData = z.infer<typeof prayerFormSchema>;
 
 const commentFormSchema = z.object({
   author: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -36,32 +36,26 @@ const commentFormSchema = z.object({
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
-// Default testimonies to show if the database is empty
-const defaultTestimonies: Testimony[] = [
-    { id: 'default-1', name: 'Abraham', description: "Became the father of many nations through faith.", hint: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-2', name: 'Esther', description: "Risked her life to save her people.", hint: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-3', name: 'Jacob', description: "Received a new name after wrestling with God.", hint: 'Wrestled God', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-4', name: 'Job', description: "Remained faithful to God despite immense loss.", hint: 'Unwavering Faith', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-5', name: 'Joseph', description: "From a prison to a palace, he saved many.", hint: 'Dreamer to Ruler', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-6', name: 'Mary Magdalene', description: "The first to see the risen Christ.", hint: 'Devoted Follower', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-7', name: 'Matthew', description: "Left his tax booth to become an apostle.", hint: 'Followed Jesus', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-8', name: 'Moses', description: "Led the Israelites out of slavery in Egypt.", hint: 'The Lawgiver', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-9', name: 'Paul', description: "Transformed from persecutor to powerful apostle.", hint: 'Damascus Road', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+// Default prayers to show if the database is empty
+const defaultPrayers: Prayer[] = [
+    { id: 'default-1', name: 'Anonymous', description: 'For strength to overcome daily challenges.', hint: 'Daily Strength', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-2', name: 'A Parent', description: 'For wisdom in guiding my children.', hint: 'Parental Wisdom', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { id: 'default-3', name: 'A Student', description: 'For focus and clarity during my studies.', hint: 'Clarity in Study', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
 
-export function TestimoniesSection() {
-  const [testimonies, setTestimonies] = useState<Testimony[]>([]);
-  const [isLoadingTestimonies, setIsLoadingTestimonies] = useState(true);
-  const [testimoniesError, setTestimoniesError] = useState<string | null>(null);
-  const [isAddTestimonyDialogOpen, setIsAddTestimonyDialogOpen] = useState(false);
-  const [commentsModal, setCommentsModal] = useState<{isOpen: boolean; testimony: Testimony | null}>({isOpen: false, testimony: null});
+export function PrayersSection() {
+  const [prayers, setPrayers] = useState<Prayer[]>([]);
+  const [isLoadingPrayers, setIsLoadingPrayers] = useState(true);
+  const [prayersError, setPrayersError] = useState<string | null>(null);
+  const [isAddPrayerDialogOpen, setIsAddPrayerDialogOpen] = useState(false);
+  const [commentsModal, setCommentsModal] = useState<{isOpen: boolean; prayer: Prayer | null}>({isOpen: false, prayer: null});
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  const testimonyForm = useForm<TestimonyFormData>({
-    resolver: zodResolver(testimonyFormSchema),
+  const prayerForm = useForm<PrayerFormData>({
+    resolver: zodResolver(prayerFormSchema),
     defaultValues: { name: '', description: '', hint: '' },
   });
 
@@ -70,59 +64,59 @@ export function TestimoniesSection() {
     defaultValues: { author: '', text: '' },
   });
 
-  const fetchTestimonies = useCallback(async () => {
-    setIsLoadingTestimonies(true);
-    setTestimoniesError(null);
+  const fetchPrayers = useCallback(async () => {
+    setIsLoadingPrayers(true);
+    setPrayersError(null);
     try {
-      const data = await getTestimonies();
+      const data = await getPrayers();
       if (data.length > 0) {
-        setTestimonies(data);
+        setPrayers(data);
       } else {
-        setTestimonies(defaultTestimonies);
+        setPrayers(defaultPrayers);
       }
     } catch (error: any) {
       console.error(error);
-      setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
-      setTestimonies([]);
+      setPrayersError(error.message || "Failed to load prayers. Please check your connection and try again.");
+      setPrayers([]);
     } finally {
-      setIsLoadingTestimonies(false);
+      setIsLoadingPrayers(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchTestimonies();
-  }, [fetchTestimonies]);
+    fetchPrayers();
+  }, [fetchPrayers]);
   
-  async function handleAddTestimony(data: TestimonyFormData) {
+  async function handleAddPrayer(data: PrayerFormData) {
     try {
-      await addTestimony(data);
-      toast({ title: 'Success!', description: 'Testimony added successfully.' });
-      setIsAddTestimonyDialogOpen(false);
-      fetchTestimonies();
-      testimonyForm.reset();
+      await addPrayer(data);
+      toast({ title: 'Success!', description: 'Prayer added successfully.' });
+      setIsAddPrayerDialogOpen(false);
+      fetchPrayers();
+      prayerForm.reset();
     } catch (error: any) {
-      toast({ title: 'Submission Error', description: error.message || 'Failed to add testimony.', variant: 'destructive' });
+      toast({ title: 'Submission Error', description: error.message || 'Failed to add prayer.', variant: 'destructive' });
     }
   }
 
-  async function handleReaction(testimonyId: string, reactionType: keyof Reactions) {
+  async function handleReaction(prayerId: string, reactionType: keyof Reactions) {
     // Optimistic update
-    setTestimonies(prev => prev.map(t => {
-        if (t.id === testimonyId) {
-            return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
+    setPrayers(prev => prev.map(p => {
+        if (p.id === prayerId) {
+            return { ...p, reactions: { ...p.reactions, [reactionType]: (p.reactions[reactionType] || 0) + 1 } };
         }
-        return t;
+        return p;
     }));
     try {
-        await addReactionToTestimony(testimonyId, reactionType);
+        await addReactionToPrayer(prayerId, reactionType);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        fetchTestimonies(); // Re-fetch to correct optimistic update
+        fetchPrayers(); // Re-fetch to correct optimistic update
     }
   }
 
   async function handleAddComment(data: CommentFormData) {
-    if (!commentsModal.testimony) return;
+    if (!commentsModal.prayer) return;
 
     const newComment: Comment = {
       id: uuidv4(),
@@ -131,22 +125,19 @@ export function TestimoniesSection() {
       createdAt: new Date().toISOString(),
     };
     
-    // Optimistic update for immediate UI feedback
-    setCommentsModal(prev => prev.testimony ? { ...prev, testimony: { ...prev.testimony, comments: [...(prev.testimony.comments || []), newComment] } } : prev);
+    setCommentsModal(prev => prev.prayer ? { ...prev, prayer: { ...prev.prayer, comments: [...(prev.prayer.comments || []), newComment] } } : prev);
     
     try {
-      await addCommentToTestimony(commentsModal.testimony.id, newComment);
+      await addCommentToPrayer(commentsModal.prayer.id, newComment);
       commentForm.reset();
-      // On success, refresh all data to ensure consistency.
-      await fetchTestimonies();
+      await fetchPrayers();
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      // On failure, revert the optimistic update by re-fetching.
-      fetchTestimonies();
+      fetchPrayers();
     }
   }
 
-  const TestimonyContentCard = ({ item }: { item: Testimony }) => {
+  const PrayerContentCard = ({ item }: { item: Prayer }) => {
     return (
       <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card">
         <CardContent className="flex-grow flex flex-col p-6">
@@ -185,7 +176,7 @@ export function TestimoniesSection() {
               </PopoverContent>
             </Popover>
             
-            <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, testimony: item })}>
+            <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, prayer: item })}>
               <MessageSquare className="h-4 w-4" />
               <span className="text-xs">{item.comments?.length || 0}</span>
             </Button>
@@ -206,12 +197,12 @@ export function TestimoniesSection() {
     </Card>
   );
 
-  const CommentArea = ({ testimony }: { testimony: Testimony }) => (
+  const CommentArea = ({ prayer }: { prayer: Prayer }) => (
     <>
       <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
         <div className="space-y-4">
-          {testimony.comments && testimony.comments.length > 0 ? (
-            testimony.comments.map(comment => (
+          {prayer.comments && prayer.comments.length > 0 ? (
+            prayer.comments.map(comment => (
               <div key={comment.id} className="flex gap-3">
                 <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{comment.author.charAt(0)}</div>
                 <div>
@@ -246,19 +237,19 @@ export function TestimoniesSection() {
     <div className="w-full text-center">
         <div className="flex justify-between items-center mb-6">
             <div>
-                <h2 className="text-2xl font-bold text-left">Testimonies</h2>
-                <p className="text-muted-foreground text-left">Stories of faith and transformation.</p>
+                <h2 className="text-2xl font-bold text-left">Prayers</h2>
+                <p className="text-muted-foreground text-left">Community prayer requests and praises.</p>
             </div>
-            <Dialog open={isAddTestimonyDialogOpen} onOpenChange={setIsAddTestimonyDialogOpen}>
-                <DialogTrigger asChild><Button>Add Testimony</Button></DialogTrigger>
+            <Dialog open={isAddPrayerDialogOpen} onOpenChange={setIsAddPrayerDialogOpen}>
+                <DialogTrigger asChild><Button>Add Prayer</Button></DialogTrigger>
                 <DialogContent>
-                    <DialogHeader> <DialogTitle>Add a New Testimony</DialogTitle> <DialogDescription>Share a testimony to encourage others.</DialogDescription> </DialogHeader>
-                    <Form {...testimonyForm}>
-                        <form onSubmit={testimonyForm.handleSubmit(handleAddTestimony)} className="space-y-4">
-                            <FormField control={testimonyForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Abraham" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={testimonyForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel> <FormControl><Input placeholder="A brief description of the testimony" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={testimonyForm.control} name="hint" render={({ field }) => ( <FormItem> <FormLabel>Testimony Hint</FormLabel> <FormControl><Input placeholder="e.g., Father of Nations" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <Button type="submit" disabled={testimonyForm.formState.isSubmitting}>{testimonyForm.formState.isSubmitting ? 'Submitting...' : 'Submit Testimony'}</Button>
+                    <DialogHeader> <DialogTitle>Add a New Prayer</DialogTitle> <DialogDescription>Share a prayer request or praise.</DialogDescription> </DialogHeader>
+                    <Form {...prayerForm}>
+                        <form onSubmit={prayerForm.handleSubmit(handleAddPrayer)} className="space-y-4">
+                            <FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={prayerForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel> <FormControl><Input placeholder="A brief description of your prayer" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={prayerForm.control} name="hint" render={({ field }) => ( <FormItem> <FormLabel>Prayer Hint</FormLabel> <FormControl><Input placeholder="e.g., For Healing" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <Button type="submit" disabled={prayerForm.formState.isSubmitting}>{prayerForm.formState.isSubmitting ? 'Submitting...' : 'Submit Prayer'}</Button>
                         </form>
                     </Form>
                 </DialogContent>
@@ -266,37 +257,37 @@ export function TestimoniesSection() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingTestimonies ? ([...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />))
-        : testimoniesError ? (
+        {isLoadingPrayers ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
+        : prayersError ? (
             <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                <CardHeader><CardTitle className="text-destructive">Error Loading Testimonies</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-destructive">Error Loading Prayers</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                     <p>The application encountered an error while trying to fetch data from the database.</p>
                     <p className="font-semibold">The specific error message from the database is:</p>
-                    <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{testimoniesError}</p>
+                    <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{prayersError}</p>
                 </CardContent>
             </Card>
-        ) : ( testimonies.map((item) => <TestimonyContentCard key={item.id} item={item} />) )}
+        ) : ( prayers.map((item) => <PrayerContentCard key={item.id} item={item} />) )}
         </div>
 
       {isMobile ? (
-        <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
+        <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
           <SheetContent side="bottom" className="h-[85vh] flex flex-col">
             <SheetHeader className="text-left">
-              <SheetTitle>Comments on "{commentsModal.testimony?.hint}"</SheetTitle>
+              <SheetTitle>Comments on "{commentsModal.prayer?.hint}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
-            {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}
+            {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} />}
           </SheetContent>
         </Sheet>
       ) : (
-        <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
+        <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
           <DialogContent className="max-w-2xl w-[90vw] h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Comments on "{commentsModal.testimony?.hint}"</DialogTitle>
+              <DialogTitle>Comments on "{commentsModal.prayer?.hint}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
-             {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}
+             {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} />}
           </DialogContent>
         </Dialog>
       )}

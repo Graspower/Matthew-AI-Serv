@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -8,7 +9,6 @@ import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TestimoniesSection } from './TestimoniesSection';
 
 interface Verse {
   book: string;
@@ -294,12 +294,6 @@ export function HomePage() {
           </DialogContent>
         </Dialog>
       )}
-
-      {/* Testimonies Section */}
-      <div className="w-full max-w-6xl mx-auto mt-8">
-        <TestimoniesSection />
-      </div>
-
     </div>
   );
 }

@@ -26,6 +26,9 @@ import {
 import { BookOpenText, Moon, Sun } from 'lucide-react';
 import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { TestimoniesSection } from '@/components/TestimoniesSection';
+import { PrayersSection } from '@/components/PrayersSection';
+import { TeachingsSection } from '@/components/TeachingsSection';
 
 const TEACHING_CACHE_KEY = 'matthew-ai-teaching-cache';
 
@@ -192,10 +195,13 @@ export default function Home() {
                 </DropdownMenu>
               </div>
             </header>
-            <TabsList className="grid w-full grid-cols-3 mt-4 max-w-lg mx-auto">
+            <TabsList className="grid w-full grid-cols-6 mt-4 max-w-4xl mx-auto">
               <TabsTrigger value="home">Home</TabsTrigger>
               <TabsTrigger value="matthewAI">AI Teaching</TabsTrigger>
               <TabsTrigger value="bibleReader">Bible Reader</TabsTrigger>
+              <TabsTrigger value="testimonies">Testimonies</TabsTrigger>
+              <TabsTrigger value="prayers">Prayers</TabsTrigger>
+              <TabsTrigger value="teachings">Teachings</TabsTrigger>
             </TabsList>
         </div>
 
@@ -243,6 +249,19 @@ export default function Home() {
         <TabsContent value="bibleReader" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
           <BibleReaderPage verseToRead={verseToRead} onReadComplete={() => setVerseToRead(null)} />
         </TabsContent>
+        
+        <TabsContent value="testimonies" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
+          <TestimoniesSection />
+        </TabsContent>
+
+        <TabsContent value="prayers" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
+          <PrayersSection />
+        </TabsContent>
+
+        <TabsContent value="teachings" className="flex-grow p-4 mt-0 data-[state=inactive]:hidden">
+          <TeachingsSection />
+        </TabsContent>
+
       </Tabs>
     </div>
   );
