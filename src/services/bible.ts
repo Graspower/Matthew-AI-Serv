@@ -1,3 +1,4 @@
+
 'use server';
 
 import fs from 'fs/promises';
@@ -66,6 +67,26 @@ async function getTranslationData(translation: BibleTranslation): Promise<BibleJ
     }
 }
 
+/**
+ * Finds a book in the Bible data using a case-insensitive search.
+ * @param translationData The loaded Bible data for a specific translation.
+ * @param bookName The name of the book to find.
+ * @returns An object containing the correctly cased key and the book's data, or null if not found.
+ */
+function findBook(translationData: BibleJson, bookName: string): { key: string, data: Record<string, Record<string, string>> } | null {
+    // Try a direct match first for performance.
+    if (translationData[bookName]) {
+        return { key: bookName, data: translationData[bookName] };
+    }
+    // Fallback to case-insensitive search.
+    const lowerCaseBookName = bookName.toLowerCase();
+    const foundKey = Object.keys(translationData).find(key => key.toLowerCase() === lowerCaseBookName);
+    if (foundKey) {
+        return { key: foundKey, data: translationData[foundKey] };
+    }
+    return null;
+}
+
 export async function getBooks(translation: BibleTranslation): Promise<BibleBook[]> {
   try {
     const translationData = await getTranslationData(translation);
@@ -82,12 +103,12 @@ export async function getBooks(translation: BibleTranslation): Promise<BibleBook
 
 export async function getChaptersForBook(translation: BibleTranslation, bookId: string): Promise<BibleChapter[]> {
     const translationData = await getTranslationData(translation);
-    const bookData = translationData[bookId];
-    if (!bookData) {
+    const bookInfo = findBook(translationData, bookId);
+    if (!bookInfo) {
         throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
     }
 
-    return Object.keys(bookData).map(chapterNumber => ({
+    return Object.keys(bookInfo.data).map(chapterNumber => ({
         id: parseInt(chapterNumber, 10),
         name: `Chapter ${chapterNumber}`,
     })).sort((a,b) => a.id - b.id);
@@ -95,17 +116,17 @@ export async function getChaptersForBook(translation: BibleTranslation, bookId: 
 
 export async function getChapterText(translation: BibleTranslation, bookId: string, chapterNumber: number, highlightVerse?: number | null): Promise<string> {
     const translationData = await getTranslationData(translation);
-    const bookData = translationData[bookId];
-    if (!bookData) {
+    const bookInfo = findBook(translationData, bookId);
+    if (!bookInfo) {
         throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
     }
 
-    const chapterData = bookData[String(chapterNumber)];
+    const chapterData = bookInfo.data[String(chapterNumber)];
     if (!chapterData) {
         throw new Error(`Chapter ${chapterNumber} not found in ${bookId} (${translation} translation).`);
     }
 
-    let formattedText = `<h3 class="text-lg font-semibold mb-2">${bookId} - Chapter ${chapterNumber} (${translation})</h3>\n`;
+    let formattedText = `<h3 class="text-lg font-semibold mb-2">${bookInfo.key} - Chapter ${chapterNumber} (${translation})</h3>\n`;
     formattedText += Object.entries(chapterData).map(([verseNum, verseText]) => {
         const verseNumber = parseInt(verseNum, 10);
         return `<p class="mb-1 transition-colors duration-300 ${verseNumber === highlightVerse ? 'bg-accent/30 rounded-md p-2' : 'p-2'}" ${verseNumber === highlightVerse ? 'id="highlighted-verse"' : ''}>` +
@@ -117,13 +138,13 @@ export async function getChapterText(translation: BibleTranslation, bookId: stri
 
 export async function getVerse(translation: BibleTranslation, bookName: string, chapterNumber: number, verseNumber: number): Promise<Verse | null> {
     const translationData = await getTranslationData(translation);
-    const bookData = translationData[bookName];
-    if (!bookData) {
+    const bookInfo = findBook(translationData, bookName);
+    if (!bookInfo) {
         console.warn(`Book not found in bible data: ${bookName} (${translation})`);
         return null;
     }
 
-    const chapterData = bookData[String(chapterNumber)];
+    const chapterData = bookInfo.data[String(chapterNumber)];
     if (!chapterData) {
         console.warn(`Chapter ${chapterNumber} not found in ${bookName} (${translation} data).`);
         return null;
@@ -136,7 +157,7 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
     }
 
     return {
-        book: bookName,
+        book: bookInfo.key,
         chapter: chapterNumber,
         verse: verseNumber,
         text: verseText,

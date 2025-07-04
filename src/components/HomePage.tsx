@@ -1,26 +1,67 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import Image from 'next/image';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
-import { getInspirationalVerses, type InspirationVerse } from '@/services/inspirations';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getTestimonies, addTestimony, type Testimony, type NewTestimony } from '@/services/testimonies';
+
+interface Verse {
+  book: string;
+  chapter: number;
+  verse: number;
+  text: string;
+}
 
 interface DailyVerse {
   timeOfDay: 'Morning' | 'Afternoon' | 'Evening';
-  verse: InspirationVerse;
+  verse: Verse;
   explanation: string;
 }
 
+const inspirationalVerses: Verse[] = [
+  { book: 'Psalm', chapter: 103, verse: 1, text: 'Bless the LORD, O my soul, and all that is within me, bless his holy name!' },
+  { book: 'Psalm', chapter: 103, verse: 2, text: 'Bless the LORD, O my soul, and forget not all his benefits.' },
+  { book: 'Psalm', chapter: 145, verse: 1, text: 'I will extol thee, my God, O king; and I will bless thy name for ever and ever.' },
+  { book: 'Psalm', chapter: 145, verse: 2, text: 'Every day will I bless thee; and I will praise thy name for ever and ever.' },
+  { book: 'Ephesians', chapter: 1, verse: 3, text: 'Blessed be the God and Father of our Lord Jesus Christ, who hath blessed us with all spiritual blessings in heavenly places in Christ.' },
+  { book: '1 Chronicles', chapter: 16, verse: 8, text: 'Give thanks unto the LORD, call upon his name, make known his deeds among the people.' },
+  { book: '1 Chronicles', chapter: 16, verse: 34, text: 'O give thanks unto the LORD; for he is good; for his mercy endureth for ever.' },
+  { book: 'Psalm', chapter: 95, verse: 2, text: 'Let us come before his presence with thanksgiving, and make a joyful noise unto him with psalms.' },
+  { book: 'Psalm', chapter: 107, verse: 1, text: 'O give thanks unto the LORD, for he is good: for his mercy endureth for ever.' },
+  { book: 'Colossians', chapter: 3, verse: 17, text: 'And whatsoever ye do in word or deed, do all in the name of the Lord Jesus, giving thanks to God and the Father by him.' },
+  { book: '1 Thessalonians', chapter: 5, verse: 18, text: 'In every thing give thanks: for this is the will of God in Christ Jesus concerning you.' },
+  { book: 'Hebrews', chapter: 13, verse: 15, text: 'By him therefore let us offer the sacrifice of praise to God continually, that is, the fruit of our lips giving thanks to his name.' },
+  { book: 'Psalm', chapter: 34, verse: 1, text: 'I will bless the LORD at all times: his praise shall continually be in my mouth.' },
+  { book: 'Jude', chapter: 1, verse: 25, text: 'To the only wise God our Saviour, be glory and majesty, dominion and power, both now and ever. Amen.'},
+  { book: 'Revelation', chapter: 4, verse: 11, text: 'Thou art worthy, O Lord, to receive glory and honour and power: for thou hast created all things, and for thy pleasure they are and were created.'},
+];
+
+// Define the schema for the testimony form.
+const testimonyFormSchema = z.object({
+  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
+  hint: z.string().min(2, { message: 'A hint is required.' }).max(100, { message: 'Hint must be 100 characters or less.' }),
+});
+type TestimonyFormData = z.infer<typeof testimonyFormSchema>;
+
+const testimonyBackgrounds = Array.from({ length: 15 }, (_, i) => `/images/testimonies/testimony-${i + 1}.jpg`);
+const abrahamImage = '/images/abrahamtestimony.png';
+
+
+// Helper to shuffle array and pick N items
 function pickRandomItems<T>(arr: T[], num: number): T[] {
-  if (arr.length <= num) {
-    return arr;
-  }
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, num);
 }
@@ -28,7 +69,7 @@ function pickRandomItems<T>(arr: T[], num: number): T[] {
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
-  return truncated.slice(0, truncated.lastIndexOf(' '));
+  return truncated.slice(0, truncated.lastIndexOf(' ')); // Avoid cutting words
 };
 
 export function HomePage() {
@@ -40,61 +81,125 @@ export function HomePage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentlySpeakingIndex, setCurrentlySpeakingIndex] = useState<number | null>(null);
+  const [testimonies, setTestimonies] = useState<Testimony[]>([]);
+  const [isLoadingTestimonies, setIsLoadingTestimonies] = useState(true);
+  const [testimoniesError, setTestimoniesError] = useState<string | null>(null);
+  const [isAddTestimonyDialogOpen, setIsAddTestimonyDialogOpen] = useState(false);
+
 
   const synth = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [activeTab, setActiveTab] = useState<'testimonies' | 'prayers' | 'teachings'>('testimonies');
+  
+  const form = useForm<TestimonyFormData>({
+    resolver: zodResolver(testimonyFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      hint: '',
+    },
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       synth.current = window.speechSynthesis;
+      // Cleanup on component unmount
       return () => {
-        if (synth.current?.speaking) synth.current.cancel();
+        if (synth.current?.speaking) {
+          synth.current.cancel();
+        }
       };
     }
   }, []);
 
   const stopSpeaking = useCallback(() => {
-    if (synth.current?.speaking) synth.current.cancel();
+    if (synth.current?.speaking) {
+      synth.current.cancel();
+    }
     setIsSpeaking(false);
     setCurrentlySpeakingIndex(null);
   }, []);
   
+  const speakInspiration = useCallback((item: DailyVerse, index: number) => {
+    if (!synth.current) return;
+    
+    // If we click the button of the currently playing audio, stop it.
+    if (isSpeaking && currentlySpeakingIndex === index) {
+      stopSpeaking();
+      return;
+    }
+  
+    // If another audio is playing, stop it before starting the new one.
+    if (synth.current.speaking) {
+      synth.current.cancel();
+    }
+  
+    const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.verse.book} chapter ${item.verse.chapter}, verse ${item.verse.verse}. ${item.verse.text}. Adoration: ${item.explanation}`;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.pitch = 1.0;
+    utterance.rate = 0.9;
+    
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      setCurrentlySpeakingIndex(index);
+    };
+  
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setCurrentlySpeakingIndex(null);
+    };
+  
+    utterance.onerror = (e) => {
+      console.error('SpeechSynthesis Error', e);
+      toast({ title: "Speech Error", description: "Could not play audio.", variant: "destructive" });
+      setIsSpeaking(false);
+      setCurrentlySpeakingIndex(null);
+    };
+  
+    synth.current.speak(utterance);
+  }, [isSpeaking, currentlySpeakingIndex, stopSpeaking, toast]);
+
   const generateAndStoreVerses = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     stopSpeaking();
-    try {
-      const allInspirationalVerses = await getInspirationalVerses();
-      if (allInspirationalVerses.length < 3) {
-          throw new Error('Not enough inspirational verses in the database to display. Please add at least 3.');
-      }
 
-      const selectedVerses = pickRandomItems(allInspirationalVerses, 3);
+    try {
+      const selectedVerses = pickRandomItems(inspirationalVerses, 3);
+      
       const explanationPromises = selectedVerses.map(verse => 
         generateVerseExplanation({
           verseReference: `${verse.book} ${verse.chapter}:${verse.verse}`,
           verseText: verse.text,
         })
       );
+      
       const explanations = await Promise.all(explanationPromises);
+
       const newDailyVerses: DailyVerse[] = [
         { timeOfDay: 'Morning', verse: selectedVerses[0], explanation: explanations[0].explanation },
         { timeOfDay: 'Afternoon', verse: selectedVerses[1], explanation: explanations[1].explanation },
         { timeOfDay: 'Evening', verse: selectedVerses[2], explanation: explanations[2].explanation },
       ];
+
       if (typeof window !== 'undefined') {
           const today = new Date().toISOString().split('T')[0];
           localStorage.setItem('dailyInspiration', JSON.stringify({ date: today, verses: newDailyVerses }));
       }
       setDailyVerses(newDailyVerses);
+
     } catch (err: any) {
       console.error('Failed to generate daily verses or explanations:', err);
       const errorMessage = `Failed to load daily inspiration. ${err.message || 'Please try again.'}`;
       setError(errorMessage);
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
       setDailyVerses([]);
     } finally {
       setIsLoading(false);
@@ -106,8 +211,10 @@ export function HomePage() {
         setIsLoading(false);
         return;
     }
+    
     const today = new Date().toISOString().split('T')[0];
     const storedData = localStorage.getItem('dailyInspiration');
+    
     if (storedData) {
       try {
         const { date, verses } = JSON.parse(storedData);
@@ -116,37 +223,39 @@ export function HomePage() {
           setIsLoading(false);
           return;
         }
-      } catch (e) { console.error("Failed to parse daily inspiration from local storage", e); }
+      } catch (e) {
+        console.error("Failed to parse daily inspiration from local storage", e);
+      }
     }
+    
     generateAndStoreVerses();
   }, [generateAndStoreVerses]);
 
-  const speakInspiration = useCallback((item: DailyVerse, index: number) => {
-    if (!synth.current) return;
-    if (isSpeaking && currentlySpeakingIndex === index) {
-      stopSpeaking();
-      return;
+  const fetchTestimonies = useCallback(async () => {
+    setIsLoadingTestimonies(true);
+    setTestimoniesError(null);
+    try {
+      const data = await getTestimonies();
+      setTestimonies(data);
+    } catch (error: any) {
+      console.error(error);
+      setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
+    } finally {
+      setIsLoadingTestimonies(false);
     }
-    if (synth.current.speaking) synth.current.cancel();
-  
-    const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.verse.book} chapter ${item.verse.chapter}, verse ${item.verse.verse}. ${item.verse.text}. Adoration: ${item.explanation}`;
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.pitch = 1.0;
-    utterance.rate = 0.9;
-    utterance.onstart = () => { setIsSpeaking(true); setCurrentlySpeakingIndex(index); };
-    utterance.onend = () => { setIsSpeaking(false); setCurrentlySpeakingIndex(null); };
-    utterance.onerror = (e) => {
-      console.error('SpeechSynthesis Error', e);
-      toast({ title: "Speech Error", description: "Could not play audio.", variant: "destructive" });
-      setIsSpeaking(false);
-      setCurrentlySpeakingIndex(null);
-    };
-    synth.current.speak(utterance);
-  }, [isSpeaking, currentlySpeakingIndex, stopSpeaking, toast]);
+  }, []);
+
+  useEffect(() => {
+    fetchTestimonies();
+  }, [fetchTestimonies]);
 
   const scrollToCard = useCallback((index: number) => {
     if (cardRefs.current[index]) {
-      cardRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      cardRefs.current[index]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
     }
   }, []);
 
@@ -154,9 +263,13 @@ export function HomePage() {
     if (!isLoading && dailyVerses.length > 0) {
       const hour = new Date().getHours();
       let initialIndex = 0;
-      if (hour >= 18) initialIndex = 2;
-      else if (hour >= 12) initialIndex = 1;
+      if (hour >= 18) { // 6 PM or later
+        initialIndex = 2;
+      } else if (hour >= 12) { // 12 PM or later
+        initialIndex = 1;
+      }
       setActiveIndex(initialIndex);
+      // Use a timeout to scroll after the component has rendered
       setTimeout(() => scrollToCard(initialIndex), 100);
     }
   }, [isLoading, dailyVerses, scrollToCard]);
@@ -178,13 +291,17 @@ export function HomePage() {
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const handleScroll = () => {
     if (isSpeaking) stopSpeaking();
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+    }
     scrollTimeout.current = setTimeout(() => {
         if(scrollContainerRef.current) {
             const { scrollLeft, scrollWidth } = scrollContainerRef.current;
             const cardWidth = scrollWidth / dailyVerses.length;
             const newIndex = Math.round(scrollLeft / cardWidth);
-            if (isFinite(newIndex) && newIndex !== activeIndex) setActiveIndex(newIndex);
+            if (isFinite(newIndex) && newIndex !== activeIndex) {
+              setActiveIndex(newIndex);
+            }
         }
     }, 150);
   };
@@ -193,27 +310,67 @@ export function HomePage() {
     setSelectedInspiration(item);
     setIsDialogOpen(true);
   }
+  
+  async function handleAddTestimony(data: TestimonyFormData) {
+    try {
+      const newTestimony: NewTestimony = {
+        name: data.name,
+        description: data.description,
+        hint: data.hint,
+      };
+
+      await addTestimony(newTestimony);
+      toast({ title: 'Success!', description: 'Testimony added successfully.' });
+      setIsAddTestimonyDialogOpen(false);
+      fetchTestimonies();
+      form.reset();
+    } catch (error: any) {
+      toast({
+        title: 'Submission Error',
+        description: error.message || 'Failed to add testimony. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }
+
 
   const renderVerseCard = (item: DailyVerse, index: number) => (
-    <div key={item.timeOfDay} ref={el => cardRefs.current[index] = el} className="w-full flex-shrink-0 snap-center p-1">
-      <Card onClick={() => handleCardClick(item)} className="w-full shadow-lg rounded-xl flex flex-col min-h-[400px] cursor-pointer">
+    <div
+      key={item.timeOfDay}
+      ref={el => cardRefs.current[index] = el}
+      className="w-full flex-shrink-0 snap-center p-1"
+    >
+      <Card
+        onClick={() => handleCardClick(item)}
+        className="w-full shadow-lg rounded-xl flex flex-col min-h-[480px] cursor-pointer"
+      >
         <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
           <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
             {`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}
           </CardDescription>
-           <Button variant="ghost" size="icon" className="absolute top-2 right-2 rounded-full" onClick={(e) => { e.stopPropagation(); speakInspiration(item, index); }}>
+           <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-2 right-2 rounded-full"
+            onClick={(e) => { e.stopPropagation(); speakInspiration(item, index); }}
+          >
             {isSpeaking && currentlySpeakingIndex === index ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
             <span className="sr-only">Speak inspiration</span>
           </Button>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4 justify-center p-4 pt-0">
           <div className="text-center">
-            <p className="text-2xl font-bold text-foreground leading-relaxed">"{item.verse.text}"</p>
+            <p className="text-2xl font-bold text-foreground leading-relaxed">
+              "{item.verse.text}"
+            </p>
           </div>
           <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
              <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
-              {truncateText(item.explanation, 120)}...<span className="text-primary font-semibold ml-1">Read More</span>
+              {truncateText(item.explanation, 120)}...
+              <span className="text-primary font-semibold ml-1">
+                Read More
+              </span>
             </p>
           </div>
         </CardContent>
@@ -223,59 +380,335 @@ export function HomePage() {
 
   const renderSkeletonCard = (key: string) => (
       <div key={key} className="w-full flex-shrink-0 snap-center p-1">
-        <Card className="w-full shadow-lg rounded-xl min-h-[400px]">
-            <CardHeader> <Skeleton className="h-6 w-1/2 mx-auto" /> <Skeleton className="h-4 w-1/4 mx-auto mt-2" /> </CardHeader>
+        <Card className="w-full shadow-lg rounded-xl min-h-[480px]">
+            <CardHeader>
+                <Skeleton className="h-6 w-1/2 mx-auto" />
+                <Skeleton className="h-4 w-1/4 mx-auto mt-2" />
+            </CardHeader>
             <CardContent className="flex flex-col gap-6 justify-center">
-                <div className="px-4 space-y-2"> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-3/4 mx-auto" /> </div>
-                <div className="mx-4 p-4"> <Skeleton className="h-4 w-full" /> <Skeleton className="h-4 w-full mt-2" /> <Skeleton className="h-4 w-5/6 mt-2" /> </div>
+                <div className="px-4 space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-3/4 mx-auto" />
+                </div>
+                <div className="mx-4 p-4">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full mt-2" />
+                    <Skeleton className="h-4 w-5/6 mt-2" />
+                </div>
             </CardContent>
         </Card>
       </div>
   );
 
+  const prayerData = [
+    { name: 'For Family', description: "Prayers for unity, protection, and God's love to fill your home.", imageSrc: '/images/prayeronmarriage.jpg', hint: 'family praying' },
+    { name: 'For Health', description: 'Seeking divine healing, strength, and wellness for body, mind, and spirit.', imageSrc: 'https://placehold.co/600x400.png', hint: 'healing light' },
+    { name: 'For the Nation', description: 'Prayers for wisdom for leaders, peace in the land, and spiritual revival.', imageSrc: 'https://placehold.co/600x400.png', hint: 'praying over map' },
+  ];
+
+  const teachingData = [
+    { name: 'On Marriage', description: 'Biblical principles for building a strong, Christ-centered, and loving marriage.', imageSrc: '/images/marriagesonteaching.jpg', hint: 'couple holding hands' },
+    { name: 'On Love', description: 'Understanding the greatest commandment and how to practice selfless, agape love.', imageSrc: 'https://placehold.co/600x400.png', hint: 'glowing heart' },
+    { name: 'On Faith', description: 'Learning to live by faith, trust in God\'s promises, and move mountains.', imageSrc: 'https://placehold.co/600x400.png', hint: 'mustard seed plant' },
+    { name: 'On Prosperity', description: 'God\'s perspective on biblical prosperity, stewardship, and generous living.', imageSrc: 'https://placehold.co/600x400.png', hint: 'overflowing harvest' },
+    { name: 'On Healing', description: 'Exploring the scriptural basis for divine healing and how to receive it.', imageSrc: 'https://placehold.co/600x400.png', hint: 'healing hands light' },
+    { name: 'On Time Management', description: 'Redeeming the time with purpose, wisdom, and eternal perspective.', imageSrc: 'https://placehold.co/600x400.png', hint: 'ancient hourglass' },
+  ];
+
+  const ContentCard = ({ item }: { item: { name: string; description: string; imageSrc: string; hint: string; } }) => (
+    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer min-h-[300px]">
+      <div className="relative w-full aspect-[3/2]">
+        <Image src={item.imageSrc} alt={item.name} layout="fill" className="object-cover" data-ai-hint={item.hint} />
+      </div>
+      <div className="flex flex-col flex-grow p-4">
+        <h3 className="text-xl font-semibold">{item.name}</h3>
+        <p className="text-sm text-muted-foreground mt-2">{item.description}</p>
+      </div>
+    </Card>
+  );
+
+  const TestimonyContentCard = ({ item }: { item: Testimony }) => {
+    const [backgroundImage, setBackgroundImage] = useState('');
+
+    useEffect(() => {
+      // This logic now runs only on the client, preventing hydration mismatch
+      if (item.name.toLowerCase() === 'abraham') {
+        setBackgroundImage(abrahamImage);
+      } else {
+        const randomIndex = Math.floor(Math.random() * testimonyBackgrounds.length);
+        setBackgroundImage(testimonyBackgrounds[randomIndex]);
+      }
+    }, [item.name]);
+
+    if (!backgroundImage) {
+      // Render a skeleton or a placeholder while waiting for the client-side effect to run
+      return <ContentCardSkeleton />;
+    }
+
+    return (
+      // The Card itself is now the container for the background image
+      <Card
+        className="w-full flex shadow-lg rounded-xl overflow-hidden transition-transform hover:scale-105 cursor-pointer min-h-[300px] text-white relative bg-cover bg-center"
+        style={{ backgroundImage: `url(${backgroundImage})` }}
+        data-ai-hint={item.name.toLowerCase() === 'abraham' ? 'abraham bible' : 'abstract spiritual light'}
+      >
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-black/50 z-0"></div>
+
+        {/* Content container, positioned above the overlay */}
+        <div className="relative z-10 w-full h-full flex flex-col justify-between items-center text-center p-6">
+          
+          {/* Hint text container, grows to fill space and centers content */}
+          <div className="flex-grow flex flex-col justify-center items-center">
+              <h3 className="text-3xl font-bold" style={{ textShadow: '2px 2px 6px rgba(0, 0, 0, 0.8)' }}>
+                  {item.hint}
+              </h3>
+          </div>
+
+          {/* Name and description container, at the bottom */}
+          <div className="w-full">
+            <p className="font-semibold text-lg">{item.name}</p>
+            <p className="text-sm opacity-90 mt-1">{item.description}</p>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+  
+  const ContentCardSkeleton = () => (
+    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px]">
+        <Skeleton className="w-full aspect-[3/2]" />
+        <div className="flex flex-col flex-grow p-4 space-y-3">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+        </div>
+    </Card>
+  );
+
   return (
     <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center p-4 min-w-0">
-      {/* Daily Inspiration Section */}
       <div className="w-full max-w-4xl text-center mb-4">
         <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
       </div>
 
       <div className="w-full max-w-4xl flex items-center justify-center gap-2">
-        <Button variant="outline" size="icon" onClick={handlePrev} disabled={isLoading || activeIndex === 0} className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex">
-          <ChevronLeft className="h-6 w-6" /> <span className="sr-only">Previous Inspiration</span>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handlePrev}
+          disabled={isLoading || activeIndex === 0}
+          className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex"
+        >
+          <ChevronLeft className="h-6 w-6" />
+          <span className="sr-only">Previous Inspiration</span>
         </Button>
-        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-grow flex min-w-0 snap-x snap-mandatory overflow-x-auto scrollbar-hide">
-            {isLoading ? ([...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`)))
-            : error ? ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[400px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-destructive">{error}</p></CardContent></Card></div> )
-            : dailyVerses.length > 0 ? ( dailyVerses.map(renderVerseCard) )
-            : ( <div className="w-full flex-shrink-0 snap-center p-1"><Card className="w-full shadow-lg rounded-xl min-h-[400px]"><CardContent className="p-6 text-center flex items-center justify-center"><p className="text-muted-foreground">Your daily inspiration is being prepared.</p></CardContent></Card></div> )}
+
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-grow flex min-w-0 snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+        >
+            {isLoading ? (
+              [...Array(3)].map((_, i) => renderSkeletonCard(`sk-${i}`))
+            ) : error ? (
+              <div className="w-full flex-shrink-0 snap-center p-1">
+                  <Card className="w-full shadow-lg rounded-xl min-h-[480px]">
+                      <CardContent className="p-6 text-center flex items-center justify-center">
+                          <p className="text-destructive">{error}</p>
+                      </CardContent>
+                  </Card>
+              </div>
+            ) : dailyVerses.length > 0 ? (
+                dailyVerses.map(renderVerseCard)
+            ) : (
+              <div className="w-full flex-shrink-0 snap-center p-1">
+                 <Card className="w-full shadow-lg rounded-xl min-h-[480px]">
+                      <CardContent className="p-6 text-center flex items-center justify-center">
+                          <p className="text-muted-foreground">Your daily inspiration is being prepared.</p>
+                      </CardContent>
+                  </Card>
+              </div>
+            )}
         </div>
-        <Button variant="outline" size="icon" onClick={handleNext} disabled={isLoading || activeIndex >= dailyVerses.length - 1} className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex">
-          <ChevronRight className="h-6 w-6" /> <span className="sr-only">Next Inspiration</span>
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleNext}
+          disabled={isLoading || activeIndex >= dailyVerses.length - 1}
+          className="h-10 w-10 rounded-full flex-shrink-0 hidden md:inline-flex"
+        >
+          <ChevronRight className="h-6 w-6" />
+          <span className="sr-only">Next Inspiration</span>
         </Button>
       </div>
 
-      {/* Daily Verse Details Dialog */}
       {selectedInspiration && (
-        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) stopSpeaking(); setIsDialogOpen(isOpen); }}>
+        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+              stopSpeaking();
+          }
+          setIsDialogOpen(isOpen);
+        }}>
           <DialogContent className="max-w-2xl w-[90vw] flex flex-col">
             <DialogHeader>
               <DialogTitle>{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
-              <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">{`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}</DialogDescription>
+              <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
+                {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
+              </DialogDescription>
                <DialogClose className="absolute right-4 top-4 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                    <X className="h-4 w-4" /> <span className="sr-only">Close</span>
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
                 </DialogClose>
             </DialogHeader>
             <div className="grid gap-4 overflow-y-auto px-6 pb-6 max-h-[70vh]">
-              <p className="text-center text-3xl font-bold text-foreground leading-relaxed">"{selectedInspiration.verse.text}"</p>
+              <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
+                "{selectedInspiration.verse.text}"
+              </p>
               <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
-                <p className="text-lg font-normal text-muted-foreground text-left leading-relaxed">{selectedInspiration.explanation}</p>
+                <p className="text-lg font-normal text-muted-foreground text-left leading-relaxed">
+                  {selectedInspiration.explanation}
+                </p>
               </div>
             </div>
           </DialogContent>
         </Dialog>
       )}
+
+      <div className="w-full max-w-6xl mx-auto mt-8 text-center">
+        <div className="flex justify-center gap-2 md:gap-4 mb-8 border-b pb-4">
+          <Button variant={activeTab === 'testimonies' ? 'default' : 'outline'} onClick={() => setActiveTab('testimonies')} className="rounded-full px-6">
+            Testimonies
+          </Button>
+          <Button variant={activeTab === 'prayers' ? 'default' : 'outline'} onClick={() => setActiveTab('prayers')} className="rounded-full px-6">
+            Prayers
+          </Button>
+          <Button variant={activeTab === 'teachings' ? 'default' : 'outline'} onClick={() => setActiveTab('teachings')} className="rounded-full px-6">
+            Teachings
+          </Button>
+        </div>
+
+        <div className="pt-4">
+          {activeTab === 'testimonies' && (
+            <div>
+                <div className="text-right mb-4">
+                    <Dialog open={isAddTestimonyDialogOpen} onOpenChange={setIsAddTestimonyDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>Add Testimony</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Add a New Testimony</DialogTitle>
+                                <DialogDescription>
+                                    Share a testimony to encourage others.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Form {...form}>
+                                <form onSubmit={form.handleSubmit(handleAddTestimony)} className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Name</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g., Abraham" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="description"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Description</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="A brief description of the testimony" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="hint"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Testimony Hint</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g., Answered prayer for healing" {...field} />
+                                                </FormControl>
+                                                <FormDescription>
+                                                  This text will be displayed on the card.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                                        {form.formState.isSubmitting ? 'Submitting...' : 'Submit Testimony'}
+                                    </Button>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {isLoadingTestimonies ? (
+                    [...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />)
+                ) : testimoniesError ? (
+                    <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
+                        <CardHeader>
+                            <CardTitle className="text-destructive">Error Loading Testimonies</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p>The application encountered an error while trying to fetch data from the database.</p>
+                            <p className="font-semibold">Please check the following:</p>
+                            <ol className="list-decimal list-inside space-y-2 text-sm">
+                                <li>
+                                    In your <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Firebase Console</a>, ensure your Firestore collection is named exactly <strong>testimonies</strong> (all lowercase).
+                                </li>
+                                <li>
+                                    Under the <strong>Firestore Database &gt; Rules</strong> tab, ensure your rules match the following exactly:
+                                    <pre className="mt-2 p-2 bg-black/50 rounded-md text-white font-mono text-xs overflow-x-auto">
+                                        {`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /testimonies/{docId} {
+      allow read, create: if true;
+    }
+  }
+}`}
+                                    </pre>
+                                </li>
+                            </ol>
+                            <p className="font-semibold">The specific error message from the database is:</p>
+                            <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{testimoniesError}</p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    testimonies.map((item) => <TestimonyContentCard key={item.id} item={item} />)
+                )}
+                </div>
+            </div>
+          )}
+          {activeTab === 'prayers' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {prayerData.map((item) => <ContentCard key={item.name} item={item} />)}
+            </div>
+          )}
+          {activeTab === 'teachings' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {teachingData.map((item) => <ContentCard key={item.name} item={item} />)}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
