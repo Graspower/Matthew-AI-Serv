@@ -16,7 +16,7 @@ export type NewTeaching = Omit<Teaching, 'id' | 'comments' | 'reactions'>;
 
 export async function addTeaching(teaching: NewTeaching): Promise<void> {
   try {
-    const teachingsCol = collection(db, 'teachings');
+    const teachingsCol = collection(db, 'Teaching');
     await addDoc(teachingsCol, {
         ...teaching,
         comments: [],
@@ -34,7 +34,7 @@ export async function addTeaching(teaching: NewTeaching): Promise<void> {
 
 export async function addCommentToTeaching(teachingId: string, comment: Comment): Promise<void> {
   try {
-    const teachingRef = doc(db, 'teachings', teachingId);
+    const teachingRef = doc(db, 'Teaching', teachingId);
     const firestoreComment = {
       ...comment,
       createdAt: Timestamp.fromDate(new Date(comment.createdAt)),
@@ -53,7 +53,7 @@ export async function addCommentToTeaching(teachingId: string, comment: Comment)
 
 export async function addReactionToTeaching(teachingId: string, reactionType: keyof Reactions): Promise<void> {
   try {
-    const teachingRef = doc(db, 'teachings', teachingId);
+    const teachingRef = doc(db, 'Teaching', teachingId);
     const fieldToIncrement = `reactions.${reactionType}`;
     await updateDoc(teachingRef, {
         [fieldToIncrement]: increment(1)
@@ -70,11 +70,11 @@ export async function addReactionToTeaching(teachingId: string, reactionType: ke
 
 export async function getTeachings(): Promise<Teaching[]> {
   try {
-    const teachingsCol = collection(db, 'teachings');
+    const teachingsCol = collection(db, 'Teaching');
     const teachingSnapshot = await getDocs(teachingsCol);
     
     if (teachingSnapshot.empty) {
-        console.log('No matching documents in "teachings" collection.');
+        console.log('No matching documents in "Teaching" collection.');
         return [];
     }
 
@@ -99,7 +99,7 @@ export async function getTeachings(): Promise<Teaching[]> {
   } catch (error: any) {
     console.error("Error fetching teachings: ", error);
     if (error.code === 'permission-denied') {
-        throw new Error("Permission Denied: Your security rules are not set up to allow reading teachings. Please update your Firestore rules to allow 'read' access to the 'teachings' collection.");
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading teachings. Please update your Firestore rules to allow 'read' access to the 'Teaching' collection.");
     }
     throw new Error(`Failed to fetch teachings. Please check your network connection. Original error: ${error.code || error.message}`);
   }
