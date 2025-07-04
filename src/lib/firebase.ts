@@ -18,12 +18,15 @@ const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 if (missingEnvVars.length > 0) {
     throw new Error(`CRITICAL: Firebase environment variables are missing.
 
-1.  **Check your .env.local file:** Ensure it's in the project root and contains these variables:
-    ${missingEnvVars.join('\n    ')}
+This is a setup issue, not a code bug. To fix this:
 
-2.  **Restart your server:** This is the most important step. Stop your development server (Ctrl+C) and run 'npm run dev' again.
+1.  **Find your project's root folder**: This is the folder that contains the 'package.json' file.
+2.  **Create a file named exactly \`.env.local\`** in that folder. Be careful, some editors might add '.txt' to the end.
+3.  **Copy the contents** from the \`.env.local.example\` file into your new \`.env.local\` file.
+4.  **Fill in your real values** from the Firebase console for each variable.
+5.  **Restart your server**: This is the most important step. Stop your development server (Ctrl+C in the terminal) and run 'npm run dev' again.
 
-This error will persist until the server is restarted with the correct .env.local file.`);
+The app will not work until the server is restarted with the correct \`.env.local\` file.`);
 }
 
 
