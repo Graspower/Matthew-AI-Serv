@@ -14,13 +14,13 @@ const firebaseConfig = {
 };
 
 // Check if all required environment variables are present
-const isConfigured =
-  firebaseConfig.apiKey &&
-  firebaseConfig.authDomain &&
-  firebaseConfig.projectId &&
-  firebaseConfig.storageBucket &&
-  firebaseConfig.messagingSenderId &&
-  firebaseConfig.appId;
+export const isConfigured =
+  !!firebaseConfig.apiKey &&
+  !!firebaseConfig.authDomain &&
+  !!firebaseConfig.projectId &&
+  !!firebaseConfig.storageBucket &&
+  !!firebaseConfig.messagingSenderId &&
+  !!firebaseConfig.appId;
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
@@ -32,8 +32,6 @@ if (isConfigured) {
   db = getFirestore(app);
   storage = getStorage(app);
   auth = getAuth(app);
-} else {
-  console.error("Firebase configuration is missing or incomplete. Please check your .env.local file and restart your server.");
 }
 
-export { app, db, storage, auth, isConfigured };
+export { app, db, storage, auth };

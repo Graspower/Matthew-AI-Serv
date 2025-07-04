@@ -43,15 +43,24 @@ const FirebaseNotConfigured = () => (
 
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // If Firebase is not configured, show the guide and stop.
+  // This prevents any other code in this component from running and causing errors.
+  if (!isConfigured) {
+    return <FirebaseNotConfigured />;
+  }
+
+  return <AuthComponent>{children}</AuthComponent>;
+}
+
+// This component contains the actual auth logic and will only be rendered
+// when Firebase is correctly configured.
+function AuthComponent({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isConfigured || !auth) {
-      setLoading(false);
-      return;
-    }
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    // auth is guaranteed to be non-null here because isConfigured is true.
+    const unsubscribe = onAuthStateChanged(auth!, (user) => {
       setUser(user);
       setLoading(false);
     });
@@ -59,14 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async () => {
-    if (!isConfigured || !auth) {
-       console.error("Login failed: Firebase is not configured.");
-       alert("Firebase is not configured. Please check the console for details.");
-       return;
-    }
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithPopup(auth!, provider);
     } catch (error) {
       console.error("Error during sign-in:", error);
     }
@@ -78,16 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
   
-  if (loading && isConfigured) {
+  if (loading) {
     return (
         <div className="flex h-screen items-center justify-center">
             <Loader2 className="h-12 w-12 animate-spin" />
         </div>
     );
-  }
-
-  if (!isConfigured) {
-    return <FirebaseNotConfigured />;
   }
   
   const value = { user, loading, login, logout };
@@ -98,7 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    // This error will only happen if useAuth is used outside a configured AuthProvider.
+    throw new Error('useAuth must be used within an AuthProvider, and Firebase must be configured.');
   }
   return context;
 }
