@@ -5,3 +5,4 @@ import '@/ai/flows/explain-bible-verse-flow.ts';
 import '@/ai/flows/generateTeachingFlow.ts';
 import '@/ai/flows/generateEncouragementFlow.ts';
 import '@/ai/flows/generateVerseExplanationFlow.ts'; // Added import
+import '@/ai/flows/askMatthewFlow.ts';
