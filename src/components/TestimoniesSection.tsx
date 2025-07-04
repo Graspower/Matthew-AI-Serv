@@ -158,11 +158,11 @@ export function TestimoniesSection() {
         className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
         onClick={() => setDetailsModal({isOpen: true, testimony: item})}
       >
-        <CardContent className="flex-grow flex flex-col p-6 justify-center items-center">
-            <h3 className="text-primary font-semibold text-lg text-center mb-auto pt-4">
+        <CardContent className="flex-grow flex flex-col p-6 justify-center items-center text-center">
+            <h3 className="font-serif font-semibold text-xl text-primary/90 capitalize [text-shadow:0_1px_2px_hsl(var(--primary)/0.2)]">
                 {item.category}
             </h3>
-            <div className="mt-auto text-center">
+            <div className="mt-4">
                 <p className="font-semibold text-lg">{item.name}</p>
                 <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
             </div>
