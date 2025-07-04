@@ -31,38 +31,74 @@ export interface BibleChapter {
   name: string;
 }
 
-// --- Data Structures for Local JSON ---
-// Assumes a structure like: { "bookName": { "chapterNum": { "verseNum": "text" } } }
+// The standardized nested object structure used by the app's functions.
+// e.g., { "Genesis": { "1": { "1": "text" } } }
 type BibleJson = Record<string, Record<string, Record<string, string>>>;
 
-// --- In-Memory Caching ---
-// Cache Bible data in memory to avoid refetching on every navigation.
+// Cache for transformed Bible data to avoid re-reading and re-transforming files.
 const bibleCache: Map<BibleTranslation, BibleJson> = new Map();
 
+/**
+ * Transforms the KJV-style array of verse objects into the standard nested object structure.
+ * @param verses An array of verse objects, e.g., { book_name, chapter, verse, text }.
+ * @returns A BibleJson object.
+ */
+function transformKjvArrayToNestedObject(verses: any[]): BibleJson {
+    const nestedObject: BibleJson = {};
+    for (const item of verses) {
+        const { book_name, chapter, verse, text } = item;
+        if (!book_name || !chapter || !verse || typeof text === 'undefined') continue;
+
+        if (!nestedObject[book_name]) {
+            nestedObject[book_name] = {};
+        }
+        if (!nestedObject[book_name][String(chapter)]) {
+            nestedObject[book_name][String(chapter)] = {};
+        }
+        nestedObject[book_name][String(chapter)][String(verse)] = text;
+    }
+    return nestedObject;
+}
+
+/**
+ * Loads and standardizes data for a given Bible translation.
+ * It handles both array-based and object-based JSON structures.
+ * @param translation The Bible translation to load (e.g., 'KJV').
+ * @returns A promise that resolves to the standardized BibleJson object.
+ */
 async function getTranslationData(translation: BibleTranslation): Promise<BibleJson> {
-    const lowerCaseTranslation = translation.toLowerCase();
     if (bibleCache.has(translation)) {
         return bibleCache.get(translation)!;
     }
 
-    try {
-        // Construct the full path to the JSON file in the public directory, using lowercase
-        const filePath = path.join(process.cwd(), 'public', 'bibles', `${lowerCaseTranslation}.json`);
-        
-        // Read the file from the filesystem since this is a server component
-        const fileContent = await fs.readFile(filePath, 'utf-8');
-        
-        // Parse the JSON data
-        const data: BibleJson = JSON.parse(fileContent);
+    const lowerCaseTranslation = translation.toLowerCase();
+    const fileName = `${lowerCaseTranslation}-bible.json`;
+    const filePath = path.join(process.cwd(), 'public', 'bibles', fileName);
 
-        // Store in cache and return
-        bibleCache.set(translation, data);
-        return data;
+    try {
+        const fileContent = await fs.readFile(filePath, 'utf-8');
+        const data = JSON.parse(fileContent);
+
+        let bibleData: BibleJson;
+
+        // Check if the data is in the KJV array format (e.g., { "verses": [...] })
+        if (data && data.verses && Array.isArray(data.verses)) {
+            bibleData = transformKjvArrayToNestedObject(data.verses);
+        } else if (Array.isArray(data)) { // Or a raw array
+            bibleData = transformKjvArrayToNestedObject(data);
+        }
+        else {
+            // Assume it's already in the standard nested object format for other versions
+            bibleData = data as BibleJson;
+        }
+
+        bibleCache.set(translation, bibleData);
+        return bibleData;
+
     } catch (error: any) {
-        console.error(`Error loading or parsing Bible data for ${translation}:`, error);
-        // Provide a more helpful error message
+        console.error(`Error loading or parsing Bible data for ${translation} from ${fileName}:`, error);
         if (error.code === 'ENOENT') {
-             throw new Error(`Could not load data for ${translation}. The file was not found at /public/bibles/${lowerCaseTranslation}.json. Please ensure the file exists and the filename is correct.`);
+             throw new Error(`Could not load data for ${translation}. The file was not found at ${filePath}. Please ensure the file exists and the filename is correct.`);
         }
         throw new Error(`Could not load data for ${translation}. Make sure the file is valid JSON. Original error: ${error.message}`);
     }
@@ -124,14 +160,16 @@ export async function getChapterText(translation: BibleTranslation, bookId: stri
 
     const chapterData = bookInfo.data[String(chapterNumber)];
     if (!chapterData) {
-        throw new Error(`Chapter ${chapterNumber} not found in ${bookId} (${translation} translation).`);
+        throw new Error(`Chapter ${chapterNumber} not found in ${bookInfo.key} (${translation} translation).`);
     }
 
     let formattedText = `<h3 class="text-lg font-semibold mb-2">${bookInfo.key} - Chapter ${chapterNumber} (${translation})</h3>\n`;
     formattedText += Object.entries(chapterData).map(([verseNum, verseText]) => {
         const verseNumber = parseInt(verseNum, 10);
+        // Remove the pilcrow (paragraph) symbol from KJV text
+        const cleanedText = verseText.replace(/^\s*\u00b6\s*/, '');
         return `<p class="mb-1 transition-colors duration-300 ${verseNumber === highlightVerse ? 'bg-accent/30 rounded-md p-2' : 'p-2'}" ${verseNumber === highlightVerse ? 'id="highlighted-verse"' : ''}>` +
-               `<strong class="mr-1">${verseNumber}</strong>${verseText.replace(/^\s*¶\s*/, '')}</p>`;
+               `<strong class="mr-1">${verseNumber}</strong>${cleanedText}</p>`;
     }).join('\n');
 
     return formattedText;
@@ -147,13 +185,13 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
 
     const chapterData = bookInfo.data[String(chapterNumber)];
     if (!chapterData) {
-        console.warn(`Chapter ${chapterNumber} not found in ${bookName} (${translation} data).`);
+        console.warn(`Chapter ${chapterNumber} not found in ${bookInfo.key} (${translation} data).`);
         return null;
     }
 
     const verseText = chapterData[String(verseNumber)];
     if (!verseText) {
-        console.warn(`Verse ${verseNumber} not found in ${bookName} ${chapterNumber} (${translation} data).`);
+        console.warn(`Verse ${verseNumber} not found in ${bookInfo.key} ${chapterNumber} (${translation} data).`);
         return null;
     }
 
@@ -161,7 +199,7 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
         book: bookInfo.key,
         chapter: chapterNumber,
         verse: verseNumber,
-        text: verseText,
+        text: verseText.replace(/^\s*\u00b6\s*/, ''), // Also clean the text here
         translationContext: translation, 
     };
 }
