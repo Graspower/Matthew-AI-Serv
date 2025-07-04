@@ -1,36 +1,9 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
+import { getAuth, type Auth } from "firebase/auth";
 
-const requiredEnvVars = [
-  'NEXT_PUBLIC_FIREBASE_API_KEY',
-  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-  'NEXT_PUBLIC_FIREBASE_APP_ID',
-];
-
-const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
-if (missingEnvVars.length > 0) {
-    throw new Error(`CRITICAL: Firebase environment variables are missing.
-
-This is a setup issue, not a code bug. To fix this:
-
-1.  **Find your project's root folder**: This is the folder that contains the 'package.json' file.
-2.  **Create a file named exactly \`.env.local\`** in that folder. Be careful, some editors might add '.txt' to the end.
-3.  **Copy the contents** from the \`.env.local.example\` file into your new \`.env.local\` file.
-4.  **Fill in your real values** from the Firebase console for each variable.
-5.  **Restart your server**: This is the most important step. Stop your development server (Ctrl+C in the terminal) and run 'npm run dev' again.
-
-The app will not work until the server is restarted with the correct \`.env.local\` file.`);
-}
-
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -40,11 +13,27 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Check if all required environment variables are present
+const isConfigured =
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.storageBucket &&
+  firebaseConfig.messagingSenderId &&
+  firebaseConfig.appId;
 
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const storage = getStorage(app);
-const auth = getAuth(app);
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
+let auth: Auth | null = null;
 
-export { app, db, storage, auth };
+if (isConfigured) {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  db = getFirestore(app);
+  storage = getStorage(app);
+  auth = getAuth(app);
+} else {
+  console.error("Firebase configuration is missing or incomplete. Please check your .env.local file and restart your server.");
+}
+
+export { app, db, storage, auth, isConfigured };
