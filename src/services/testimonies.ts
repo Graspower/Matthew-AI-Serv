@@ -46,22 +46,39 @@ export async function addTestimony(testimony: NewTestimony): Promise<void> {
 }
 
 export async function addCommentToTestimony(testimonyId: string, comment: Comment): Promise<void> {
-  const testimonyRef = doc(db, 'testimonies', testimonyId);
-  const firestoreComment = {
-    ...comment,
-    createdAt: Timestamp.fromDate(new Date(comment.createdAt)),
-  };
-  await updateDoc(testimonyRef, {
-    comments: arrayUnion(firestoreComment)
-  });
+  try {
+    const testimonyRef = doc(db, 'testimonies', testimonyId);
+    const firestoreComment = {
+      ...comment,
+      createdAt: Timestamp.fromDate(new Date(comment.createdAt)),
+    };
+    await updateDoc(testimonyRef, {
+      comments: arrayUnion(firestoreComment)
+    });
+  } catch (error: any) {
+    console.error("Error adding comment: ", error);
+    if (error.code === 'permission-denied') {
+      throw new Error("Failed to add comment: Permission denied. Please check your Firestore security rules.");
+    }
+    throw new Error(`Failed to add comment. Please check your connection. Original error: ${error.code || error.message}`);
+  }
 }
 
 export async function addReactionToTestimony(testimonyId: string, reactionType: keyof Reactions): Promise<void> {
+  try {
     const testimonyRef = doc(db, 'testimonies', testimonyId);
     const fieldToIncrement = `reactions.${reactionType}`;
     await updateDoc(testimonyRef, {
         [fieldToIncrement]: increment(1)
     });
+  } catch (error: any)
+  {
+    console.error("Error adding reaction: ", error);
+    if (error.code === 'permission-denied') {
+      throw new Error("Failed to add reaction: Permission denied. Please check your Firestore security rules.");
+    }
+    throw new Error(`Failed to add reaction. Please check your connection. Original error: ${error.code || error.message}`);
+  }
 }
 
 export async function getTestimonies(): Promise<Testimony[]> {
