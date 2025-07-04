@@ -23,9 +23,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer, type NewPrayer, type Comment, type Reactions } from '@/services/prayers';
 
-const CACHE_KEY = 'matthew-ai-prayers-cache';
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
-
 const prayerFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
@@ -81,12 +78,6 @@ export function PrayersSection() {
       const data = await getPrayers();
       if (data.length > 0) {
         setPrayers(data);
-         if (typeof window !== 'undefined') {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({
-                timestamp: Date.now(),
-                data: data,
-            }));
-        }
       } else {
         setPrayers(defaultPrayers);
       }
@@ -100,22 +91,7 @@ export function PrayersSection() {
   }, []);
 
   useEffect(() => {
-     if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-            const { timestamp, data } = JSON.parse(cached);
-            if (Date.now() - timestamp < CACHE_DURATION_MS) {
-                setPrayers(data);
-                setIsLoadingPrayers(false);
-            } else {
-                fetchPrayers();
-            }
-        } else {
-            fetchPrayers();
-        }
-    } else {
-        fetchPrayers();
-    }
+    fetchPrayers();
   }, [fetchPrayers]);
   
   async function handleAddPrayer(data: PrayerFormData) {

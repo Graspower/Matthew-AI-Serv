@@ -16,7 +16,7 @@ export type NewTeaching = Omit<Teaching, 'id' | 'comments' | 'reactions'>;
 
 export async function addTeaching(teaching: NewTeaching): Promise<void> {
   try {
-    const teachingsCol = collection(db, 'Teachings');
+    const teachingsCol = collection(db, 'Teaching');
     await addDoc(teachingsCol, {
         ...teaching,
         comments: [],
@@ -34,7 +34,7 @@ export async function addTeaching(teaching: NewTeaching): Promise<void> {
 
 export async function addCommentToTeaching(teachingId: string, comment: Comment): Promise<void> {
   try {
-    const teachingRef = doc(db, 'Teachings', teachingId);
+    const teachingRef = doc(db, 'Teaching', teachingId);
     const firestoreComment = {
       ...comment,
       createdAt: Timestamp.fromDate(new Date(comment.createdAt)),
@@ -53,7 +53,7 @@ export async function addCommentToTeaching(teachingId: string, comment: Comment)
 
 export async function addReactionToTeaching(teachingId: string, reactionType: keyof Reactions): Promise<void> {
   try {
-    const teachingRef = doc(db, 'Teachings', teachingId);
+    const teachingRef = doc(db, 'Teaching', teachingId);
     const fieldToIncrement = `reactions.${reactionType}`;
     await updateDoc(teachingRef, {
         [fieldToIncrement]: increment(1)
@@ -70,7 +70,7 @@ export async function addReactionToTeaching(teachingId: string, reactionType: ke
 
 export async function getTeachings(): Promise<Teaching[]> {
   try {
-    const teachingsCol = collection(db, 'Teachings');
+    const teachingsCol = collection(db, 'Teaching');
     const teachingSnapshot = await getDocs(teachingsCol);
     
     if (teachingSnapshot.empty) {

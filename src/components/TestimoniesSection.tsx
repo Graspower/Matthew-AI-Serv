@@ -23,9 +23,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony, type Comment, type Reactions } from '@/services/testimonies';
 
-const CACHE_KEY = 'matthew-ai-testimonies-cache';
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
-
 const testimonyFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
@@ -81,13 +78,6 @@ export function TestimoniesSection() {
       const data = await getTestimonies();
       if (data.length > 0) {
         setTestimonies(data);
-        // Save to cache
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({
-                timestamp: Date.now(),
-                data: data,
-            }));
-        }
       } else {
         setTestimonies(defaultTestimonies);
       }
@@ -101,22 +91,7 @@ export function TestimoniesSection() {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-            const { timestamp, data } = JSON.parse(cached);
-            if (Date.now() - timestamp < CACHE_DURATION_MS) {
-                setTestimonies(data);
-                setIsLoadingTestimonies(false);
-            } else {
-                fetchTestimonies();
-            }
-        } else {
-            fetchTestimonies();
-        }
-    } else {
-        fetchTestimonies();
-    }
+    fetchTestimonies();
   }, [fetchTestimonies]);
   
   async function handleAddTestimony(data: TestimonyFormData) {

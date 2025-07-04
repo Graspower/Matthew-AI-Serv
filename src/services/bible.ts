@@ -2,8 +2,6 @@
 'use server';
 
 import type { BibleTranslation } from '@/contexts/SettingsContext';
-import { db } from '@/lib/firebase';
-import { getDoc, doc, collection, getDocs, limit } from "firebase/firestore";
 
 export interface Verse {
   book: string;
@@ -31,70 +29,51 @@ export interface BibleChapter {
   name: string;
 }
 
-// --- Firestore Data Structures ---
-// Each book is a document in a collection named after the translation (e.g., 'KJV')
-// The document contains a map of chapters, which contains a map of verses.
-// { "1": { "1": "Verse text...", "2": "..." }, "2": { "1": "..." } }
-type FirestoreBookData = Record<string, Record<string, string>>;
+// --- Data Structures for Local JSON ---
+// Assumes a structure like: { "bookName": { "chapterNum": { "verseNum": "text" } } }
+type BibleJson = Record<string, Record<string, Record<string, string>>>;
 
-// --- Caching ---
-type BookCache = Map<BibleTranslation, Map<string, FirestoreBookData>>;
-const bookCache: BookCache = new Map();
+// --- In-Memory Caching ---
+// Cache Bible data in memory to avoid refetching on every navigation.
+const bibleCache: Map<BibleTranslation, BibleJson> = new Map();
 
-async function getBookData(translation: BibleTranslation, bookName: string): Promise<FirestoreBookData | null> {
-    // Check cache first
-    if (bookCache.has(translation) && bookCache.get(translation)!.has(bookName)) {
-        return bookCache.get(translation)!.get(bookName)!;
+async function getTranslationData(translation: BibleTranslation): Promise<BibleJson> {
+    if (bibleCache.has(translation)) {
+        return bibleCache.get(translation)!;
     }
 
     try {
-        const bookRef = doc(db, translation, bookName);
-        const docSnap = await getDoc(bookRef);
-
-        if (!docSnap.exists()) {
-            console.warn(`[Firestore] Document for ${bookName} in ${translation} collection not found.`);
-            return null;
+        // Construct the URL to the JSON file in the public folder
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/bibles/${translation}.json`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch Bible data for ${translation}: ${response.statusText}`);
         }
-
-        const data = docSnap.data() as FirestoreBookData;
-        
-        // Populate cache
-        if (!bookCache.has(translation)) {
-            bookCache.set(translation, new Map());
-        }
-        bookCache.get(translation)!.set(bookName, data);
-
+        const data: BibleJson = await response.json();
+        bibleCache.set(translation, data);
         return data;
     } catch (error: any) {
-        console.error(`[Firestore] Error fetching book ${bookName} from ${translation}:`, error);
-        throw new Error(`Could not fetch data for ${bookName} (${translation}). Check Firestore rules and data structure. Original error: ${error.message}`);
+        console.error(`Error loading or parsing Bible data for ${translation}:`, error);
+        throw new Error(`Could not load data for ${translation}. Make sure the file exists at /public/bibles/${translation}.json. Original error: ${error.message}`);
     }
 }
 
 export async function getBooks(translation: BibleTranslation): Promise<BibleBook[]> {
   try {
-    const translationRef = collection(db, translation);
-    const querySnapshot = await getDocs(translationRef);
-
-    if (querySnapshot.empty) {
-        console.warn(`No books found for ${translation} collection in Firestore. It may be empty or you lack permissions.`);
-        return [];
-    }
-
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      name: doc.id, 
-      chapterCount: Object.keys(doc.data()).length,
+    const translationData = await getTranslationData(translation);
+    return Object.keys(translationData).map(bookName => ({
+      id: bookName,
+      name: bookName,
+      chapterCount: Object.keys(translationData[bookName]).length,
     }));
   } catch (error: any) {
-     console.error(`[Firestore] Error fetching book list for ${translation}:`, error);
-     throw new Error(`Could not fetch book list for ${translation}. Check Firestore rules. Original error: ${error.message}`);
+     console.error(`Error getting books for ${translation}:`, error);
+     throw error;
   }
 }
 
-
 export async function getChaptersForBook(translation: BibleTranslation, bookId: string): Promise<BibleChapter[]> {
-    const bookData = await getBookData(translation, bookId);
+    const translationData = await getTranslationData(translation);
+    const bookData = translationData[bookId];
     if (!bookData) {
         throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
     }
@@ -105,9 +84,9 @@ export async function getChaptersForBook(translation: BibleTranslation, bookId: 
     })).sort((a,b) => a.id - b.id);
 }
 
-
 export async function getChapterText(translation: BibleTranslation, bookId: string, chapterNumber: number, highlightVerse?: number | null): Promise<string> {
-    const bookData = await getBookData(translation, bookId);
+    const translationData = await getTranslationData(translation);
+    const bookData = translationData[bookId];
     if (!bookData) {
         throw new Error(`Book not found: ${bookId} in ${translation} translation.`);
     }
@@ -127,9 +106,9 @@ export async function getChapterText(translation: BibleTranslation, bookId: stri
     return formattedText;
 }
 
-
 export async function getVerse(translation: BibleTranslation, bookName: string, chapterNumber: number, verseNumber: number): Promise<Verse | null> {
-    const bookData = await getBookData(translation, bookName);
+    const translationData = await getTranslationData(translation);
+    const bookData = translationData[bookName];
     if (!bookData) {
         return null;
     }
