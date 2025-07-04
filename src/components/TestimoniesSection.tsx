@@ -8,15 +8,17 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { formatDistanceToNow } from 'date-fns';
 
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony, type Comment, type Reactions } from '@/services/testimonies';
@@ -56,6 +58,7 @@ export function TestimoniesSection() {
   const [commentsModal, setCommentsModal] = useState<{isOpen: boolean; testimony: Testimony | null}>({isOpen: false, testimony: null});
 
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   const testimonyForm = useForm<TestimonyFormData>({
     resolver: zodResolver(testimonyFormSchema),
@@ -144,40 +147,47 @@ export function TestimoniesSection() {
   const TestimonyContentCard = ({ item }: { item: Testimony }) => {
     return (
       <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card">
-        <CardContent className="flex-grow flex flex-col justify-center items-center text-center p-6">
-          <h3 className="text-4xl font-extrabold text-primary">
+        <CardContent className="flex-grow flex flex-col p-6">
+          <h3 className="text-4xl font-bold text-primary text-center">
             {item.hint}
           </h3>
-          <p className="text-sm text-muted-foreground mt-4">{item.description}</p>
-          <p className="font-semibold text-lg mt-2">- {item.name}</p>
+          <div className="mt-auto text-center">
+            <p className="font-semibold text-lg">{item.name}</p>
+            <p className="text-sm text-muted-foreground font-bold">{item.description}</p>
+          </div>
         </CardContent>
-        <CardFooter className="p-2 pt-0 grid grid-cols-2 gap-1 border-t">
-          <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex-col h-auto py-1" onClick={() => handleReaction(item.id, 'like')}>
-                    <Heart className="h-4 w-4 mb-1" />
-                    <span className="text-xs">{item.reactions?.like || 0}</span>
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-1">
-                <div className="flex gap-1">
-                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}>
-                        <Hand className="h-4 w-4" />
-                     </Button>
-                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}>
-                        <ThumbsUp className="h-4 w-4" />
-                     </Button>
-                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}>
-                        <ThumbsDown className="h-4 w-4" />
-                     </Button>
-                </div>
-            </PopoverContent>
-          </Popover>
-          
-          <Button variant="ghost" size="sm" className="flex-col h-auto py-1" onClick={() => setCommentsModal({ isOpen: true, testimony: item })}>
-            <MessageSquare className="h-4 w-4 mb-1" />
-            <span className="text-xs">{item.comments?.length || 0}</span>
-          </Button>
+        <CardFooter className="p-2 pt-0 border-t">
+          <div className="flex items-center ml-auto">
+            <Popover>
+              <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                      <Heart className="h-4 w-4" />
+                      <span className="text-xs">{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
+                  </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1">
+                  <div className="flex gap-1">
+                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}>
+                          <Heart className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}>
+                          <Hand className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}>
+                          <ThumbsUp className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}>
+                          <ThumbsDown className="h-4 w-4" />
+                       </Button>
+                  </div>
+              </PopoverContent>
+            </Popover>
+            
+            <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, testimony: item })}>
+              <MessageSquare className="h-4 w-4" />
+              <span className="text-xs">{item.comments?.length || 0}</span>
+            </Button>
+          </div>
         </CardFooter>
       </Card>
     );
@@ -192,6 +202,42 @@ export function TestimoniesSection() {
             <Skeleton className="h-4 w-5/6" />
         </div>
     </Card>
+  );
+
+  const CommentArea = ({ testimony }: { testimony: Testimony }) => (
+    <>
+      <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
+        <div className="space-y-4">
+          {testimony.comments && testimony.comments.length > 0 ? (
+            testimony.comments.map(comment => (
+              <div key={comment.id} className="flex gap-3">
+                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{comment.author.charAt(0)}</div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">{comment.author}</p>
+                    <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</p>
+                  </div>
+                  <p className="text-sm text-foreground/90">{comment.text}</p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-muted-foreground py-8">No comments yet. Be the first to share!</p>
+          )}
+        </div>
+      </ScrollArea>
+      <div className="mt-auto pt-4 border-t">
+        <Form {...commentForm}>
+          <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
+            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <div className="text-right">
+                <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
+            </div>
+          </form>
+        </Form>
+      </div>
+    </>
   );
 
   return (
@@ -231,46 +277,28 @@ export function TestimoniesSection() {
         ) : ( testimonies.map((item) => <TestimonyContentCard key={item.id} item={item} />) )}
         </div>
 
-       {/* Comments Dialog */}
-      <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
-        <DialogContent className="max-w-2xl w-[90vw] h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Comments on "{commentsModal.testimony?.hint}"</DialogTitle>
-            <DialogDescription>Read what others are saying.</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
-            <div className="space-y-4">
-              {commentsModal.testimony?.comments && commentsModal.testimony.comments.length > 0 ? (
-                commentsModal.testimony.comments.map(comment => (
-                  <div key={comment.id} className="flex gap-3">
-                    <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{comment.author.charAt(0)}</div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{comment.author}</p>
-                        <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</p>
-                      </div>
-                      <p className="text-sm text-foreground/90">{comment.text}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No comments yet. Be the first to share!</p>
-              )}
-            </div>
-          </ScrollArea>
-          <div className="mt-auto pt-4 border-t">
-            <Form {...commentForm}>
-              <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-                <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                <div className="text-right">
-                    <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
-                </div>
-              </form>
-            </Form>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {isMobile ? (
+        <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
+          <SheetContent side="bottom" className="h-[85vh] flex flex-col">
+            <SheetHeader className="text-left">
+              <SheetTitle>Comments on "{commentsModal.testimony?.hint}"</SheetTitle>
+              <SheetDescription>Read what others are saying.</SheetDescription>
+            </SheetHeader>
+            {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
+          <DialogContent className="max-w-2xl w-[90vw] h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Comments on "{commentsModal.testimony?.hint}"</DialogTitle>
+              <DialogDescription>Read what others are saying.</DialogDescription>
+            </DialogHeader>
+             {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
+
