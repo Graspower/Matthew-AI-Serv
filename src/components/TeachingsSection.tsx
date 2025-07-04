@@ -136,8 +136,7 @@ export function TeachingsSection() {
     }
   }
 
-  const TeachingContentCard = ({ item }: { item: Teaching }) => {
-    return (
+  const TeachingContentCard = ({ item }: { item: Teaching }) => (
       <Card 
         className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
         onClick={() => setDetailsModal({isOpen: true, teaching: item})}
@@ -162,8 +161,7 @@ export function TeachingsSection() {
             </div>
         </CardFooter>
       </Card>
-    );
-  };
+  );
   
   const ContentCardSkeleton = () => (
     <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px]">
@@ -258,7 +256,7 @@ export function TeachingsSection() {
                 </CardContent>
             </Card>
         ) : teachings.length > 0 ? (
-           teachings.map((item) => <TeachingContentCard key={item.id} item={item} />
+           teachings.map((item) => <TeachingContentCard key={item.id} item={item} />)
         ) : (
           <div className="col-span-full text-center text-muted-foreground mt-8">
             <p>No teachings have been added yet.</p>
