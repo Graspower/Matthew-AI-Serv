@@ -15,6 +15,12 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Validate that all Firebase config values are present.
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error("Firebase configuration is missing. Please create a .env.local file and add all the required NEXT_PUBLIC_FIREBASE_ variables from your Firebase project console.");
+}
+
+
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
