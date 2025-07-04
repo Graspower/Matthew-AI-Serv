@@ -6,40 +6,6 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, type 
 import { auth, isConfigured } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 
-// New error component to display when Firebase isn't configured.
-function FirebaseConfigError() {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="max-w-2xl p-8 mx-4 text-center border rounded-lg shadow-lg bg-card text-card-foreground">
-        <h1 className="text-2xl font-bold text-destructive">Configuration Error</h1>
-        <p className="mt-4 text-lg">Your Firebase environment variables are missing.</p>
-        <div className="mt-6 text-left text-muted-foreground">
-            <p className="mb-4">This is a setup issue, not a code bug. To fix this, please follow these steps:</p>
-            <ol className="pl-5 space-y-2 list-decimal">
-                <li>
-                    <strong>Find your project's root folder</strong>: This is the folder that contains the <code>package.json</code> file.
-                </li>
-                <li>
-                    <strong>Create a file named exactly <code>.env.local</code></strong> in that folder.
-                </li>
-                <li>
-                    <strong>Copy the contents</strong> from the <code>.env.local.example</code> file into your new <code>.env.local</code> file.
-                </li>
-                <li>
-                    <strong>Fill in your real Firebase values</strong> from your Firebase project console for each variable.
-                </li>
-                <li>
-                    <strong>Restart your server</strong>: This is the most important step. Stop your development server (Ctrl+C in the terminal) and run <code>npm run dev</code> again.
-                </li>
-            </ol>
-            <p className="mt-4">The app will not work correctly until the server is restarted with the correct <code>.env.local</code> file.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -53,15 +19,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // If Firebase is not configured, show a dedicated error screen instead of crashing.
-  if (!isConfigured) {
-    return <FirebaseConfigError />;
-  }
-
-  // The rest of the component assumes `auth` is not null because `isConfigured` is true.
   useEffect(() => {
-    // We can safely assert auth is not null here due to the `isConfigured` check
-    const unsubscribe = onAuthStateChanged(auth!, (user) => {
+    // If Firebase isn't configured, `auth` will be null.
+    // We'll skip trying to set up a listener and just show the app in a logged-out state.
+    if (!auth) {
+      console.warn("Firebase is not configured. Authentication will be disabled. Please check your .env.local file and restart your server.");
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
     });
@@ -69,24 +36,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async () => {
+    // If `auth` is null, do nothing and log a helpful error.
+    if (!auth) {
+      console.error("Login failed: Firebase is not configured. Please check your .env.local file and restart the server.");
+      alert("Login is disabled because the app is not connected to Firebase. Please check the developer console for more information.");
+      return;
+    }
     try {
       const provider = new GoogleAuthProvider();
-      // We can safely assert auth is not null here
-      await signInWithPopup(auth!, provider);
+      await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Error during sign-in:", error);
     }
   };
 
   const logout = async () => {
+    // If `auth` is null, do nothing.
+    if (!auth) {
+        console.error("Logout failed: Firebase is not configured.");
+        return;
+    }
     try {
-      // We can safely assert auth is not null here
-      await signOut(auth!);
+      await signOut(auth);
     } catch (error) {
       console.error("Error during sign-out:", error);
     }
   };
-
+  
+  // Show a global loader while we are checking the auth state initially.
   if (loading) {
       return (
           <div className="flex items-center justify-center min-h-screen">
