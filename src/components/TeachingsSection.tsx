@@ -38,12 +38,6 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const teachingCategories = ['Faith', 'Love', 'Forgiveness', 'Parables', 'Discipleship', 'End Times', 'The Law', 'Grace', 'Prayer', 'Serving Others'];
 
-const defaultTeachings: Teaching[] = [
-    { id: 'default-1', name: 'Jesus', description: "A man had two sons...", category: 'Prodigal Son', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-2', name: 'Jesus', description: "Blessed are the meek, for they will inherit the earth.", category: 'The Beatitudes', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-3', name: 'Paul', description: "Love is patient, love is kind...", category: 'The Way of Love', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-];
-
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
@@ -76,11 +70,7 @@ export function TeachingsSection() {
     setTeachingsError(null);
     try {
       const data = await getTeachings();
-      if (data.length > 0) {
-        setTeachings(data);
-      } else {
-        setTeachings(defaultTeachings);
-      }
+      setTeachings(data);
     } catch (error: any) {
       console.error(error);
       setTeachingsError(error.message || "Failed to load teachings. Please check your connection and try again.");
@@ -267,7 +257,14 @@ export function TeachingsSection() {
                     <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{teachingsError}</p>
                 </CardContent>
             </Card>
-        ) : ( teachings.map((item) => <TeachingContentCard key={item.id} item={item} />) )}
+        ) : teachings.length > 0 ? (
+           teachings.map((item) => <TeachingContentCard key={item.id} item={item} />)
+        ) : (
+          <div className="col-span-full text-center text-muted-foreground mt-8">
+            <p>No teachings have been added yet.</p>
+            <p>You can add one by clicking the "Add Teaching" button.</p>
+          </div>
+        )}
         </div>
 
       {detailsModal.teaching && (
@@ -341,3 +338,5 @@ export function TeachingsSection() {
     </div>
   );
 }
+
+    
