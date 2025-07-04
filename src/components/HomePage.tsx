@@ -9,6 +9,10 @@ import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TestimoniesSection } from '@/components/TestimoniesSection';
+import { PrayersSection } from '@/components/PrayersSection';
+import { TeachingsSection } from '@/components/TeachingsSection';
+import { cn } from '@/lib/utils';
 
 interface Verse {
   book: string;
@@ -52,6 +56,7 @@ const truncateText = (text: string, maxLength: number) => {
   return truncated.slice(0, truncated.lastIndexOf(' ')); // Avoid cutting words
 };
 
+type ActiveSection = 'testimonies' | 'prayers' | 'teachings';
 
 export function HomePage() {
   const [dailyVerses, setDailyVerses] = useState<DailyVerse[]>([]);
@@ -62,6 +67,8 @@ export function HomePage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentlySpeakingIndex, setCurrentlySpeakingIndex] = useState<number | null>(null);
+  const [activeSection, setActiveSection] = useState<ActiveSection>('testimonies');
+
 
   const synth = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
@@ -294,6 +301,36 @@ export function HomePage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Community Sections */}
+      <div className="w-full max-w-5xl mt-12">
+        <div className="flex justify-center gap-4 mb-8">
+          <Button 
+            variant={activeSection === 'testimonies' ? 'default' : 'outline'} 
+            onClick={() => setActiveSection('testimonies')}
+          >
+            Testimonies
+          </Button>
+          <Button 
+            variant={activeSection === 'prayers' ? 'default' : 'outline'} 
+            onClick={() => setActiveSection('prayers')}
+          >
+            Prayers
+          </Button>
+          <Button 
+            variant={activeSection === 'teachings' ? 'default' : 'outline'} 
+            onClick={() => setActiveSection('teachings')}
+          >
+            Teachings
+          </Button>
+        </div>
+
+        <div>
+          {activeSection === 'testimonies' && <TestimoniesSection />}
+          {activeSection === 'prayers' && <PrayersSection />}
+          {activeSection === 'teachings' && <TeachingsSection />}
+        </div>
+      </div>
     </div>
   );
 }
