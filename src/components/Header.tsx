@@ -70,7 +70,16 @@ export function Header() {
       );
     }
 
-    return <Button onClick={login}>Login with Google</Button>;
+    return (
+      <div className="flex items-center gap-2">
+        <Button onClick={login} variant="outline" size="sm">
+          Signup
+        </Button>
+        <Button onClick={login} size="sm">
+          Login
+        </Button>
+      </div>
+    );
   };
 
   return (
