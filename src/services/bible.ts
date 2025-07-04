@@ -1,6 +1,7 @@
-
 'use server';
 
+import fs from 'fs/promises';
+import path from 'path';
 import type { BibleTranslation } from '@/contexts/SettingsContext';
 
 export interface Verse {
@@ -43,18 +44,25 @@ async function getTranslationData(translation: BibleTranslation): Promise<BibleJ
     }
 
     try {
-        // Use a relative path to fetch from the public folder.
-        // This is more robust than relying on NEXT_PUBLIC_APP_URL.
-        const response = await fetch(`/bibles/${translation}.json`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch Bible data for ${translation}: ${response.statusText} (status: ${response.status})`);
-        }
-        const data: BibleJson = await response.json();
+        // Construct the full path to the JSON file in the public directory
+        const filePath = path.join(process.cwd(), 'public', 'bibles', `${translation}.json`);
+        
+        // Read the file from the filesystem since this is a server component
+        const fileContent = await fs.readFile(filePath, 'utf-8');
+        
+        // Parse the JSON data
+        const data: BibleJson = JSON.parse(fileContent);
+
+        // Store in cache and return
         bibleCache.set(translation, data);
         return data;
     } catch (error: any) {
         console.error(`Error loading or parsing Bible data for ${translation}:`, error);
-        throw new Error(`Could not load data for ${translation}. Make sure the file exists at /public/bibles/${translation}.json and is valid JSON. Original error: ${error.message}`);
+        // Provide a more helpful error message
+        if (error.code === 'ENOENT') {
+             throw new Error(`Could not load data for ${translation}. The file was not found at /public/bibles/${translation}.json. Please ensure the file exists and the filename is correct.`);
+        }
+        throw new Error(`Could not load data for ${translation}. Make sure the file is valid JSON. Original error: ${error.message}`);
     }
 }
 
