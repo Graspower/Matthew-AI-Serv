@@ -73,8 +73,7 @@ async function getTranslationData(translation: BibleTranslation): Promise<BibleJ
 
     const lowerCaseTranslation = translation.toLowerCase();
     const fileName = `${lowerCaseTranslation}-bible.json`;
-    // Corrected path: Read from `src/data/bibles` to ensure bundling in production.
-    const filePath = path.join(process.cwd(), 'src', 'data', 'bibles', fileName);
+    const filePath = path.join(process.cwd(), 'public', 'bibles', fileName);
 
     try {
         const fileContent = await fs.readFile(filePath, 'utf-8');
