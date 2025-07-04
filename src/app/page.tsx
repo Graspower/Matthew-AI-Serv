@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 /* Salvation to people in the world */
+=======
+>>>>>>> 120a979 (Make the following changes:)
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -186,10 +189,10 @@ export default function Home() {
                 </DropdownMenu>
               </div>
             </header>
-            <TabsList className="mx-auto mt-4 h-auto rounded-full bg-muted p-1.5">
-              <TabsTrigger value="home" className="rounded-full px-5 py-2 text-sm sm:text-base">Home</TabsTrigger>
-              <TabsTrigger value="matthewAI" className="rounded-full px-5 py-2 text-sm sm:text-base">Ask Matthew</TabsTrigger>
-              <TabsTrigger value="bibleReader" className="rounded-full px-5 py-2 text-sm sm:text-base">Bible Reader</TabsTrigger>
+            <TabsList className="w-full max-w-lg mx-auto mt-4 h-auto rounded-full bg-muted p-1.5 flex">
+              <TabsTrigger value="home" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Home</TabsTrigger>
+              <TabsTrigger value="matthewAI" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Ask Matthew</TabsTrigger>
+              <TabsTrigger value="bibleReader" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Bible Reader</TabsTrigger>
             </TabsList>
         </div>
 
