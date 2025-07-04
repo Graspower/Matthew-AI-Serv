@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, Firestore } from 'firebase/firestore';
 
 export interface Comment {
   id: string;
@@ -27,9 +27,17 @@ export interface Testimony {
 
 export type NewTestimony = Omit<Testimony, 'id' | 'comments' | 'reactions'>;
 
+function checkDb() {
+    if (!db) {
+        throw new Error("Firebase is not configured. Please check your .env.local file and restart the server.");
+    }
+    return db as Firestore;
+}
+
 export async function addTestimony(testimony: NewTestimony): Promise<void> {
   try {
-    const testimoniesCol = collection(db, 'testimonies');
+    const firestore = checkDb();
+    const testimoniesCol = collection(firestore, 'testimonies');
     await addDoc(testimoniesCol, {
         ...testimony,
         comments: [],
@@ -47,7 +55,8 @@ export async function addTestimony(testimony: NewTestimony): Promise<void> {
 
 export async function addCommentToTestimony(testimonyId: string, comment: Comment): Promise<void> {
   try {
-    const testimonyRef = doc(db, 'testimonies', testimonyId);
+    const firestore = checkDb();
+    const testimonyRef = doc(firestore, 'testimonies', testimonyId);
     const firestoreComment = {
       ...comment,
       createdAt: Timestamp.fromDate(new Date(comment.createdAt)),
@@ -66,7 +75,8 @@ export async function addCommentToTestimony(testimonyId: string, comment: Commen
 
 export async function addReactionToTestimony(testimonyId: string, reactionType: keyof Reactions): Promise<void> {
   try {
-    const testimonyRef = doc(db, 'testimonies', testimonyId);
+    const firestore = checkDb();
+    const testimonyRef = doc(firestore, 'testimonies', testimonyId);
     const fieldToIncrement = `reactions.${reactionType}`;
     await updateDoc(testimonyRef, {
         [fieldToIncrement]: increment(1)
@@ -83,7 +93,8 @@ export async function addReactionToTestimony(testimonyId: string, reactionType: 
 
 export async function getTestimonies(): Promise<Testimony[]> {
   try {
-    const testimoniesCol = collection(db, 'testimonies');
+    const firestore = checkDb();
+    const testimoniesCol = collection(firestore, 'testimonies');
     const testimonySnapshot = await getDocs(testimoniesCol);
     
     if (testimonySnapshot.empty) {

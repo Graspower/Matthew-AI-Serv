@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, Firestore } from 'firebase/firestore';
 
 export interface InspirationVerse {
   id: string;
@@ -12,13 +12,22 @@ export interface InspirationVerse {
   text: string;
 }
 
+function checkDb() {
+    if (!db) {
+        throw new Error("Firebase is not configured. Please check your .env.local file and restart the server.");
+    }
+    return db as Firestore;
+}
+
+
 /**
  * Fetches the list of inspirational verses from the 'inspirations' collection in Firestore.
  * @returns A promise that resolves to an array of InspirationVerse objects.
  */
 export async function getInspirationalVerses(): Promise<InspirationVerse[]> {
   try {
-    const inspirationsCol = collection(db, 'inspirations');
+    const firestore = checkDb();
+    const inspirationsCol = collection(firestore, 'inspirations');
     const snapshot = await getDocs(inspirationsCol);
 
     if (snapshot.empty) {

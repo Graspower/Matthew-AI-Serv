@@ -13,8 +13,8 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Check if all required environment variables are present
-export const isConfigured =
+// This check is the crucial first step.
+const hasAllConfig =
   !!firebaseConfig.apiKey &&
   !!firebaseConfig.authDomain &&
   !!firebaseConfig.projectId &&
@@ -27,11 +27,25 @@ let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 let auth: Auth | null = null;
 
-if (isConfigured) {
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  db = getFirestore(app);
-  storage = getStorage(app);
-  auth = getAuth(app);
+// The `isConfigured` flag will be our single source of truth.
+let isConfigured: boolean = false;
+
+// Only attempt to initialize Firebase if the config is complete.
+// This prevents the SDK from throwing an error on module load.
+if (hasAllConfig) {
+  try {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app);
+    storage = getStorage(app);
+    auth = getAuth(app);
+    isConfigured = true;
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
+    // If initialization fails for any reason, we ensure the app knows it's not configured.
+    isConfigured = false;
+  }
+} else {
+    console.warn("Firebase configuration is missing or incomplete. Please check your .env.local file.");
 }
 
-export { app, db, storage, auth };
+export { app, db, storage, auth, isConfigured };

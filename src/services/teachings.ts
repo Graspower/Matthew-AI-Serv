@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, Firestore } from 'firebase/firestore';
 import type { Comment, Reactions } from './testimonies'; // Reuse comment/reaction types
 
 export interface Teaching {
@@ -14,9 +14,17 @@ export interface Teaching {
 
 export type NewTeaching = Omit<Teaching, 'id' | 'comments' | 'reactions'>;
 
+function checkDb() {
+    if (!db) {
+        throw new Error("Firebase is not configured. Please check your .env.local file and restart the server.");
+    }
+    return db as Firestore;
+}
+
 export async function addTeaching(teaching: NewTeaching): Promise<void> {
   try {
-    const teachingsCol = collection(db, 'Teachings');
+    const firestore = checkDb();
+    const teachingsCol = collection(firestore, 'Teachings');
     await addDoc(teachingsCol, {
         ...teaching,
         comments: [],
@@ -34,7 +42,8 @@ export async function addTeaching(teaching: NewTeaching): Promise<void> {
 
 export async function addCommentToTeaching(teachingId: string, comment: Comment): Promise<void> {
   try {
-    const teachingRef = doc(db, 'Teachings', teachingId);
+    const firestore = checkDb();
+    const teachingRef = doc(firestore, 'Teachings', teachingId);
     const firestoreComment = {
       ...comment,
       createdAt: Timestamp.fromDate(new Date(comment.createdAt)),
@@ -53,7 +62,8 @@ export async function addCommentToTeaching(teachingId: string, comment: Comment)
 
 export async function addReactionToTeaching(teachingId: string, reactionType: keyof Reactions): Promise<void> {
   try {
-    const teachingRef = doc(db, 'Teachings', teachingId);
+    const firestore = checkDb();
+    const teachingRef = doc(firestore, 'Teachings', teachingId);
     const fieldToIncrement = `reactions.${reactionType}`;
     await updateDoc(teachingRef, {
         [fieldToIncrement]: increment(1)
@@ -70,7 +80,8 @@ export async function addReactionToTeaching(teachingId: string, reactionType: ke
 
 export async function getTeachings(): Promise<Teaching[]> {
   try {
-    const teachingsCol = collection(db, 'Teachings');
+    const firestore = checkDb();
+    const teachingsCol = collection(firestore, 'Teachings');
     const teachingSnapshot = await getDocs(teachingsCol);
     
     if (teachingSnapshot.empty) {

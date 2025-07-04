@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, type User, type Auth } from 'firebase/auth';
 import { auth, isConfigured } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 
@@ -15,25 +15,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// A component to render when Firebase is not configured.
+// A self-contained, helpful component to display when Firebase is not configured.
 const FirebaseNotConfigured = () => (
   <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background p-8 text-center">
     <div className="max-w-2xl rounded-lg border border-destructive/50 bg-destructive/10 p-8">
       <h1 className="text-2xl font-bold text-destructive">Firebase Not Configured</h1>
       <p className="mt-4 text-destructive/90">
-        The application cannot connect to Firebase because the necessary environment variables are missing.
+        Your app is running, but it cannot connect to Firebase. This usually means your local environment variables are missing or incorrect.
       </p>
       <div className="mt-6 text-left text-sm text-foreground">
-        <p className="font-semibold">To fix this:</p>
+        <p className="font-semibold">To fix this, please follow these steps:</p>
         <ol className="ml-4 mt-2 list-decimal space-y-2">
-          <li>Find your project's root folder (where `package.json` is located).</li>
-          <li>Create a file named exactly <strong>.env.local</strong> in that folder.</li>
+          <li>Ensure a file named <strong>.env.local</strong> exists in your project's root folder (the same folder as `package.json`).</li>
           <li>
-            Copy the contents from the <strong>.env.local.example</strong> file into your new <strong>.env.local</strong> file.
+            Verify that this file contains all the required Firebase keys, each starting with `NEXT_PUBLIC_`. You can copy them from `.env.local.example`.
           </li>
           <li>Fill in your actual project values from the Firebase console for each variable.</li>
           <li>
-            <strong>Restart your server.</strong> This is crucial. Stop the running server (Ctrl+C in the terminal) and start it again with `npm run dev`.
+            <strong>CRITICAL: Restart your development server.</strong> Stop the running server (press `Ctrl+C` in the terminal) and start it again with `npm run dev`. Changes to `.env.local` are only applied on startup.
           </li>
         </ol>
       </div>
@@ -43,24 +42,24 @@ const FirebaseNotConfigured = () => (
 
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // If Firebase is not configured, show the guide and stop.
-  // This prevents any other code in this component from running and causing errors.
+  // If Firebase is not configured, we show the guide and stop rendering the rest of the app.
+  // This is the main guard that prevents any crashes.
   if (!isConfigured) {
     return <FirebaseNotConfigured />;
   }
 
+  // If configured, we can safely render the component that uses Firebase.
   return <AuthComponent>{children}</AuthComponent>;
 }
 
-// This component contains the actual auth logic and will only be rendered
-// when Firebase is correctly configured.
+// This component ONLY renders when `isConfigured` is true.
 function AuthComponent({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // auth is guaranteed to be non-null here because isConfigured is true.
-    const unsubscribe = onAuthStateChanged(auth!, (user) => {
+    // Because this component only renders when isConfigured is true, `auth` is guaranteed to be a valid Auth instance.
+    const unsubscribe = onAuthStateChanged(auth as Auth, (user) => {
       setUser(user);
       setLoading(false);
     });
@@ -70,16 +69,16 @@ function AuthComponent({ children }: { children: ReactNode }) {
   const login = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth!, provider);
+      // `auth` is non-null here as well.
+      await signInWithPopup(auth as Auth, provider);
     } catch (error) {
       console.error("Error during sign-in:", error);
     }
   };
 
   const logout = async () => {
-    if (auth) {
-      await signOut(auth);
-    }
+    // `auth` is non-null here as well.
+    await signOut(auth as Auth);
   };
   
   if (loading) {
@@ -98,8 +97,14 @@ function AuthComponent({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    // This error will only happen if useAuth is used outside a configured AuthProvider.
-    throw new Error('useAuth must be used within an AuthProvider, and Firebase must be configured.');
+    // This case will be hit if a component tries to useAuth without being a child of a configured AuthProvider.
+    // We return a safe, "logged-out" default state.
+    return {
+      user: null,
+      loading: false,
+      login: async () => console.error("Login call failed: Firebase is not configured."),
+      logout: async () => {},
+    };
   }
   return context;
 }

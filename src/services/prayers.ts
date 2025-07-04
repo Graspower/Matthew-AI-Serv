@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, Firestore } from 'firebase/firestore';
 import type { Comment, Reactions } from './testimonies'; // Reuse comment/reaction types
 
 export interface Prayer {
@@ -14,9 +14,17 @@ export interface Prayer {
 
 export type NewPrayer = Omit<Prayer, 'id' | 'comments' | 'reactions'>;
 
+function checkDb() {
+    if (!db) {
+        throw new Error("Firebase is not configured. Please check your .env.local file and restart the server.");
+    }
+    return db as Firestore;
+}
+
 export async function addPrayer(prayer: NewPrayer): Promise<void> {
   try {
-    const prayersCol = collection(db, 'prayers');
+    const firestore = checkDb();
+    const prayersCol = collection(firestore, 'prayers');
     await addDoc(prayersCol, {
         ...prayer,
         comments: [],
@@ -34,7 +42,8 @@ export async function addPrayer(prayer: NewPrayer): Promise<void> {
 
 export async function addCommentToPrayer(prayerId: string, comment: Comment): Promise<void> {
   try {
-    const prayerRef = doc(db, 'prayers', prayerId);
+    const firestore = checkDb();
+    const prayerRef = doc(firestore, 'prayers', prayerId);
     const firestoreComment = {
       ...comment,
       createdAt: Timestamp.fromDate(new Date(comment.createdAt)),
@@ -53,7 +62,8 @@ export async function addCommentToPrayer(prayerId: string, comment: Comment): Pr
 
 export async function addReactionToPrayer(prayerId: string, reactionType: keyof Reactions): Promise<void> {
   try {
-    const prayerRef = doc(db, 'prayers', prayerId);
+    const firestore = checkDb();
+    const prayerRef = doc(firestore, 'prayers', prayerId);
     const fieldToIncrement = `reactions.${reactionType}`;
     await updateDoc(prayerRef, {
         [fieldToIncrement]: increment(1)
@@ -70,7 +80,8 @@ export async function addReactionToPrayer(prayerId: string, reactionType: keyof 
 
 export async function getPrayers(): Promise<Prayer[]> {
   try {
-    const prayersCol = collection(db, 'prayers');
+    const firestore = checkDb();
+    const prayersCol = collection(firestore, 'prayers');
     const prayerSnapshot = await getDocs(prayersCol);
     
     if (prayerSnapshot.empty) {

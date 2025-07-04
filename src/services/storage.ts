@@ -1,6 +1,13 @@
 import { storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, FirebaseStorage } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
+
+function checkStorage() {
+    if (!storage) {
+        throw new Error("Firebase is not configured. Please check your .env.local file and restart the server.");
+    }
+    return storage as FirebaseStorage;
+}
 
 export async function uploadTestimonyImage(imageFile: File): Promise<string> {
   if (!imageFile) {
@@ -8,7 +15,8 @@ export async function uploadTestimonyImage(imageFile: File): Promise<string> {
   }
   const fileExtension = imageFile.name.split('.').pop();
   const fileName = `${uuidv4()}.${fileExtension}`;
-  const storageRef = ref(storage, `testimonies/${fileName}`);
+  const firebaseStorage = checkStorage();
+  const storageRef = ref(firebaseStorage, `testimonies/${fileName}`);
 
   try {
     const snapshot = await uploadBytes(storageRef, imageFile);
