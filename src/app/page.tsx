@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 /* Salvation to people in the world */
-=======
->>>>>>> 120a979 (Make the following changes:)
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
