@@ -14,8 +14,6 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 import { SettingsProvider } from '@/contexts/SettingsContext'; // Import SettingsProvider
 import { ThemeProvider } from '@/contexts/ThemeContext'; // Import ThemeProvider
-import { AuthProvider } from '@/contexts/AuthContext';
-import { Header } from '@/components/Header';
 import Script from 'next/script';
 
 // Initialize fonts correctly in the layout
@@ -74,13 +72,10 @@ export default function RootLayout({
           defaultTheme="system"
           storageKey="matthew-ai-theme"
         >
-          <AuthProvider>
             <SettingsProvider>
-              <Header />
               {children}
               <Toaster />
             </SettingsProvider>
-          </AuthProvider>
         </ThemeProvider>
         <Script id="sw-registration" strategy="lazyOnload">
           {`
