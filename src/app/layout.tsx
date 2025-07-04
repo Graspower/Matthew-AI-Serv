@@ -11,10 +11,10 @@ import type {Metadata, Viewport} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google'; // Correct import location
 import { Source_Serif_4 } from 'next/font/google';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster"; // Import Toaster
-import { SettingsProvider } from '@/contexts/SettingsContext'; // Import SettingsProvider
-import { ThemeProvider } from '@/contexts/ThemeContext'; // Import ThemeProvider
-import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
+import { Toaster } from "@/components/ui/toaster";
+import { SettingsProvider } from '@/contexts/SettingsContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import Script from 'next/script';
 import { Header } from '@/components/Header';
 
