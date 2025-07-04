@@ -43,17 +43,18 @@ async function getTranslationData(translation: BibleTranslation): Promise<BibleJ
     }
 
     try {
-        // Construct the URL to the JSON file in the public folder
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/bibles/${translation}.json`);
+        // Use a relative path to fetch from the public folder.
+        // This is more robust than relying on NEXT_PUBLIC_APP_URL.
+        const response = await fetch(`/bibles/${translation}.json`);
         if (!response.ok) {
-            throw new Error(`Failed to fetch Bible data for ${translation}: ${response.statusText}`);
+            throw new Error(`Failed to fetch Bible data for ${translation}: ${response.statusText} (status: ${response.status})`);
         }
         const data: BibleJson = await response.json();
         bibleCache.set(translation, data);
         return data;
     } catch (error: any) {
         console.error(`Error loading or parsing Bible data for ${translation}:`, error);
-        throw new Error(`Could not load data for ${translation}. Make sure the file exists at /public/bibles/${translation}.json. Original error: ${error.message}`);
+        throw new Error(`Could not load data for ${translation}. Make sure the file exists at /public/bibles/${translation}.json and is valid JSON. Original error: ${error.message}`);
     }
 }
 
@@ -110,6 +111,7 @@ export async function getVerse(translation: BibleTranslation, bookName: string, 
     const translationData = await getTranslationData(translation);
     const bookData = translationData[bookName];
     if (!bookData) {
+        console.warn(`Book not found in bible data: ${bookName} (${translation})`);
         return null;
     }
 

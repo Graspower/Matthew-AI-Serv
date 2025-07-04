@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,7 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,65 @@ const truncateText = (text: string, maxLength: number) => {
   const truncated = text.slice(0, maxLength);
   return truncated.slice(0, truncated.lastIndexOf(' '));
 };
+
+function ContentCardSkeleton() {
+  return (
+    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px]">
+        <Skeleton className="w-full h-40" />
+        <div className="flex flex-col flex-grow p-4 space-y-3">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+        </div>
+    </Card>
+  );
+}
+
+function CommentArea({
+  testimony,
+  commentForm,
+  handleAddComment,
+}: {
+  testimony: Testimony;
+  commentForm: UseFormReturn<CommentFormData>;
+  handleAddComment: (data: CommentFormData) => void;
+}) {
+  return (
+    <>
+      <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
+        <div className="space-y-4">
+          {testimony.comments && testimony.comments.length > 0 ? (
+            testimony.comments.map(comment => (
+              <div key={comment.id} className="flex gap-3">
+                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{comment.author.charAt(0)}</div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">{comment.author}</p>
+                    <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</p>
+                  </div>
+                  <p className="text-sm text-foreground/90">{comment.text}</p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-muted-foreground py-8">No comments yet. Be the first to share!</p>
+          )}
+        </div>
+      </ScrollArea>
+      <div className="mt-auto pt-4 border-t">
+        <Form {...commentForm}>
+          <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
+            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <div className="text-right">
+                <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
+            </div>
+          </form>
+        </Form>
+      </div>
+    </>
+  );
+}
 
 export function TestimoniesSection() {
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
@@ -175,53 +234,6 @@ export function TestimoniesSection() {
     );
   };
   
-  const ContentCardSkeleton = () => (
-    <Card className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px]">
-        <Skeleton className="w-full h-40" />
-        <div className="flex flex-col flex-grow p-4 space-y-3">
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-        </div>
-    </Card>
-  );
-
-  const CommentArea = ({ testimony }: { testimony: Testimony }) => (
-    <>
-      <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
-        <div className="space-y-4">
-          {testimony.comments && testimony.comments.length > 0 ? (
-            testimony.comments.map(comment => (
-              <div key={comment.id} className="flex gap-3">
-                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{comment.author.charAt(0)}</div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{comment.author}</p>
-                    <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</p>
-                  </div>
-                  <p className="text-sm text-foreground/90">{comment.text}</p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-center text-muted-foreground py-8">No comments yet. Be the first to share!</p>
-          )}
-        </div>
-      </ScrollArea>
-      <div className="mt-auto pt-4 border-t">
-        <Form {...commentForm}>
-          <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <div className="text-right">
-                <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
-            </div>
-          </form>
-        </Form>
-      </div>
-    </>
-  );
-
   return (
     <div className="w-full text-center">
         <div className="flex justify-between items-center mb-6">
@@ -319,12 +331,12 @@ export function TestimoniesSection() {
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
-          <SheetContent side="bottom" className="max-h-[90vh] flex flex-col">
+          <SheetContent side="bottom" className="max-h-[80vh] flex flex-col">
             <SheetHeader className="text-left">
               <SheetTitle>Comments on "{commentsModal.testimony?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
-            {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}
+            {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} commentForm={commentForm} handleAddComment={handleAddComment} />}
           </SheetContent>
         </Sheet>
       ) : (
@@ -334,7 +346,7 @@ export function TestimoniesSection() {
               <DialogTitle>Comments on "{commentsModal.testimony?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
-             {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} />}
+             {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} commentForm={commentForm} handleAddComment={handleAddComment} />}
           </DialogContent>
         </Dialog>
       )}
