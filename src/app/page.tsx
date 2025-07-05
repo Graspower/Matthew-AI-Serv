@@ -17,9 +17,34 @@ import { TestimoniesSection } from '@/components/TestimoniesSection';
 import { PrayersSection } from '@/components/PrayersSection';
 import { TeachingsSection } from '@/components/TeachingsSection';
 
-const TEACHING_CACHE_KEY = 'matthew-ai-teaching-cache';
+const LAST_SEARCH_CACHE_KEY = 'matthew-ai-last-search';
+const TEACHINGS_CACHE_KEY = 'matthew-ai-teachings-cache';
 
 type HomeSection = 'testimonies' | 'prayers' | 'teachings';
+
+// Helper functions for the new cache
+const getTeachingsCache = () => {
+  try {
+    if (typeof window === 'undefined') return {};
+    const cached = localStorage.getItem(TEACHINGS_CACHE_KEY);
+    return cached ? JSON.parse(cached) : {};
+  } catch (e) {
+    console.error("Failed to read teachings cache:", e);
+    return {};
+  }
+};
+
+const setTeachingsCache = (key: string, data: any) => {
+  try {
+    if (typeof window === 'undefined') return;
+    const cache = getTeachingsCache();
+    cache[key] = data;
+    localStorage.setItem(TEACHINGS_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    console.error("Failed to write to teachings cache:", e);
+  }
+};
+
 
 export default function Home() {
   const [currentQueryTopic, setCurrentQueryTopic] = useState<string | null>(null);
@@ -36,21 +61,19 @@ export default function Home() {
   const { language, bibleTranslation } = useSettings();
 
   useEffect(() => {
+    // Restore the last search state on initial load
     try {
-      const cachedData = localStorage.getItem(TEACHING_CACHE_KEY);
+      const cachedData = localStorage.getItem(LAST_SEARCH_CACHE_KEY);
       if (cachedData) {
-        const { query, verses, teaching } = JSON.parse(cachedData);
+        const { query, verses } = JSON.parse(cachedData);
         if (query && verses) {
           setCurrentQueryTopic(query);
           setCurrentVersesForTopic(verses);
-          if (teaching) {
-            setTeachingText(teaching);
-          }
         }
       }
     } catch (error) {
-      console.error("Failed to load teaching from cache:", error);
-      localStorage.removeItem(TEACHING_CACHE_KEY);
+      console.error("Failed to load last search from cache:", error);
+      localStorage.removeItem(LAST_SEARCH_CACHE_KEY);
     }
   }, []);
 
@@ -58,11 +81,12 @@ export default function Home() {
     setCurrentQueryTopic(query);
     setCurrentVersesForTopic(versesWithText);
 
+    // Cache the latest search query and its verses to be restored on next visit
     if (!query) {
-      localStorage.removeItem(TEACHING_CACHE_KEY);
+      localStorage.removeItem(LAST_SEARCH_CACHE_KEY);
     } else {
       try {
-        localStorage.setItem(TEACHING_CACHE_KEY, JSON.stringify({
+        localStorage.setItem(LAST_SEARCH_CACHE_KEY, JSON.stringify({
           query: query,
           verses: versesWithText,
         }));
@@ -79,7 +103,7 @@ export default function Home() {
 
   useEffect(() => {
     const fetchTeaching = async () => {
-      if (!currentQueryTopic || !currentVersesForTopic || currentVersesForTopic.length === 0) {
+      if (!currentQueryTopic || !currentVersesForTopic) {
         setTeachingText(null);
         setTeachingError(null);
         setIsTeachingLoading(false);
@@ -90,6 +114,22 @@ export default function Home() {
       setTeachingError(null);
       setTeachingText(null);
 
+      const cacheKey = `${currentQueryTopic}-${language}-${bibleTranslation}-${teachingLength}`;
+      const teachingsCache = getTeachingsCache();
+
+      if (teachingsCache[cacheKey]) {
+        setTeachingText(teachingsCache[cacheKey].teaching);
+        setIsTeachingLoading(false);
+        return;
+      }
+      
+      if (currentVersesForTopic.length === 0) {
+        setTeachingText(null);
+        setTeachingError(null);
+        setIsTeachingLoading(false);
+        return;
+      }
+
       try {
         const result = await generateTeaching({
           query: currentQueryTopic,
@@ -99,18 +139,15 @@ export default function Home() {
           bibleTranslation: bibleTranslation,
         });
         setTeachingText(result.teaching);
-        localStorage.setItem(TEACHING_CACHE_KEY, JSON.stringify({
-          query: currentQueryTopic,
-          verses: currentVersesForTopic,
-          teaching: result.teaching
-        }));
+        setTeachingsCache(cacheKey, { teaching: result.teaching });
+
       } catch (error: any)
       {
         console.error('Failed to generate teaching:', error);
-        setTeachingError("Something went wrong. Please try again later.");
+        setTeachingError(error.message || "Something went wrong. Please try again later.");
         toast({
-          title: 'Error',
-          description: 'Failed to generate teaching.',
+          title: 'Error Generating Teaching',
+          description: error.message || 'An unexpected error occurred.',
           variant: 'destructive',
         });
       } finally {

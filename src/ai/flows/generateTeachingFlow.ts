@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Generates a teaching or sermonette based on a user's query and relevant Bible verses, considering language and translation.
@@ -95,15 +94,23 @@ const generateTeachingFlow = ai.defineFlow(
     if (input.lengthPreference === 'brief') {
       lengthInstructionText = "This teaching should be very concise, aiming for approximately three sentences.";
     }
-    // TODO: Add translations for lengthInstructionText if needed, or pass to AI to handle
-
-    const {output} = await teachingPrompt({
-      query: input.query,
-      verses: input.verses,
-      lengthInstruction: lengthInstructionText,
-      language: input.language,
-      bibleTranslation: input.bibleTranslation,
-    });
-    return output!;
+    
+    try {
+      const {output} = await teachingPrompt({
+        query: input.query,
+        verses: input.verses,
+        lengthInstruction: lengthInstructionText,
+        language: input.language,
+        bibleTranslation: input.bibleTranslation,
+      });
+      return output!;
+    } catch (error: any) {
+        console.error(`Error in generateTeachingFlow for query "${input.query}":`, error);
+        if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests'))) {
+            throw new Error("You have exceeded your daily limit for AI requests. The quota typically resets daily. Please try again tomorrow or upgrade your Google AI plan.");
+        }
+        // Re-throw other errors
+        throw new Error(`An unexpected AI error occurred: ${error.message}`);
+    }
   }
 );
