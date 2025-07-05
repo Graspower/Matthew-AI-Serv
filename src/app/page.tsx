@@ -159,6 +159,56 @@ export default function Home() {
     fetchTeaching();
   }, [currentQueryTopic, currentVersesForTopic, teachingLength, toast, language, bibleTranslation]);
 
+  // Hiding header on scroll logic
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>('[data-main-header="true"]');
+    if (!header) return;
+
+    let lastScrollY = window.scrollY;
+    let isTicking = false;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (activeTab === 'bibleReader') {
+        if (currentScrollY > lastScrollY && currentScrollY > header.offsetHeight) {
+          // Scrolling down
+          header.classList.add('header-hidden');
+        } else {
+          // Scrolling up
+          header.classList.remove('header-hidden');
+        }
+      } else {
+        // Not in bible reader tab, ensure header is visible
+        header.classList.remove('header-hidden');
+      }
+
+      lastScrollY = currentScrollY;
+      isTicking = false;
+    };
+
+    const onScroll = () => {
+      if (!isTicking) {
+        window.requestAnimationFrame(handleScroll);
+        isTicking = true;
+      }
+    };
+
+    if (activeTab === 'bibleReader') {
+      window.addEventListener('scroll', onScroll);
+    } else {
+      // If not in the bible reader, ensure header is visible
+      header.classList.remove('header-hidden');
+    }
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      // Ensure header is visible when component unmounts or tab changes
+      header.classList.remove('header-hidden');
+    };
+  }, [activeTab]);
+
   return (
     <div className="container mx-auto py-4">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-grow">
