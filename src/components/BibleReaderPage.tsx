@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
 import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter, type Verse, type VerseReference } from '@/services/bible';
 import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight, ArrowUp, Settings, Sun, Moon, Copy, Bookmark as BookmarkIcon } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -407,7 +408,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
             }}
         >
             <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={handleCopy}><Copy className="h-4 w-4 mr-2" /> Copy</Button>
+                <Button variant="ghost" size="sm" onClick={handleCopyVerse}><Copy className="h-4 w-4 mr-2" /> Copy</Button>
                 <Button variant="ghost" size="sm" onClick={handleBookmarkVerse}><BookmarkIcon className="h-4 w-4 mr-2" /> Bookmark</Button>
             </div>
         </PopoverContent>
