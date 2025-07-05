@@ -77,10 +77,12 @@ function CommentArea({
   teaching,
   commentForm,
   handleAddComment,
+  user,
 }: {
   teaching: Teaching;
   commentForm: UseFormReturn<CommentFormData>;
   handleAddComment: (data: CommentFormData) => void;
+  user: any;
 }) {
   return (
     <>
@@ -107,7 +109,7 @@ function CommentArea({
       <div className="mt-auto pt-4 border-t">
         <Form {...commentForm}>
           <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <div className="text-right">
                 <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
@@ -140,6 +142,12 @@ export function TeachingsSection() {
     resolver: zodResolver(commentFormSchema),
     defaultValues: { author: '', text: '' },
   });
+
+  useEffect(() => {
+    if (user?.displayName && (commentsModal.isOpen || detailsModal.isOpen)) {
+        commentForm.setValue('author', user.displayName);
+    }
+  }, [user, commentForm, commentsModal.isOpen, detailsModal.isOpen]);
 
   const fetchTeachings = useCallback(async (forceRefresh = false) => {
     setIsLoadingTeachings(true);
@@ -192,19 +200,31 @@ export function TeachingsSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
         return;
     }
-    setTeachings(prev => prev.map(t => {
+
+    const originalTeachings = [...teachings];
+    const updatedTeachings = teachings.map(t => {
         if (t.id === teachingId) {
             return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
         }
         return t;
-    }));
-    setDetailsModal(prev => prev.teaching?.id === teachingId ? { ...prev, teaching: { ...prev.teaching, reactions: { ...prev.teaching.reactions, [reactionType]: (prev.teaching.reactions[reactionType] || 0) + 1 } } } : prev);
+    });
+
+    setTeachings(updatedTeachings);
+    setDetailsModal(prev => {
+        const updatedTeaching = updatedTeachings.find(t => t.id === prev.teaching?.id);
+        return updatedTeaching ? { ...prev, teaching: updatedTeaching } : prev;
+    });
 
     try {
         await addReactionToTeaching(teachingId, reactionType);
+        setTeachingsInCache(updatedTeachings);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        fetchTeachings(true);
+        setTeachings(originalTeachings);
+        setDetailsModal(prev => {
+            const originalTeaching = originalTeachings.find(t => t.id === prev.teaching?.id);
+            return originalTeaching ? { ...prev, teaching: originalTeaching } : prev;
+        });
     }
   }
 
@@ -221,15 +241,31 @@ export function TeachingsSection() {
       createdAt: new Date().toISOString(),
     };
     
-    setCommentsModal(prev => prev.teaching ? { ...prev, teaching: { ...prev.teaching, comments: [...(prev.teaching.comments || []), newComment] } } : prev);
+    const originalTeachings = [...teachings];
+    const originalTeachingInModal = commentsModal.teaching;
+    
+    const updatedTeaching = {
+        ...commentsModal.teaching,
+        comments: [...(commentsModal.teaching.comments || []), newComment],
+    };
+
+    setCommentsModal({ isOpen: true, teaching: updatedTeaching });
+    setDetailsModal(prev => prev.teaching?.id === updatedTeaching.id ? { isOpen: true, teaching: updatedTeaching } : prev);
+    setTeachings(prevTeachings => {
+        const newTeachings = prevTeachings.map(t => t.id === updatedTeaching.id ? updatedTeaching : t);
+        setTeachingsInCache(newTeachings);
+        return newTeachings;
+    });
     
     try {
       await addCommentToTeaching(commentsModal.teaching.id, newComment);
-      commentForm.reset();
-      fetchTeachings(true); 
+      commentForm.reset({ author: user?.displayName || '', text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      fetchTeachings(true);
+      setTeachings(originalTeachings);
+      setCommentsModal({ isOpen: true, teaching: originalTeachingInModal });
+      setDetailsModal(prev => prev.teaching?.id === originalTeachingInModal.id ? { isOpen: true, teaching: originalTeachingInModal } : prev);
+      setTeachingsInCache(originalTeachings);
     }
   }
 
@@ -248,15 +284,27 @@ export function TeachingsSection() {
                 <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
             </div>
         </CardContent>
-         <CardFooter className="p-2 border-t justify-end flex items-center gap-4">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Heart className="h-4 w-4" />
-                <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+         <CardFooter className="p-2 border-t justify-end flex items-center gap-1">
+            <Popover>
+              <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+                    <Heart className="h-4 w-4" />
+                    <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
+                  </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}><Heart className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}><Hand className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); setCommentsModal({ isOpen: true, teaching: item }); }}>
                 <MessageSquare className="h-4 w-4" />
                 <span>{item.comments?.length || 0}</span>
-            </div>
+            </Button>
         </CardFooter>
       </Card>
     );
@@ -371,7 +419,7 @@ export function TeachingsSection() {
               <SheetTitle>Comments on "{commentsModal.teaching?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
-            {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={handleAddComment} />}
+            {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
           </SheetContent>
         </Sheet>
       ) : (
@@ -381,7 +429,7 @@ export function TeachingsSection() {
               <DialogTitle>Comments on "{commentsModal.teaching?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
-             {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={handleAddComment} />}
+             {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
           </DialogContent>
         </Dialog>
       )}

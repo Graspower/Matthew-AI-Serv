@@ -77,10 +77,12 @@ function CommentArea({
   prayer,
   commentForm,
   handleAddComment,
+  user
 }: {
   prayer: Prayer;
   commentForm: UseFormReturn<CommentFormData>;
   handleAddComment: (data: CommentFormData) => void;
+  user: any;
 }) {
   return (
     <>
@@ -107,7 +109,7 @@ function CommentArea({
       <div className="mt-auto pt-4 border-t">
         <Form {...commentForm}>
           <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <div className="text-right">
                 <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
@@ -140,6 +142,13 @@ export function PrayersSection() {
     resolver: zodResolver(commentFormSchema),
     defaultValues: { author: '', text: '' },
   });
+
+  useEffect(() => {
+    if (user?.displayName && (commentsModal.isOpen || detailsModal.isOpen)) {
+        commentForm.setValue('author', user.displayName);
+    }
+  }, [user, commentForm, commentsModal.isOpen, detailsModal.isOpen]);
+
 
   const fetchPrayers = useCallback(async (forceRefresh = false) => {
     setIsLoadingPrayers(true);
@@ -192,19 +201,30 @@ export function PrayersSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
         return;
     }
-    setPrayers(prev => prev.map(p => {
+    const originalPrayers = [...prayers];
+    const updatedPrayers = prayers.map(p => {
         if (p.id === prayerId) {
             return { ...p, reactions: { ...p.reactions, [reactionType]: (p.reactions[reactionType] || 0) + 1 } };
         }
         return p;
-    }));
-    setDetailsModal(prev => prev.prayer?.id === prayerId ? { ...prev, prayer: { ...prev.prayer, reactions: { ...prev.prayer.reactions, [reactionType]: (prev.prayer.reactions[reactionType] || 0) + 1 } } } : prev);
+    });
+
+    setPrayers(updatedPrayers);
+    setDetailsModal(prev => {
+        const updatedPrayer = updatedPrayers.find(p => p.id === prev.prayer?.id);
+        return updatedPrayer ? { ...prev, prayer: updatedPrayer } : prev;
+    });
 
     try {
         await addReactionToPrayer(prayerId, reactionType);
+        setPrayersInCache(updatedPrayers);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        fetchPrayers(true);
+        setPrayers(originalPrayers);
+        setDetailsModal(prev => {
+            const originalPrayer = originalPrayers.find(p => p.id === prev.prayer?.id);
+            return originalPrayer ? { ...prev, prayer: originalPrayer } : prev;
+        });
     }
   }
 
@@ -214,22 +234,39 @@ export function PrayersSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
         return;
     }
+
     const newComment: Comment = {
       id: uuidv4(),
       author: data.author,
       text: data.text,
       createdAt: new Date().toISOString(),
     };
-    
-    setCommentsModal(prev => prev.prayer ? { ...prev, prayer: { ...prev.prayer, comments: [...(prev.prayer.comments || []), newComment] } } : prev);
-    
+
+    const originalPrayers = [...prayers];
+    const originalPrayerInModal = commentsModal.prayer;
+
+    const updatedPrayer = {
+        ...commentsModal.prayer,
+        comments: [...(commentsModal.prayer.comments || []), newComment],
+    };
+
+    setCommentsModal({ isOpen: true, prayer: updatedPrayer });
+    setDetailsModal(prev => prev.prayer?.id === updatedPrayer.id ? { isOpen: true, prayer: updatedPrayer } : prev);
+    setPrayers(prevPrayers => {
+        const newPrayers = prevPrayers.map(p => p.id === updatedPrayer.id ? updatedPrayer : p);
+        setPrayersInCache(newPrayers);
+        return newPrayers;
+    });
+
     try {
       await addCommentToPrayer(commentsModal.prayer.id, newComment);
-      commentForm.reset();
-      fetchPrayers(true);
+      commentForm.reset({ author: user?.displayName || '', text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      fetchPrayers(true);
+      setPrayers(originalPrayers);
+      setCommentsModal({ isOpen: true, prayer: originalPrayerInModal });
+      setDetailsModal(prev => prev.prayer?.id === originalPrayerInModal.id ? { isOpen: true, prayer: originalPrayerInModal } : prev);
+      setPrayersInCache(originalPrayers);
     }
   }
 
@@ -248,15 +285,27 @@ export function PrayersSection() {
                 <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
             </div>
         </CardContent>
-         <CardFooter className="p-2 border-t justify-end flex items-center gap-4">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Heart className="h-4 w-4" />
-                <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+         <CardFooter className="p-2 border-t justify-end flex items-center gap-1">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+                  <Heart className="h-4 w-4" />
+                  <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}><Heart className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}><Hand className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); setCommentsModal({isOpen: true, prayer: item}); }}>
                 <MessageSquare className="h-4 w-4" />
                 <span>{item.comments?.length || 0}</span>
-            </div>
+            </Button>
         </CardFooter>
       </Card>
     );
@@ -371,7 +420,7 @@ export function PrayersSection() {
               <SheetTitle>Comments on "{commentsModal.prayer?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
-            {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={handleAddComment} />}
+            {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
           </SheetContent>
         </Sheet>
       ) : (
@@ -381,7 +430,7 @@ export function PrayersSection() {
               <DialogTitle>Comments on "{commentsModal.prayer?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
-             {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={handleAddComment} />}
+             {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
           </DialogContent>
         </Dialog>
       )}

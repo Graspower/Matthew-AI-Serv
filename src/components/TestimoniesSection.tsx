@@ -77,10 +77,12 @@ function CommentArea({
   testimony,
   commentForm,
   handleAddComment,
+  user,
 }: {
   testimony: Testimony;
   commentForm: UseFormReturn<CommentFormData>;
   handleAddComment: (data: CommentFormData) => void;
+  user: any;
 }) {
   return (
     <>
@@ -107,7 +109,7 @@ function CommentArea({
       <div className="mt-auto pt-4 border-t">
         <Form {...commentForm}>
           <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <div className="text-right">
                 <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
@@ -140,6 +142,13 @@ export function TestimoniesSection() {
     resolver: zodResolver(commentFormSchema),
     defaultValues: { author: '', text: '' },
   });
+
+  useEffect(() => {
+    if (user?.displayName && (commentsModal.isOpen || detailsModal.isOpen)) {
+        commentForm.setValue('author', user.displayName);
+    }
+  }, [user, commentForm, commentsModal.isOpen, detailsModal.isOpen]);
+
 
   const fetchTestimonies = useCallback(async (forceRefresh = false) => {
     setIsLoadingTestimonies(true);
@@ -192,19 +201,29 @@ export function TestimoniesSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
         return;
     }
-    setTestimonies(prev => prev.map(t => {
+    const originalTestimonies = [...testimonies];
+    const updatedTestimonies = testimonies.map(t => {
         if (t.id === testimonyId) {
             return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
         }
         return t;
-    }));
-    setDetailsModal(prev => prev.testimony?.id === testimonyId ? { ...prev, testimony: { ...prev.testimony, reactions: { ...prev.testimony.reactions, [reactionType]: (prev.testimony.reactions[reactionType] || 0) + 1 } } } : prev);
+    });
+    setTestimonies(updatedTestimonies);
+    setDetailsModal(prev => {
+        const updatedTestimony = updatedTestimonies.find(t => t.id === prev.testimony?.id);
+        return updatedTestimony ? { ...prev, testimony: updatedTestimony } : prev;
+    });
     
     try {
         await addReactionToTestimony(testimonyId, reactionType);
+        setTestimoniesInCache(updatedTestimonies);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        fetchTestimonies(true);
+        setTestimonies(originalTestimonies);
+         setDetailsModal(prev => {
+            const originalTestimony = originalTestimonies.find(t => t.id === prev.testimony?.id);
+            return originalTestimony ? { ...prev, testimony: originalTestimony } : prev;
+        });
     }
   }
 
@@ -221,15 +240,31 @@ export function TestimoniesSection() {
       createdAt: new Date().toISOString(),
     };
     
-    setCommentsModal(prev => prev.testimony ? { ...prev, testimony: { ...prev.testimony, comments: [...(prev.testimony.comments || []), newComment] } } : prev);
+    const originalTestimonies = [...testimonies];
+    const originalTestimonyInModal = commentsModal.testimony;
+
+    const updatedTestimony = {
+        ...commentsModal.testimony,
+        comments: [...(commentsModal.testimony.comments || []), newComment],
+    };
+
+    setCommentsModal({ isOpen: true, testimony: updatedTestimony });
+    setDetailsModal(prev => prev.testimony?.id === updatedTestimony.id ? { isOpen: true, testimony: updatedTestimony } : prev);
+    setTestimonies(prevTestimonies => {
+        const newTestimonies = prevTestimonies.map(t => t.id === updatedTestimony.id ? updatedTestimony : t);
+        setTestimoniesInCache(newTestimonies);
+        return newTestimonies;
+    });
     
     try {
       await addCommentToTestimony(commentsModal.testimony.id, newComment);
-      commentForm.reset();
-      fetchTestimonies(true); 
+      commentForm.reset({ author: user?.displayName || '', text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      fetchTestimonies(true); 
+      setTestimonies(originalTestimonies);
+      setCommentsModal({ isOpen: true, testimony: originalTestimonyInModal });
+      setDetailsModal(prev => prev.testimony?.id === originalTestimonyInModal.id ? { isOpen: true, testimony: originalTestimonyInModal } : prev);
+      setTestimoniesInCache(originalTestimonies);
     }
   }
 
@@ -248,15 +283,27 @@ export function TestimoniesSection() {
                 <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
             </div>
         </CardContent>
-        <CardFooter className="p-2 border-t justify-end flex items-center gap-4">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Heart className="h-4 w-4" />
-                <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MessageSquare className="h-4 w-4" />
-                <span>{item.comments?.length || 0}</span>
-            </div>
+        <CardFooter className="p-2 border-t justify-end flex items-center gap-1">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+                  <Heart className="h-4 w-4" />
+                  <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}><Heart className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}><Hand className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); setCommentsModal({isOpen: true, testimony: item}); }}>
+              <MessageSquare className="h-4 w-4" />
+              <span>{item.comments?.length || 0}</span>
+            </Button>
         </CardFooter>
       </Card>
     );
@@ -371,7 +418,7 @@ export function TestimoniesSection() {
               <SheetTitle>Comments on "{commentsModal.testimony?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
             </SheetHeader>
-            {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} commentForm={commentForm} handleAddComment={handleAddComment} />}
+            {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
           </SheetContent>
         </Sheet>
       ) : (
@@ -381,7 +428,7 @@ export function TestimoniesSection() {
               <DialogTitle>Comments on "{commentsModal.testimony?.category}"</DialogTitle>
               <DialogDescription>Read what others are saying.</DialogDescription>
             </DialogHeader>
-             {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} commentForm={commentForm} handleAddComment={handleAddComment} />}
+             {commentsModal.testimony && <CommentArea testimony={commentsModal.testimony} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
           </DialogContent>
         </Dialog>
       )}
