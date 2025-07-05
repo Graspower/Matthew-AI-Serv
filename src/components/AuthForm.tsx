@@ -57,9 +57,11 @@ export function AuthForm({ mode, onModeChange, onAuthSuccess }: AuthFormProps) {
       onAuthSuccess();
     } catch (error: any) {
         const firebaseError = error as FirebaseError;
-        let description = 'An unexpected error occurred.';
+        let description = 'An unexpected error occurred. Please try again.';
         if (firebaseError.code === 'auth/email-already-in-use') {
             description = 'This email is already in use. Please try logging in.';
+        } else if (firebaseError.code === 'auth/operation-not-allowed') {
+            description = 'Email/Password sign-up is not enabled. Please enable it in your Firebase console.';
         }
         toast({ title: 'Signup Failed', description, variant: 'destructive' });
     } finally {
@@ -75,9 +77,11 @@ export function AuthForm({ mode, onModeChange, onAuthSuccess }: AuthFormProps) {
       onAuthSuccess();
     } catch (error: any) {
         const firebaseError = error as FirebaseError;
-        let description = 'An unexpected error occurred.';
+        let description = 'An unexpected error occurred. Please try again.';
         if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/invalid-credential') {
             description = 'Invalid email or password. Please try again.';
+        } else if (firebaseError.code === 'auth/operation-not-allowed') {
+            description = 'Email/Password sign-in is not enabled. Please enable it in your Firebase console.';
         }
         toast({ title: 'Login Failed', description, variant: 'destructive' });
     } finally {
