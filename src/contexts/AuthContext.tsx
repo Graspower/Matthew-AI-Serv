@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, type User, type Auth } from 'firebase/auth';
 import { auth, isConfigured } from '@/lib/firebase';
-import { Loader2 } from 'lucide-react';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 // A self-contained, helpful component to display when Firebase is not configured.
 const FirebaseNotConfigured = () => (
@@ -80,11 +80,7 @@ function AuthComponent({ children }: { children: ReactNode }) {
   };
   
   if (loading) {
-    return (
-        <div className="flex h-screen items-center justify-center">
-            <Loader2 className="h-12 w-12 animate-spin" />
-        </div>
-    );
+    return <LoadingScreen />;
   }
   
   const value = { user, loading, signUp, logIn, logout };
