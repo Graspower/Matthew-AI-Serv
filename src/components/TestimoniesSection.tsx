@@ -39,6 +39,20 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const testimonyCategories = ['Salvation', 'Business Breakthrough', 'Marriage Success', 'Job', 'Health', 'Baby', 'Healing', 'Deliverance', 'Financial Provision', 'Academic Success'];
 
+const TESTIMONIES_CACHE_KEY = 'matthew-ai-testimonies';
+
+const getTestimoniesFromCache = (): Testimony[] | null => {
+  if (typeof window === 'undefined') return null;
+  const cached = localStorage.getItem(TESTIMONIES_CACHE_KEY);
+  return cached ? JSON.parse(cached) : null;
+};
+
+const setTestimoniesInCache = (data: Testimony[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TESTIMONIES_CACHE_KEY, JSON.stringify(data));
+};
+
+
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
@@ -126,12 +140,23 @@ export function TestimoniesSection() {
     defaultValues: { author: '', text: '' },
   });
 
-  const fetchTestimonies = useCallback(async () => {
+  const fetchTestimonies = useCallback(async (forceRefresh = false) => {
     setIsLoadingTestimonies(true);
     setTestimoniesError(null);
+
+    if (!forceRefresh) {
+        const cachedTestimonies = getTestimoniesFromCache();
+        if (cachedTestimonies) {
+            setTestimonies(cachedTestimonies);
+            setIsLoadingTestimonies(false);
+            return;
+        }
+    }
+
     try {
       const data = await getTestimonies();
       setTestimonies(data);
+      setTestimoniesInCache(data);
     } catch (error: any) {
       console.error(error);
       setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
@@ -154,7 +179,7 @@ export function TestimoniesSection() {
       await addTestimony(data, user.uid);
       toast({ title: 'Success!', description: 'Testimony added successfully.' });
       setIsAddTestimonyDialogOpen(false);
-      fetchTestimonies();
+      fetchTestimonies(true);
       testimonyForm.reset();
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add testimony.', variant: 'destructive' });
@@ -178,7 +203,7 @@ export function TestimoniesSection() {
         await addReactionToTestimony(testimonyId, reactionType);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        await fetchTestimonies();
+        fetchTestimonies(true);
     }
   }
 
@@ -200,17 +225,17 @@ export function TestimoniesSection() {
     try {
       await addCommentToTestimony(commentsModal.testimony.id, newComment);
       commentForm.reset();
-      await fetchTestimonies(); 
+      fetchTestimonies(true); 
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchTestimonies(); 
+      fetchTestimonies(true); 
     }
   }
 
   const TestimonyContentCard = ({ item }: { item: Testimony }) => {
     return (
       <Card 
-        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
+        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer transition-transform duration-300 hover:scale-105 hover:shadow-xl"
         onClick={() => setDetailsModal({isOpen: true, testimony: item})}
       >
         <CardContent className="flex-grow flex flex-col p-6 justify-center items-center text-center">

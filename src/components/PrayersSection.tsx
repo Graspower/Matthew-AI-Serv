@@ -39,6 +39,20 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const prayerCategories = ['Health & Healing', 'Family', 'Guidance', 'Finances', 'Protection', 'Thanksgiving', 'Spiritual Growth', 'World & Leaders', 'Loss & Grief', 'Salvation'];
 
+const PRAYERS_CACHE_KEY = 'matthew-ai-prayers';
+
+const getPrayersFromCache = (): Prayer[] | null => {
+  if (typeof window === 'undefined') return null;
+  const cached = localStorage.getItem(PRAYERS_CACHE_KEY);
+  return cached ? JSON.parse(cached) : null;
+};
+
+const setPrayersInCache = (data: Prayer[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PRAYERS_CACHE_KEY, JSON.stringify(data));
+};
+
+
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
@@ -126,12 +140,23 @@ export function PrayersSection() {
     defaultValues: { author: '', text: '' },
   });
 
-  const fetchPrayers = useCallback(async () => {
+  const fetchPrayers = useCallback(async (forceRefresh = false) => {
     setIsLoadingPrayers(true);
     setPrayersError(null);
+
+    if (!forceRefresh) {
+        const cachedPrayers = getPrayersFromCache();
+        if (cachedPrayers) {
+          setPrayers(cachedPrayers);
+          setIsLoadingPrayers(false);
+          return;
+        }
+    }
+
     try {
       const data = await getPrayers();
       setPrayers(data);
+      setPrayersInCache(data);
     } catch (error: any) {
       console.error(error);
       setPrayersError(error.message || "Failed to load prayers. Please check your connection and try again.");
@@ -154,7 +179,7 @@ export function PrayersSection() {
       await addPrayer(data, user.uid);
       toast({ title: 'Success!', description: 'Prayer added successfully.' });
       setIsAddPrayerDialogOpen(false);
-      fetchPrayers();
+      fetchPrayers(true);
       prayerForm.reset();
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add prayer.', variant: 'destructive' });
@@ -178,7 +203,7 @@ export function PrayersSection() {
         await addReactionToPrayer(prayerId, reactionType);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        await fetchPrayers();
+        fetchPrayers(true);
     }
   }
 
@@ -200,17 +225,17 @@ export function PrayersSection() {
     try {
       await addCommentToPrayer(commentsModal.prayer.id, newComment);
       commentForm.reset();
-      await fetchPrayers();
+      fetchPrayers(true);
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchPrayers();
+      fetchPrayers(true);
     }
   }
 
   const PrayerContentCard = ({ item }: { item: Prayer }) => {
     return (
       <Card 
-        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
+        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer transition-transform duration-300 hover:scale-105 hover:shadow-xl"
         onClick={() => setDetailsModal({isOpen: true, prayer: item})}
       >
         <CardContent className="flex-grow flex flex-col p-6 justify-center items-center text-center">

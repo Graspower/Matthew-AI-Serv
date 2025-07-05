@@ -39,6 +39,20 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const teachingCategories = ['Faith', 'Love', 'Forgiveness', 'Parables', 'Discipleship', 'End Times', 'The Law', 'Grace', 'Prayer', 'Serving Others'];
 
+const TEACHINGS_CACHE_KEY = 'matthew-ai-teachings';
+
+const getTeachingsFromCache = (): Teaching[] | null => {
+  if (typeof window === 'undefined') return null;
+  const cached = localStorage.getItem(TEACHINGS_CACHE_KEY);
+  return cached ? JSON.parse(cached) : null;
+};
+
+const setTeachingsInCache = (data: Teaching[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TEACHINGS_CACHE_KEY, JSON.stringify(data));
+};
+
+
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
@@ -126,12 +140,23 @@ export function TeachingsSection() {
     defaultValues: { author: '', text: '' },
   });
 
-  const fetchTeachings = useCallback(async () => {
+  const fetchTeachings = useCallback(async (forceRefresh = false) => {
     setIsLoadingTeachings(true);
     setTeachingsError(null);
+
+    if (!forceRefresh) {
+        const cachedTeachings = getTeachingsFromCache();
+        if (cachedTeachings) {
+            setTeachings(cachedTeachings);
+            setIsLoadingTeachings(false);
+            return;
+        }
+    }
+    
     try {
       const data = await getTeachings();
       setTeachings(data);
+      setTeachingsInCache(data);
     } catch (error: any) {
       console.error(error);
       setTeachingsError(error.message || "Failed to load teachings. Please check your connection and try again.");
@@ -154,7 +179,7 @@ export function TeachingsSection() {
       await addTeaching(data, user.uid);
       toast({ title: 'Success!', description: 'Teaching added successfully.' });
       setIsAddTeachingDialogOpen(false);
-      fetchTeachings();
+      fetchTeachings(true);
       teachingForm.reset();
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add teaching.', variant: 'destructive' });
@@ -178,7 +203,7 @@ export function TeachingsSection() {
         await addReactionToTeaching(teachingId, reactionType);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        await fetchTeachings();
+        fetchTeachings(true);
     }
   }
 
@@ -200,17 +225,17 @@ export function TeachingsSection() {
     try {
       await addCommentToTeaching(commentsModal.teaching.id, newComment);
       commentForm.reset();
-      await fetchTeachings(); 
+      fetchTeachings(true); 
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      await fetchTeachings();
+      fetchTeachings(true);
     }
   }
 
   function TeachingContentCard({ item }: { item: Teaching }) {
     return (
       <Card 
-        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer"
+        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer transition-transform duration-300 hover:scale-105 hover:shadow-xl"
         onClick={() => setDetailsModal({isOpen: true, teaching: item})}
       >
         <CardContent className="flex-grow flex flex-col p-6 justify-center items-center text-center">
