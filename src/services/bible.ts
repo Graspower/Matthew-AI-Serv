@@ -1,9 +1,13 @@
 
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
 import type { BibleTranslation } from '@/contexts/SettingsContext';
+
+// Direct import of Bible data. This is more reliable for production builds.
+import kjvData from '../../public/bibles/kjv-bible.json';
+import esvData from '../../public/bibles/esv-bible.json';
+import nivData from '../../public/bibles/niv-bible.json';
+import nrsvData from '../../public/bibles/nrsv-bible.json';
 
 export interface Verse {
   book: string;
@@ -35,6 +39,14 @@ export interface BibleChapter {
 // e.g., { "Genesis": { "1": { "1": "text" } } }
 type BibleJson = Record<string, Record<string, Record<string, string>>>;
 
+// A map to hold our statically imported Bible data.
+const bibleDataMap: Record<BibleTranslation, any> = {
+    'KJV': kjvData,
+    'NIV': nivData,
+    'NRSV': nrsvData,
+    'ESV': esvData,
+};
+
 // Cache for transformed Bible data to avoid re-reading and re-transforming files.
 const bibleCache: Map<BibleTranslation, BibleJson> = new Map();
 
@@ -61,8 +73,7 @@ function transformKjvArrayToNestedObject(verses: any[]): BibleJson {
 }
 
 /**
- * Loads and standardizes data for a given Bible translation.
- * It handles both array-based and object-based JSON structures.
+ * Loads and standardizes data for a given Bible translation from statically imported data.
  * @param translation The Bible translation to load (e.g., 'KJV').
  * @returns A promise that resolves to the standardized BibleJson object.
  */
@@ -71,16 +82,16 @@ async function getTranslationData(translation: BibleTranslation): Promise<BibleJ
         return bibleCache.get(translation)!;
     }
 
-    const lowerCaseTranslation = translation.toLowerCase();
-    const fileName = `${lowerCaseTranslation}-bible.json`;
-    const filePath = path.join(process.cwd(), 'public', 'bibles', fileName);
+    const data = bibleDataMap[translation];
 
+    if (!data) {
+        const errorMessage = `Could not load data for ${translation}. Please ensure the corresponding JSON file exists and is correctly imported.`;
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+    }
+    
     try {
-        const fileContent = await fs.readFile(filePath, 'utf-8');
-        const data = JSON.parse(fileContent);
-
         let bibleData: BibleJson;
-
         // Check if the data is in the KJV array format (e.g., { "verses": [...] })
         if (data && data.verses && Array.isArray(data.verses)) {
             bibleData = transformKjvArrayToNestedObject(data.verses);
@@ -96,11 +107,8 @@ async function getTranslationData(translation: BibleTranslation): Promise<BibleJ
         return bibleData;
 
     } catch (error: any) {
-        console.error(`Error loading or parsing Bible data for ${translation} from ${fileName}:`, error);
-        if (error.code === 'ENOENT') {
-             throw new Error(`Could not load data for ${translation}. The file was not found at ${filePath}. Please ensure the file exists and the filename is correct.`);
-        }
-        throw new Error(`Could not load data for ${translation}. Make sure the file is valid JSON. Original error: ${error.message}`);
+        console.error(`Error processing Bible data for ${translation}:`, error);
+        throw new Error(`Could not process data for ${translation}. Make sure the file is valid JSON. Original error: ${error.message}`);
     }
 }
 
