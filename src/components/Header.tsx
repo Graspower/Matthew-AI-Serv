@@ -11,7 +11,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Dialog,
   DialogContent,
-  DialogTrigger,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -157,6 +159,12 @@ export function Header() {
       </header>
       <Dialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen}>
           <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Account Access</DialogTitle>
+                <DialogDescription>
+                  Log in or create an account to save your prayers, testimonies, and teachings.
+                </DialogDescription>
+              </DialogHeader>
               <AuthForm mode={authMode} onModeChange={setAuthMode} onAuthSuccess={() => setIsAuthDialogOpen(false)}/>
           </DialogContent>
       </Dialog>
