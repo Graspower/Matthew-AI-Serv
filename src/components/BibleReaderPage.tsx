@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Select,
   SelectContent,
@@ -10,16 +11,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter, type Verse } from '@/services/bible';
-import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight, ArrowUp, Book } from 'lucide-react';
-import { useSettings, type BibleTranslation } from '@/contexts/SettingsContext';
+import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter, type Verse, type VerseReference } from '@/services/bible';
+import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight, ArrowUp, Settings, Sun, Moon, Copy, Bookmark as BookmarkIcon } from 'lucide-react';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { addBookmark } from '@/services/bookmarks';
 import { SearchForm } from '@/components/SearchForm';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +47,10 @@ const MIN_SWIPE_DISTANCE = 50;
 
 export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPageProps) {
   const { bibleTranslation } = useSettings();
+  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
   const [books, setBooks] = useState<BibleBook[]>([]);
   const [selectedBook, setSelectedBook] = useState<string | null>('Genesis');
   const [chapters, setChapters] = useState<BibleChapter[]>([]);
@@ -61,7 +68,9 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
   const [fontSizeIndex, setFontSizeIndex] = useState(1); // 'text-base'
   const [fontFamilyIndex, setFontFamilyIndex] = useState(0); // 'font-sans'
   const [isScrolled, setIsScrolled] = useState(false);
-
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [selectedVerseRef, setSelectedVerseRef] = useState<VerseReference | null>(null);
+  const [popoverTarget, setPopoverTarget] = useState<EventTarget | null>(null);
 
   const chapterScrollAreaRef = useRef<HTMLDivElement>(null);
   const touchStart = useRef<{ x: number, y: number } | null>(null);
@@ -156,7 +165,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
             viewport.removeEventListener('scroll', handleScroll);
         }
     };
-}, [chapterScrollAreaRef]);
+  }, [chapterScrollAreaRef]);
 
   // --- UI Handlers ---
 
@@ -196,6 +205,52 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
       viewport.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, []);
+
+  const handleVerseClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const verseElement = target.closest<HTMLParagraphElement>('[data-verse]');
+    
+    if (verseElement) {
+        const book = verseElement.dataset.book;
+        const chapter = verseElement.dataset.chapter;
+        const verse = verseElement.dataset.verse;
+
+        if (book && chapter && verse) {
+            setSelectedVerseRef({ book, chapter: parseInt(chapter), verse: parseInt(verse) });
+            setPopoverTarget(verseElement);
+            setPopoverOpen(true);
+        }
+    }
+  };
+
+  const handleCopyVerse = useCallback(() => {
+    if (selectedVerseRef && popoverTarget instanceof HTMLElement) {
+      const verseText = popoverTarget.textContent?.replace(/^\d+\s*/, '').trim();
+      if (verseText) {
+        navigator.clipboard.writeText(`"${verseText}" - ${selectedVerseRef.book} ${selectedVerseRef.chapter}:${selectedVerseRef.verse} (${bibleTranslation})`);
+        toast({ title: 'Copied', description: 'Verse copied to clipboard.' });
+      }
+    }
+    setPopoverOpen(false);
+  }, [selectedVerseRef, popoverTarget, toast, bibleTranslation]);
+
+  const handleBookmarkVerse = useCallback(async () => {
+    if (!user) {
+        toast({ title: 'Login Required', description: 'Please log in to save bookmarks.', variant: 'destructive'});
+        setPopoverOpen(false);
+        return;
+    }
+    if (selectedVerseRef) {
+        try {
+            await addBookmark(user.uid, selectedVerseRef, bibleTranslation);
+            toast({ title: 'Bookmarked!', description: `${selectedVerseRef.book} ${selectedVerseRef.chapter}:${selectedVerseRef.verse} has been saved.`});
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive'});
+        }
+    }
+    setPopoverOpen(false);
+  }, [user, selectedVerseRef, bibleTranslation, toast]);
+
 
   const canGoToPrevChapter = useMemo(() => {
     if (!selectedBook || selectedChapter === null || chapters.length === 0) return false;
@@ -259,76 +314,104 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
           {selectedBook && selectedChapter ? `${selectedBook} ${selectedChapter}` : 'Select Book'}
         </Button>
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={() => setIsSearchOpen(true)}>
-            <Search className="h-4 w-4" />
-          </Button>
+           <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                  <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                  <span className="sr-only">Toggle theme</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setTheme('light')}>Light</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>Dark</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('system')}>System</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Baseline className="h-4 w-4" />
+            <Link href="/settings">
+              <Button variant="outline" size="icon" asChild>
+                <div><Settings className="h-4 w-4" /><span className="sr-only">Settings</span></div>
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Font Size</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Adjust the text size for readability.
-                  </p>
+            </Link>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Baseline className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56">
+                <div className="grid gap-4">
+                  <div className="space-y-2"><h4 className="font-medium leading-none">Font Size</h4><p className="text-sm text-muted-foreground">Adjust text size.</p></div>
+                  <div className="flex items-center gap-2"><span className="text-sm font-medium">A</span><Slider min={0} max={fontSizes.length - 1} step={1} value={[fontSizeIndex]} onValueChange={(v) => setFontSizeIndex(v[0])} /><span className="text-xl font-medium">A</span></div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">A</span>
-                  <Slider
-                    min={0}
-                    max={fontSizes.length - 1}
-                    step={1}
-                    value={[fontSizeIndex]}
-                    onValueChange={(value) => setFontSizeIndex(value[0])}
-                  />
-                  <span className="text-xl font-medium">A</span>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+              </PopoverContent>
+            </Popover>
           
-          <Button variant="outline" size="icon" onClick={toggleFontFamily}>
-            <Type className="h-4 w-4" />
-          </Button>
+            <Button variant="outline" size="icon" onClick={toggleFontFamily}>
+                <Type className="h-4 w-4" />
+            </Button>
+
+            <Button variant="outline" size="icon" onClick={() => setIsSearchOpen(true)}>
+                <Search className="h-4 w-4" />
+            </Button>
         </div>
       </div>
       
       {/* Reader Content */}
-      <ScrollArea
-        ref={chapterScrollAreaRef}
-        className="flex-grow p-2 md:p-4 relative"
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <PopoverTrigger asChild>
+          <div style={{ position: 'absolute', top: -9999, left: -9999 }} />
+        </PopoverTrigger>
+        <ScrollArea
+          ref={chapterScrollAreaRef}
+          className="flex-grow p-2 md:p-4 relative"
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+          )}
+          {error && <p className="text-destructive text-center py-2">{error}</p>}
+          
+          {chapterText ? (
+              <div 
+                className={cn(
+                  "prose prose-sm sm:prose-base max-w-none leading-relaxed transition-all dark:prose-invert",
+                  fontSizes[fontSizeIndex], 
+                  fontFamilies[fontFamilyIndex]
+                )} 
+                dangerouslySetInnerHTML={{ __html: chapterText }}
+                onClick={handleVerseClick}
+              ></div>
+          ) : (
+              !isLoading && !error && (
+                  <p className="text-muted-foreground text-center pt-10">
+                  {selectedBook && selectedChapter !== null ? `Loading ${bibleTranslation} chapter...` : `Select a book and chapter to read.`}
+                  </p>
+              )
+          )}
+        </ScrollArea>
+        <PopoverContent 
+            className="w-auto p-1" 
+            side="top" 
+            align="center"
+            style={{ 
+                position: 'absolute', 
+                left: popoverTarget ? `${(popoverTarget as HTMLElement).offsetLeft + (popoverTarget as HTMLElement).offsetWidth / 2}px` : '50%',
+                top: popoverTarget ? `${(popoverTarget as HTMLElement).offsetTop}px` : '50%',
+                transform: 'translateX(-50%) translateY(-100%) translateY(-8px)'
+            }}
+        >
+            <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={handleCopy}><Copy className="h-4 w-4 mr-2" /> Copy</Button>
+                <Button variant="ghost" size="sm" onClick={handleBookmarkVerse}><BookmarkIcon className="h-4 w-4 mr-2" /> Bookmark</Button>
             </div>
-        )}
-        {error && <p className="text-destructive text-center py-2">{error}</p>}
-        
-        {chapterText ? (
-            <div 
-              className={cn(
-                "prose prose-sm sm:prose-base max-w-none leading-relaxed transition-all dark:prose-invert",
-                fontSizes[fontSizeIndex], 
-                fontFamilies[fontFamilyIndex]
-              )} 
-              dangerouslySetInnerHTML={{ __html: chapterText }}
-            ></div>
-        ) : (
-            !isLoading && !error && (
-                <p className="text-muted-foreground text-center pt-10">
-                {selectedBook && selectedChapter !== null ? `Loading ${bibleTranslation} chapter...` : `Select a book and chapter to read.`}
-                </p>
-            )
-        )}
-      </ScrollArea>
+        </PopoverContent>
+      </Popover>
 
       {/* Floating Navigation Buttons */}
       {selectedBook && selectedChapter !== null && (

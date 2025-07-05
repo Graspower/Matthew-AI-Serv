@@ -179,6 +179,33 @@ export async function getChaptersForBook(translation: BibleTranslation, bookId: 
 }
 
 export async function getChapterText(translation: BibleTranslation, bookId: string, chapterNumber: number, highlightVerse?: number | null): Promise<string> {
+    const cacheKey = `bible-chapter-${translation}-${bookId}-${chapterNumber}`;
+    if (typeof window !== 'undefined') {
+      const cachedChapter = localStorage.getItem(cacheKey);
+      if (cachedChapter) {
+        try {
+            // Re-apply highlight if needed, since highlight is dynamic.
+            const doc = new DOMParser().parseFromString(cachedChapter, 'text/html');
+            const previousHighlight = doc.getElementById('highlighted-verse');
+            if (previousHighlight) {
+                previousHighlight.removeAttribute('id');
+                previousHighlight.classList.remove('bg-accent/30', 'rounded-md');
+            }
+            if (highlightVerse) {
+                const newHighlight = doc.querySelector(`[data-verse='${highlightVerse}']`);
+                if (newHighlight) {
+                    newHighlight.id = 'highlighted-verse';
+                    newHighlight.classList.add('bg-accent/30', 'rounded-md');
+                }
+            }
+            return doc.body.innerHTML;
+        } catch (e) {
+            console.error("Failed to parse cached chapter", e);
+            localStorage.removeItem(cacheKey);
+        }
+      }
+    }
+
     const translationData = await getTranslationData(translation);
     const bookInfo = findBook(translationData, bookId);
     if (!bookInfo) {
@@ -193,11 +220,26 @@ export async function getChapterText(translation: BibleTranslation, bookId: stri
     let formattedText = `<h3 class="text-lg font-semibold mb-2">${bookInfo.key} - Chapter ${chapterNumber} (${translation})</h3>\n`;
     formattedText += Object.entries(chapterData).map(([verseNum, verseText]) => {
         const verseNumber = parseInt(verseNum, 10);
-        // Remove the pilcrow (paragraph) symbol from KJV text
         const cleanedText = verseText.replace(/^\s*\u00b6\s*/, '');
-        return `<p class="mb-1 transition-colors duration-300 ${verseNumber === highlightVerse ? 'bg-accent/30 rounded-md p-2' : 'p-2'}" ${verseNumber === highlightVerse ? 'id="highlighted-verse"' : ''}>` +
-               `<strong class="mr-1">${verseNumber}</strong>${cleanedText}</p>`;
+        return `<p class="mb-1 transition-colors duration-300 p-2 cursor-pointer" ` +
+               `data-book="${bookInfo.key}" data-chapter="${chapterNumber}" data-verse="${verseNumber}">` +
+               `<strong class="mr-1 pointer-events-none">${verseNumber}</strong><span class="pointer-events-none">${cleanedText}</span></p>`;
     }).join('\n');
+
+    if (typeof window !== 'undefined') {
+        localStorage.setItem(cacheKey, formattedText);
+    }
+    
+    // Apply highlight after caching the base HTML
+    if (highlightVerse) {
+        const doc = new DOMParser().parseFromString(formattedText, 'text/html');
+        const newHighlight = doc.querySelector(`[data-verse='${highlightVerse}']`);
+        if (newHighlight) {
+            newHighlight.id = 'highlighted-verse';
+            newHighlight.classList.add('bg-accent/30', 'rounded-md');
+        }
+        return doc.body.innerHTML;
+    }
 
     return formattedText;
 }
