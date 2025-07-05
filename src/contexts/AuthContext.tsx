@@ -3,7 +3,20 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, type User, type Auth } from 'firebase/auth';
+import { 
+  onAuthStateChanged, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  updateProfile, 
+  type User, 
+  type Auth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  type ConfirmationResult
+} from 'firebase/auth';
 import { auth, isConfigured } from '@/lib/firebase';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
@@ -38,6 +51,8 @@ interface AuthContextType {
   signUp: (name: string, email: string, pass: string) => Promise<any>;
   logIn: (email: string, pass: string) => Promise<any>;
   logout: () => Promise<void>;
+  signInWithGoogle: () => Promise<any>;
+  setUpRecaptcha: (phoneNumber: string) => Promise<ConfirmationResult>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,11 +94,26 @@ function AuthComponent({ children }: { children: ReactNode }) {
     await signOut(auth as Auth);
   };
   
+  const signInWithGoogle = () => {
+    const provider = new GoogleAuthProvider();
+    return signInWithPopup(auth as Auth, provider);
+  };
+
+  const setUpRecaptcha = (phoneNumber: string) => {
+    const recaptchaVerifier = new RecaptchaVerifier(auth as Auth, 'recaptcha-container', {
+      'size': 'invisible',
+      'callback': (response: any) => {
+        // reCAPTCHA solved, you can proceed with phone sign-in.
+      },
+    });
+    return signInWithPhoneNumber(auth as Auth, phoneNumber, recaptchaVerifier);
+  };
+
   if (loading) {
     return <LoadingScreen />;
   }
   
-  const value = { user, loading, signUp, logIn, logout };
+  const value = { user, loading, signUp, logIn, logout, signInWithGoogle, setUpRecaptcha };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -97,6 +127,8 @@ export function useAuth() {
       signUp: async () => console.error("Auth call failed: Firebase is not configured."),
       logIn: async () => console.error("Auth call failed: Firebase is not configured."),
       logout: async () => {},
+      signInWithGoogle: async () => console.error("Auth call failed: Firebase is not configured."),
+      setUpRecaptcha: async () => { throw new Error("Auth call failed: Firebase is not configured.") },
     };
   }
   return context;

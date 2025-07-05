@@ -28,17 +28,13 @@ import {
 import { Settings, Sun, Moon, BookOpenText, LogOut, Loader2, MessageSquare } from 'lucide-react';
 import { AuthForm } from './AuthForm';
 
-type AuthMode = 'login' | 'signup';
-
 export function Header() {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, bibleTranslation, setBibleTranslation } = useSettings();
   const { user, loading, logout } = useAuth();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>('login');
 
-  const openAuthDialog = (mode: AuthMode) => {
-    setAuthMode(mode);
+  const openAuthDialog = () => {
     setIsAuthDialogOpen(true);
   }
 
@@ -90,10 +86,10 @@ export function Header() {
 
     return (
        <div className="flex items-center gap-2">
-        <Button onClick={() => openAuthDialog('signup')} variant="outline" size="sm">
+        <Button onClick={() => openAuthDialog()} variant="outline" size="sm">
           Signup
         </Button>
-        <Button onClick={() => openAuthDialog('login')} size="sm">
+        <Button onClick={() => openAuthDialog()} size="sm">
           Login
         </Button>
       </div>
@@ -162,10 +158,10 @@ export function Header() {
               <DialogHeader>
                 <DialogTitle>Account Access</DialogTitle>
                 <DialogDescription>
-                  Log in or create an account to save your prayers, testimonies, and teachings.
+                  Log in or create an account to save your progress.
                 </DialogDescription>
               </DialogHeader>
-              <AuthForm mode={authMode} onModeChange={setAuthMode} onAuthSuccess={() => setIsAuthDialogOpen(false)}/>
+              <AuthForm onAuthSuccess={() => setIsAuthDialogOpen(false)}/>
           </DialogContent>
       </Dialog>
     </>
