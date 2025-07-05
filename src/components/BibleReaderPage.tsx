@@ -80,9 +80,25 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
 
   useEffect(() => {
     async function fetchBooksForTranslation() {
+      const cacheKey = `bible-books-${bibleTranslation}`;
+      if (typeof window !== 'undefined') {
+        const cachedBooks = localStorage.getItem(cacheKey);
+        if (cachedBooks) {
+          try {
+            setBooks(JSON.parse(cachedBooks));
+            return;
+          } catch (e) {
+            console.error("Failed to parse cached books", e);
+            localStorage.removeItem(cacheKey);
+          }
+        }
+      }
       try {
         const fetchedBooks = await getBooks(bibleTranslation);
         setBooks(fetchedBooks);
+         if (typeof window !== 'undefined') {
+          localStorage.setItem(cacheKey, JSON.stringify(fetchedBooks));
+        }
       } catch (err: any) {
         setError(`Failed to load Bible books for ${bibleTranslation}: ${err.message}`);
       }
@@ -110,9 +126,31 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     setIsLoading(true);
     setError(null);
     setChapterText(null);
+
+    const cacheKey = `bible-chapter-${bibleTranslation}-${book}-${chapter}`;
+    if (typeof window !== 'undefined') {
+      const cachedChapter = localStorage.getItem(cacheKey);
+      if (cachedChapter) {
+        // Since highlight is dynamic, we need to regenerate the text if the highlight changes.
+        // A simple way is to refetch if we need a highlight, but for now we just load from cache.
+        // A more complex solution would parse and modify the cached HTML.
+        if (verseToHighlight === null) {
+          setChapterText(cachedChapter);
+          setIsLoading(false);
+          return;
+        }
+      }
+    }
+
     try {
       const text = await getChapterText(bibleTranslation, book, chapter, verseToHighlight);
       setChapterText(text);
+      if (typeof window !== 'undefined') {
+        // We only cache the non-highlighted version to avoid stale highlights in cache
+        if(verseToHighlight === null) {
+          localStorage.setItem(cacheKey, text);
+        }
+      }
     } catch (err: any) {
       setError(`Failed to load ${book} chapter ${chapter} (${bibleTranslation}): ${err.message}`);
     } finally {
