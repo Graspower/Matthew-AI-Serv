@@ -392,17 +392,16 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
   return (
     <>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                <TabsTrigger value="phone">Phone</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
                 <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6 pt-4">
                     <FormField control={loginForm.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email</FormLabel> <FormControl><Input placeholder="you@example.com" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={loginForm.control} name="password" render={({ field }) => ( <FormItem> <FormLabel>Password</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                    <Button type="submit" className="w-full" disabled={anyLoading}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Login </Button>
+                    <Button type="submit" className="w-full" disabled={true}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Login </Button>
                 </form>
                 </Form>
             </TabsContent>
@@ -412,86 +411,9 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
                     <FormField control={signupForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="Your Name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={signupForm.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email</FormLabel> <FormControl><Input placeholder="you@example.com" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={signupForm.control} name="password" render={({ field }) => ( <FormItem> <FormLabel>Password</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                    <Button type="submit" className="w-full" disabled={anyLoading}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Account </Button>
+                    <Button type="submit" className="w-full" disabled={true}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Account </Button>
                 </form>
                 </Form>
-            </TabsContent>
-            <TabsContent value="phone">
-                {!phoneAuthState.isOtpSent ? (
-                    <Form {...phoneForm}>
-                        <form onSubmit={phoneForm.handleSubmit(handleSendOtp)} className="space-y-6 pt-4">
-                            <FormField control={phoneForm.control} name="phone" render={({ field }) => ( 
-                                <FormItem> 
-                                    <FormLabel>Phone Number</FormLabel>
-                                    <FormControl>
-                                        <div className="flex items-center gap-2">
-                                            <Popover open={isCountryPopoverOpen} onOpenChange={setIsCountryPopoverOpen}>
-                                                <PopoverTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        role="combobox"
-                                                        aria-expanded={isCountryPopoverOpen}
-                                                        className="w-[180px] justify-between"
-                                                    >
-                                                        {selectedCountryCode
-                                                            ? `${countries.find((c) => c.dial_code === selectedCountryCode)?.name} (${selectedCountryCode})`
-                                                            : "Select country..."}
-                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-[300px] p-0">
-                                                    <Command>
-                                                        <CommandInput placeholder="Search country..." />
-                                                        <CommandList>
-                                                            <CommandEmpty>No country found.</CommandEmpty>
-                                                            <CommandGroup>
-                                                                {countries.map((country) => (
-                                                                    <CommandItem
-                                                                        key={country.code}
-                                                                        value={country.name}
-                                                                        onSelect={() => {
-                                                                            setSelectedCountryCode(country.dial_code);
-                                                                            setIsCountryPopoverOpen(false);
-                                                                        }}
-                                                                    >
-                                                                        <Check
-                                                                            className={cn(
-                                                                                "mr-2 h-4 w-4",
-                                                                                selectedCountryCode === country.dial_code ? "opacity-100" : "opacity-0"
-                                                                            )}
-                                                                        />
-                                                                        {country.name} ({country.dial_code})
-                                                                    </CommandItem>
-                                                                ))}
-                                                            </CommandGroup>
-                                                        </CommandList>
-                                                    </Command>
-                                                </PopoverContent>
-                                            </Popover>
-                                            <Input placeholder="555 123 4567" {...field} />
-                                        </div>
-                                    </FormControl>
-                                    <FormMessage /> 
-                                </FormItem> 
-                            )}/>
-                            <div id="recaptcha-container"></div>
-                            <Button type="submit" className="w-full" disabled={anyLoading}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Send OTP </Button>
-                        </form>
-                    </Form>
-                ) : (
-                    <Form {...otpForm}>
-                        <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-6 pt-4">
-                            <FormField control={otpForm.control} name="otp" render={({ field }) => ( 
-                                <FormItem> 
-                                    <FormLabel>Verification Code</FormLabel>
-                                    <FormControl><Input placeholder="Enter 6-digit code" {...field} /></FormControl>
-                                    <FormMessage /> 
-                                </FormItem> 
-                            )}/>
-                            <Button type="submit" className="w-full" disabled={anyLoading}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Verify OTP </Button>
-                        </form>
-                    </Form>
-                )}
             </TabsContent>
         </Tabs>
 
@@ -506,6 +428,84 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
             {isGoogleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon className="mr-2 h-5 w-5" />}
             Google
         </Button>
+        
+        <div className="mt-6">
+          {!phoneAuthState.isOtpSent ? (
+              <Form {...phoneForm}>
+                  <form onSubmit={phoneForm.handleSubmit(handleSendOtp)} className="space-y-4">
+                      <FormField control={phoneForm.control} name="phone" render={({ field }) => ( 
+                          <FormItem> 
+                              <FormLabel>Phone Number</FormLabel>
+                              <FormControl>
+                                  <div className="flex items-center gap-2">
+                                      <Popover open={isCountryPopoverOpen} onOpenChange={setIsCountryPopoverOpen}>
+                                          <PopoverTrigger asChild>
+                                              <Button
+                                                  variant="outline"
+                                                  role="combobox"
+                                                  aria-expanded={isCountryPopoverOpen}
+                                                  className="w-[180px] justify-between"
+                                              >
+                                                  {selectedCountryCode
+                                                      ? `${countries.find((c) => c.dial_code === selectedCountryCode)?.name} (${selectedCountryCode})`
+                                                      : "Select country..."}
+                                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                              </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[300px] p-0">
+                                              <Command>
+                                                  <CommandInput placeholder="Search country..." />
+                                                  <CommandList>
+                                                      <CommandEmpty>No country found.</CommandEmpty>
+                                                      <CommandGroup>
+                                                          {countries.map((country) => (
+                                                              <CommandItem
+                                                                  key={`${country.code}-${country.dial_code}`}
+                                                                  value={country.name}
+                                                                  onSelect={() => {
+                                                                      setSelectedCountryCode(country.dial_code);
+                                                                      setIsCountryPopoverOpen(false);
+                                                                  }}
+                                                              >
+                                                                  <Check
+                                                                      className={cn(
+                                                                          "mr-2 h-4 w-4",
+                                                                          selectedCountryCode === country.dial_code ? "opacity-100" : "opacity-0"
+                                                                      )}
+                                                                  />
+                                                                  {country.name} ({country.dial_code})
+                                                              </CommandItem>
+                                                          ))}
+                                                      </CommandGroup>
+                                                  </CommandList>
+                                              </Command>
+                                          </PopoverContent>
+                                      </Popover>
+                                      <Input placeholder="555 123 4567" {...field} />
+                                  </div>
+                              </FormControl>
+                              <FormMessage /> 
+                          </FormItem> 
+                      )}/>
+                      <Button type="submit" className="w-full" disabled={anyLoading}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Send OTP </Button>
+                  </form>
+              </Form>
+          ) : (
+              <Form {...otpForm}>
+                  <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-6 pt-4">
+                      <FormField control={otpForm.control} name="otp" render={({ field }) => ( 
+                          <FormItem> 
+                              <FormLabel>Verification Code</FormLabel>
+                              <FormControl><Input placeholder="Enter 6-digit code" {...field} /></FormControl>
+                              <FormMessage /> 
+                          </FormItem> 
+                      )}/>
+                      <Button type="submit" className="w-full" disabled={anyLoading}> {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Verify OTP </Button>
+                  </form>
+              </Form>
+          )}
+        </div>
+        <div id="recaptcha-container" className="mt-4"></div>
     </>
   );
 }

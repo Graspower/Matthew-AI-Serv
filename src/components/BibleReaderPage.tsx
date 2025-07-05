@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter, type Verse } from '@/services/bible';
-import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight, ArrowUp } from 'lucide-react';
 import { useSettings, type BibleTranslation } from '@/contexts/SettingsContext';
 import { SearchForm } from '@/components/SearchForm';
 import { cn } from '@/lib/utils';
@@ -171,6 +171,13 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     }
   }, [selectedBook, selectedChapter, chapters]);
   
+  const handleScrollToTop = useCallback(() => {
+    const viewport = chapterScrollAreaRef.current?.querySelector<HTMLElement>('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      viewport.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
   const canGoToPrevChapter = useMemo(() => {
     if (!selectedBook || selectedChapter === null || chapters.length === 0) return false;
     return selectedChapter > 1;
@@ -310,6 +317,9 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
             <ChevronLeft className="h-5 w-5 md:mr-2" />
             <span className="hidden md:inline">Previous</span>
           </Button>
+          <Button onClick={handleScrollToTop} variant="secondary" size="icon" className="shadow-lg">
+            <ArrowUp className="h-5 w-5" />
+          </Button>
           <Button onClick={handleNextChapter} disabled={!canGoToNextChapter} variant="secondary" className="shadow-lg">
             <span className="hidden md:inline">Next</span>
             <ChevronRight className="h-5 w-5 md:ml-2" />
@@ -388,5 +398,3 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     </div>
   );
 }
-
-    
