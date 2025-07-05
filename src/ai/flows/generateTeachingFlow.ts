@@ -93,7 +93,7 @@ const generateTeachingFlow = ai.defineFlow(
       return { teaching: noVerseMessage };
     }
 
-    let lengthInstructionText = "The teaching should be a single, insightful, medium-length paragraph. The total length should be between 100 and 112 tokens.";
+    let lengthInstructionText = "The teaching should be a single, insightful, medium-length paragraph, concluding with a motivating summary that blesses the reader and inspires life and hope in God. The total length should be between 100 and 112 tokens.";
     if (input.lengthPreference === 'brief') {
       lengthInstructionText = "The teaching should be very concise, consisting of a short introductory paragraph followed by a bulleted or numbered list of key sentences. The total response should be approximately 80 tokens.";
     }
