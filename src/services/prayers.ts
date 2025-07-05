@@ -1,7 +1,7 @@
 
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, query, where, Firestore } from 'firebase/firestore';
-import type { Comment, Reactions } from './testimonies'; // Reuse comment/reaction types
+import type { Comment, Reactions } from '@/types';
 
 export interface Prayer {
   id: string;

@@ -21,8 +21,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getTeachings, addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching, type NewTeaching, type Comment, type Reactions } from '@/services/teachings';
+import { getTeachings, addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching, type NewTeaching } from '@/services/teachings';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Comment, Reactions } from '@/types';
 
 const teachingFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),

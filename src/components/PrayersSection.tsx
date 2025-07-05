@@ -21,8 +21,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer, type NewPrayer, type Comment, type Reactions } from '@/services/prayers';
+import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer, type NewPrayer } from '@/services/prayers';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Comment, Reactions } from '@/types';
 
 const prayerFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),

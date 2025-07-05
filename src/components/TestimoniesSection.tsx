@@ -21,8 +21,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony, type Comment, type Reactions } from '@/services/testimonies';
+import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony } from '@/services/testimonies';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Comment, Reactions } from '@/types';
 
 const testimonyFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),

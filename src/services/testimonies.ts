@@ -1,20 +1,7 @@
 
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, query, where, Firestore } from 'firebase/firestore';
-
-export interface Comment {
-  id: string;
-  author: string;
-  text: string;
-  createdAt: string; // ISO string format
-}
-
-export interface Reactions {
-  like: number;
-  pray: number;
-  claps: number;
-  downlike: number;
-}
+import type { Comment, Reactions } from '@/types';
 
 export interface Testimony {
   id: string;
