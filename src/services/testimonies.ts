@@ -93,15 +93,14 @@ export async function addReactionToTestimony(testimonyId: string, reactionType: 
   }
 }
 
-export async function getTestimonies(userId: string): Promise<Testimony[]> {
+export async function getTestimonies(): Promise<Testimony[]> {
   try {
     const firestore = checkDb();
     const testimoniesCol = collection(firestore, 'testimonies');
-    const q = query(testimoniesCol, where("userId", "==", userId));
-    const testimonySnapshot = await getDocs(q);
+    const testimonySnapshot = await getDocs(testimoniesCol);
     
     if (testimonySnapshot.empty) {
-        console.log('No matching documents in "testimonies" collection for this user.');
+        console.log('No documents in "testimonies" collection.');
         return [];
     }
 
@@ -127,7 +126,7 @@ export async function getTestimonies(userId: string): Promise<Testimony[]> {
   } catch (error: any) {
     console.error("Error fetching testimonies: ", error);
     if (error.code === 'permission-denied') {
-        throw new Error("Permission Denied: Your security rules are not set up to allow reading testimonies. Please update your Firestore rules to allow 'read' access to the 'testimonies' collection for authenticated users.");
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading testimonies. Please update your Firestore rules to allow 'read' access to the 'testimonies' collection for all users.");
     }
     throw new Error(`Failed to fetch testimonies. Please check your network connection. Original error: ${error.code || error.message}`);
   }

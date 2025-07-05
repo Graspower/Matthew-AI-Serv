@@ -39,12 +39,6 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const testimonyCategories = ['Salvation', 'Business Breakthrough', 'Marriage Success', 'Job', 'Health', 'Baby', 'Healing', 'Deliverance', 'Financial Provision', 'Academic Success'];
 
-const defaultTestimonies: Omit<Testimony, 'id' | 'userId'>[] = [
-    { name: 'Abraham', description: "Became the father of many nations through faith.", category: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { name: 'Esther', description: "Risked her life to save her people.", category: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { name: 'Jacob', description: "Received a new name after wrestling with God.", category: 'Wrestled God', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-];
-
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
@@ -135,13 +129,8 @@ export function TestimoniesSection() {
   const fetchTestimonies = useCallback(async () => {
     setIsLoadingTestimonies(true);
     setTestimoniesError(null);
-    if (!user) {
-        setTestimonies(defaultTestimonies.map(t => ({...t, id: uuidv4(), userId: 'default'})));
-        setIsLoadingTestimonies(false);
-        return;
-    }
     try {
-      const data = await getTestimonies(user.uid);
+      const data = await getTestimonies();
       setTestimonies(data);
     } catch (error: any) {
       console.error(error);
@@ -150,7 +139,7 @@ export function TestimoniesSection() {
     } finally {
       setIsLoadingTestimonies(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchTestimonies();
@@ -282,17 +271,24 @@ export function TestimoniesSection() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingTestimonies ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
-        : testimoniesError ? (
-            <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                <CardContent className="p-6">
-                  <h3 className="text-destructive font-bold">Error Loading Testimonies</h3>
-                  <p>The application encountered an error while trying to fetch data.</p>
-                  <p className="font-semibold mt-2">Error Details:</p>
-                  <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{testimoniesError}</p>
-                </CardContent>
-            </Card>
-        ) : ( testimonies.map((item) => <TestimonyContentCard key={item.id} item={item} />) )}
+          {isLoadingTestimonies ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
+          : testimoniesError ? (
+              <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
+                  <CardContent className="p-6">
+                    <h3 className="text-destructive font-bold">Error Loading Testimonies</h3>
+                    <p>The application encountered an error while trying to fetch data.</p>
+                    <p className="font-semibold mt-2">Error Details:</p>
+                    <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{testimoniesError}</p>
+                  </CardContent>
+              </Card>
+          ) : testimonies.length > 0 ? (
+            testimonies.map((item) => <TestimonyContentCard key={item.id} item={item} />)
+          ) : (
+            <div className="col-span-full text-center text-muted-foreground mt-8">
+              <p>No testimonies have been shared yet.</p>
+              {user && <p>Be the first to share one by clicking the "Add Testimony" button!</p>}
+            </div>
+          )}
         </div>
         
       {detailsModal.testimony && (

@@ -80,15 +80,14 @@ export async function addReactionToPrayer(prayerId: string, reactionType: keyof 
   }
 }
 
-export async function getPrayers(userId: string): Promise<Prayer[]> {
+export async function getPrayers(): Promise<Prayer[]> {
   try {
     const firestore = checkDb();
     const prayersCol = collection(firestore, 'prayers');
-    const q = query(prayersCol, where("userId", "==", userId));
-    const prayerSnapshot = await getDocs(q);
+    const prayerSnapshot = await getDocs(prayersCol);
     
     if (prayerSnapshot.empty) {
-        console.log('No matching documents in "prayers" collection for this user.');
+        console.log('No documents in "prayers" collection.');
         return [];
     }
 
@@ -114,7 +113,7 @@ export async function getPrayers(userId: string): Promise<Prayer[]> {
   } catch (error: any) {
     console.error("Error fetching prayers: ", error);
     if (error.code === 'permission-denied') {
-        throw new Error("Permission Denied: Your security rules are not set up to allow reading prayers. Please update your Firestore rules to allow 'read' access to the 'prayers' collection for authenticated users.");
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading prayers. Please update your Firestore rules to allow 'read' access to the 'prayers' collection for all users.");
     }
     throw new Error(`Failed to fetch prayers. Please check your network connection. Original error: ${error.code || error.message}`);
   }

@@ -129,13 +129,8 @@ export function TeachingsSection() {
   const fetchTeachings = useCallback(async () => {
     setIsLoadingTeachings(true);
     setTeachingsError(null);
-    if (!user) {
-        setTeachings([]);
-        setIsLoadingTeachings(false);
-        return;
-    }
     try {
-      const data = await getTeachings(user.uid);
+      const data = await getTeachings();
       setTeachings(data);
     } catch (error: any) {
       console.error(error);
@@ -144,7 +139,7 @@ export function TeachingsSection() {
     } finally {
       setIsLoadingTeachings(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchTeachings();
@@ -276,24 +271,24 @@ export function TeachingsSection() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingTeachings ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
-        : teachingsError ? (
-            <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                <CardContent className="p-6">
-                    <h3 className="text-destructive font-bold">Error Loading Teachings</h3>
-                    <p>The application encountered an error while trying to fetch data.</p>
-                    <p className="font-semibold mt-2">Error Details:</p>
-                    <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{teachingsError}</p>
-                </CardContent>
-            </Card>
-        ) : teachings.length > 0 ? (
-           teachings.map((item) => <TeachingContentCard key={item.id} item={item} />)
-        ) : (
-          <div className="col-span-full text-center text-muted-foreground mt-8">
-            <p>{user ? 'You have not added any teachings yet.' : 'Please log in to see your teachings.'}</p>
-            {user && <p>You can add one by clicking the "Add Teaching" button.</p>}
-          </div>
-        )}
+          {isLoadingTeachings ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
+          : teachingsError ? (
+              <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
+                  <CardContent className="p-6">
+                      <h3 className="text-destructive font-bold">Error Loading Teachings</h3>
+                      <p>The application encountered an error while trying to fetch data.</p>
+                      <p className="font-semibold mt-2">Error Details:</p>
+                      <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{teachingsError}</p>
+                  </CardContent>
+              </Card>
+          ) : teachings.length > 0 ? (
+            teachings.map((item) => <TeachingContentCard key={item.id} item={item} />)
+          ) : (
+            <div className="col-span-full text-center text-muted-foreground mt-8">
+              <p>No teachings have been shared yet.</p>
+              {user && <p>Be the first to share one by clicking the "Add Teaching" button!</p>}
+            </div>
+          )}
         </div>
 
       {detailsModal.teaching && (

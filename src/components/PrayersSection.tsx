@@ -39,12 +39,6 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const prayerCategories = ['Health & Healing', 'Family', 'Guidance', 'Finances', 'Protection', 'Thanksgiving', 'Spiritual Growth', 'World & Leaders', 'Loss & Grief', 'Salvation'];
 
-const defaultPrayers: Omit<Prayer, 'id' | 'userId'>[] = [
-    { name: 'Anonymous', description: 'For strength to overcome daily challenges.', category: 'Daily Strength', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { name: 'A Parent', description: 'For wisdom in guiding my children.', category: 'Parental Wisdom', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { name: 'A Student', description: 'For focus and clarity during my studies.', category: 'Clarity in Study', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-];
-
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   const truncated = text.slice(0, maxLength);
@@ -135,13 +129,8 @@ export function PrayersSection() {
   const fetchPrayers = useCallback(async () => {
     setIsLoadingPrayers(true);
     setPrayersError(null);
-    if (!user) {
-        setPrayers(defaultPrayers.map(p => ({...p, id: uuidv4(), userId: 'default'})));
-        setIsLoadingPrayers(false);
-        return;
-    }
     try {
-      const data = await getPrayers(user.uid);
+      const data = await getPrayers();
       setPrayers(data);
     } catch (error: any) {
       console.error(error);
@@ -150,7 +139,7 @@ export function PrayersSection() {
     } finally {
       setIsLoadingPrayers(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchPrayers();
@@ -282,17 +271,24 @@ export function PrayersSection() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingPrayers ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
-        : prayersError ? (
-            <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                <CardContent className="p-6">
-                    <h3 className="text-destructive font-bold">Error Loading Prayers</h3>
-                    <p>The application encountered an error while trying to fetch data.</p>
-                    <p className="font-semibold mt-2">Error Details:</p>
-                    <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{prayersError}</p>
-                </CardContent>
-            </Card>
-        ) : ( prayers.map((item) => <PrayerContentCard key={item.id} item={item} />) )}
+          {isLoadingPrayers ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
+          : prayersError ? (
+              <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
+                  <CardContent className="p-6">
+                      <h3 className="text-destructive font-bold">Error Loading Prayers</h3>
+                      <p>The application encountered an error while trying to fetch data.</p>
+                      <p className="font-semibold mt-2">Error Details:</p>
+                      <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{prayersError}</p>
+                  </CardContent>
+              </Card>
+          ) : prayers.length > 0 ? (
+            prayers.map((item) => <PrayerContentCard key={item.id} item={item} />)
+          ) : (
+            <div className="col-span-full text-center text-muted-foreground mt-8">
+              <p>No prayers have been shared yet.</p>
+              {user && <p>Be the first to share one by clicking the "Add Prayer" button!</p>}
+            </div>
+          )}
         </div>
       
       {detailsModal.prayer && (

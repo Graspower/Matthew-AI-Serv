@@ -80,15 +80,14 @@ export async function addReactionToTeaching(teachingId: string, reactionType: ke
   }
 }
 
-export async function getTeachings(userId: string): Promise<Teaching[]> {
+export async function getTeachings(): Promise<Teaching[]> {
   try {
     const firestore = checkDb();
     const teachingsCol = collection(firestore, 'Teachings');
-    const q = query(teachingsCol, where("userId", "==", userId));
-    const teachingSnapshot = await getDocs(q);
+    const teachingSnapshot = await getDocs(teachingsCol);
     
     if (teachingSnapshot.empty) {
-        console.log('No matching documents in "Teachings" collection for this user.');
+        console.log('No documents in "Teachings" collection.');
         return [];
     }
 
@@ -114,7 +113,7 @@ export async function getTeachings(userId: string): Promise<Teaching[]> {
   } catch (error: any) {
     console.error("Error fetching teachings: ", error);
     if (error.code === 'permission-denied') {
-        throw new Error("Permission Denied: Your security rules are not set up to allow reading teachings. Please update your Firestore rules to allow 'read' access to the 'Teachings' collection for authenticated users.");
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading teachings. Please update your Firestore rules to allow 'read' access to the 'Teachings' collection for all users.");
     }
     throw new Error(`Failed to fetch teachings. Please check your network connection. Original error: ${error.code || error.message}`);
   }
