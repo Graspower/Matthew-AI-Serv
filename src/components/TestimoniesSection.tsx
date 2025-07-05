@@ -22,6 +22,7 @@ import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony, type Comment, type Reactions } from '@/services/testimonies';
+import { useAuth } from '@/contexts/AuthContext';
 
 const testimonyFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -38,10 +39,10 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const testimonyCategories = ['Salvation', 'Business Breakthrough', 'Marriage Success', 'Job', 'Health', 'Baby', 'Healing', 'Deliverance', 'Financial Provision', 'Academic Success'];
 
-const defaultTestimonies: Testimony[] = [
-    { id: 'default-1', name: 'Abraham', description: "Became the father of many nations through faith.", category: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-2', name: 'Esther', description: "Risked her life to save her people.", category: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-3', name: 'Jacob', description: "Received a new name after wrestling with God.", category: 'Wrestled God', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+const defaultTestimonies: Omit<Testimony, 'id' | 'userId'>[] = [
+    { name: 'Abraham', description: "Became the father of many nations through faith.", category: 'Father of Nations', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { name: 'Esther', description: "Risked her life to save her people.", category: 'Courageous Queen', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { name: 'Jacob', description: "Received a new name after wrestling with God.", category: 'Wrestled God', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
 const truncateText = (text: string, maxLength: number) => {
@@ -119,6 +120,7 @@ export function TestimoniesSection() {
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   
   const testimonyForm = useForm<TestimonyFormData>({
     resolver: zodResolver(testimonyFormSchema),
@@ -133,13 +135,14 @@ export function TestimoniesSection() {
   const fetchTestimonies = useCallback(async () => {
     setIsLoadingTestimonies(true);
     setTestimoniesError(null);
+    if (!user) {
+        setTestimonies(defaultTestimonies.map(t => ({...t, id: uuidv4(), userId: 'default'})));
+        setIsLoadingTestimonies(false);
+        return;
+    }
     try {
-      const data = await getTestimonies();
-      if (data.length > 0) {
-        setTestimonies(data);
-      } else {
-        setTestimonies(defaultTestimonies);
-      }
+      const data = await getTestimonies(user.uid);
+      setTestimonies(data);
     } catch (error: any) {
       console.error(error);
       setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
@@ -147,15 +150,19 @@ export function TestimoniesSection() {
     } finally {
       setIsLoadingTestimonies(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchTestimonies();
   }, [fetchTestimonies]);
   
   async function handleAddTestimony(data: TestimonyFormData) {
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to add a testimony.', variant: 'destructive' });
+        return;
+    }
     try {
-      await addTestimony(data);
+      await addTestimony(data, user.uid);
       toast({ title: 'Success!', description: 'Testimony added successfully.' });
       setIsAddTestimonyDialogOpen(false);
       fetchTestimonies();
@@ -166,6 +173,10 @@ export function TestimoniesSection() {
   }
 
   async function handleReaction(testimonyId: string, reactionType: keyof Reactions) {
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
+        return;
+    }
     setTestimonies(prev => prev.map(t => {
         if (t.id === testimonyId) {
             return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
@@ -176,7 +187,6 @@ export function TestimoniesSection() {
     
     try {
         await addReactionToTestimony(testimonyId, reactionType);
-        await fetchTestimonies();
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
         await fetchTestimonies();
@@ -185,7 +195,10 @@ export function TestimoniesSection() {
 
   async function handleAddComment(data: CommentFormData) {
     if (!commentsModal.testimony) return;
-
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
+        return;
+    }
     const newComment: Comment = {
       id: uuidv4(),
       author: data.author,
@@ -269,7 +282,7 @@ export function TestimoniesSection() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingTestimonies ? ([...Array(6)].map((_, i) => <ContentCardSkeleton key={i} />))
+        {isLoadingTestimonies ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
         : testimoniesError ? (
             <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
                 <CardContent className="p-6">

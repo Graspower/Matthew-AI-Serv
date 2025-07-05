@@ -22,6 +22,7 @@ import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer, type NewPrayer, type Comment, type Reactions } from '@/services/prayers';
+import { useAuth } from '@/contexts/AuthContext';
 
 const prayerFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -38,10 +39,10 @@ type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const prayerCategories = ['Health & Healing', 'Family', 'Guidance', 'Finances', 'Protection', 'Thanksgiving', 'Spiritual Growth', 'World & Leaders', 'Loss & Grief', 'Salvation'];
 
-const defaultPrayers: Prayer[] = [
-    { id: 'default-1', name: 'Anonymous', description: 'For strength to overcome daily challenges.', category: 'Daily Strength', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-2', name: 'A Parent', description: 'For wisdom in guiding my children.', category: 'Parental Wisdom', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
-    { id: 'default-3', name: 'A Student', description: 'For focus and clarity during my studies.', category: 'Clarity in Study', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+const defaultPrayers: Omit<Prayer, 'id' | 'userId'>[] = [
+    { name: 'Anonymous', description: 'For strength to overcome daily challenges.', category: 'Daily Strength', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { name: 'A Parent', description: 'For wisdom in guiding my children.', category: 'Parental Wisdom', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
+    { name: 'A Student', description: 'For focus and clarity during my studies.', category: 'Clarity in Study', comments: [], reactions: { like: 0, pray: 0, claps: 0, downlike: 0 } },
 ];
 
 const truncateText = (text: string, maxLength: number) => {
@@ -49,13 +50,6 @@ const truncateText = (text: string, maxLength: number) => {
   const truncated = text.slice(0, maxLength);
   return truncated.slice(0, truncated.lastIndexOf(' '));
 };
-
-function PrayerContentCard({ item }: { item: Prayer }) {
-  // This component is defined outside the main export to avoid re-rendering issues.
-  // It's a placeholder for the actual card implementation.
-  // The actual implementation is inside PrayersSection.
-  return null;
-}
 
 function ContentCardSkeleton() {
   return (
@@ -126,6 +120,7 @@ export function PrayersSection() {
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   
   const prayerForm = useForm<PrayerFormData>({
     resolver: zodResolver(prayerFormSchema),
@@ -140,13 +135,14 @@ export function PrayersSection() {
   const fetchPrayers = useCallback(async () => {
     setIsLoadingPrayers(true);
     setPrayersError(null);
+    if (!user) {
+        setPrayers(defaultPrayers.map(p => ({...p, id: uuidv4(), userId: 'default'})));
+        setIsLoadingPrayers(false);
+        return;
+    }
     try {
-      const data = await getPrayers();
-      if (data.length > 0) {
-        setPrayers(data);
-      } else {
-        setPrayers(defaultPrayers);
-      }
+      const data = await getPrayers(user.uid);
+      setPrayers(data);
     } catch (error: any) {
       console.error(error);
       setPrayersError(error.message || "Failed to load prayers. Please check your connection and try again.");
@@ -154,15 +150,19 @@ export function PrayersSection() {
     } finally {
       setIsLoadingPrayers(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchPrayers();
   }, [fetchPrayers]);
   
   async function handleAddPrayer(data: PrayerFormData) {
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to add a prayer.', variant: 'destructive' });
+        return;
+    }
     try {
-      await addPrayer(data);
+      await addPrayer(data, user.uid);
       toast({ title: 'Success!', description: 'Prayer added successfully.' });
       setIsAddPrayerDialogOpen(false);
       fetchPrayers();
@@ -173,6 +173,10 @@ export function PrayersSection() {
   }
 
   async function handleReaction(prayerId: string, reactionType: keyof Reactions) {
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
+        return;
+    }
     setPrayers(prev => prev.map(p => {
         if (p.id === prayerId) {
             return { ...p, reactions: { ...p.reactions, [reactionType]: (p.reactions[reactionType] || 0) + 1 } };
@@ -183,7 +187,6 @@ export function PrayersSection() {
 
     try {
         await addReactionToPrayer(prayerId, reactionType);
-        await fetchPrayers();
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
         await fetchPrayers();
@@ -192,7 +195,10 @@ export function PrayersSection() {
 
   async function handleAddComment(data: CommentFormData) {
     if (!commentsModal.prayer) return;
-
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
+        return;
+    }
     const newComment: Comment = {
       id: uuidv4(),
       author: data.author,

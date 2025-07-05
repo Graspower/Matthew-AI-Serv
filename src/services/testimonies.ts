@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, Firestore } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, query, where, Firestore } from 'firebase/firestore';
 
 export interface Comment {
   id: string;
@@ -23,9 +23,10 @@ export interface Testimony {
   category: string;
   comments: Comment[];
   reactions: Reactions;
+  userId: string;
 }
 
-export type NewTestimony = Omit<Testimony, 'id' | 'comments' | 'reactions'>;
+export type NewTestimony = Omit<Testimony, 'id' | 'comments' | 'reactions' | 'userId'>;
 
 function checkDb() {
     if (!db) {
@@ -34,12 +35,13 @@ function checkDb() {
     return db as Firestore;
 }
 
-export async function addTestimony(testimony: NewTestimony): Promise<void> {
+export async function addTestimony(testimony: NewTestimony, userId: string): Promise<void> {
   try {
     const firestore = checkDb();
     const testimoniesCol = collection(firestore, 'testimonies');
     await addDoc(testimoniesCol, {
         ...testimony,
+        userId,
         comments: [],
         reactions: { like: 0, pray: 0, claps: 0, downlike: 0 },
         createdAt: Timestamp.now(),
@@ -91,20 +93,20 @@ export async function addReactionToTestimony(testimonyId: string, reactionType: 
   }
 }
 
-export async function getTestimonies(): Promise<Testimony[]> {
+export async function getTestimonies(userId: string): Promise<Testimony[]> {
   try {
     const firestore = checkDb();
     const testimoniesCol = collection(firestore, 'testimonies');
-    const testimonySnapshot = await getDocs(testimoniesCol);
+    const q = query(testimoniesCol, where("userId", "==", userId));
+    const testimonySnapshot = await getDocs(q);
     
     if (testimonySnapshot.empty) {
-        console.log('No matching documents in "testimonies" collection.');
+        console.log('No matching documents in "testimonies" collection for this user.');
         return [];
     }
 
     const testimonyList = testimonySnapshot.docs.map(doc => {
       const data = doc.data();
-      // Convert Firestore Timestamps in comments to ISO strings for client-side use
       const comments = (data.comments || []).map((c: any) => ({
         ...c,
         createdAt: c.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
@@ -117,15 +119,15 @@ export async function getTestimonies(): Promise<Testimony[]> {
         category: data.category || 'Testimony',
         reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
         comments: comments,
+        userId: data.userId,
       } as Testimony;
     });
 
-    // Sort the results on the client side after fetching.
     return testimonyList.sort((a, b) => a.name.localeCompare(b.name));
   } catch (error: any) {
     console.error("Error fetching testimonies: ", error);
     if (error.code === 'permission-denied') {
-        throw new Error("Permission Denied: Your security rules are not set up to allow reading testimonies. Please update your Firestore rules to allow 'read' access to the 'testimonies' collection.");
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading testimonies. Please update your Firestore rules to allow 'read' access to the 'testimonies' collection for authenticated users.");
     }
     throw new Error(`Failed to fetch testimonies. Please check your network connection. Original error: ${error.code || error.message}`);
   }

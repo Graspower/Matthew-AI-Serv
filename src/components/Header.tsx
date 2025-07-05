@@ -1,12 +1,18 @@
+
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSettings, type Language, type BibleTranslation } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,11 +24,21 @@ import {
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import { MessageSquare, Settings, Sun, Moon, BookOpenText, LogOut, Loader2 } from 'lucide-react';
+import { AuthForm } from './AuthForm';
+
+type AuthMode = 'login' | 'signup';
 
 export function Header() {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, bibleTranslation, setBibleTranslation } = useSettings();
-  const { user, loading, login, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+
+  const openAuthDialog = (mode: AuthMode) => {
+    setAuthMode(mode);
+    setIsAuthDialogOpen(true);
+  }
 
   const UserProfile = () => {
     if (loading) {
@@ -36,7 +52,7 @@ export function Header() {
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user.photoURL ?? ''} alt={user.displayName ?? 'User'} />
-                <AvatarFallback>{user.displayName?.charAt(0) ?? 'U'}</AvatarFallback>
+                <AvatarFallback>{user.displayName?.charAt(0).toUpperCase() ?? 'U'}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
@@ -71,11 +87,11 @@ export function Header() {
     }
 
     return (
-      <div className="flex items-center gap-2">
-        <Button onClick={login} variant="outline" size="sm">
+       <div className="flex items-center gap-2">
+        <Button onClick={() => openAuthDialog('signup')} variant="outline" size="sm">
           Signup
         </Button>
-        <Button onClick={login} size="sm">
+        <Button onClick={() => openAuthDialog('login')} size="sm">
           Login
         </Button>
       </div>
@@ -83,60 +99,67 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center space-x-2">
-          <MessageSquare className="h-6 w-6 text-primary" />
-          <span className="inline-block font-bold">Matthew AI</span>
-        </Link>
+    <>
+      <header className="sticky top-0 z-40 w-full border-b bg-background">
+        <div className="container flex h-16 items-center justify-between">
+          <Link href="/" className="flex items-center space-x-2">
+            <MessageSquare className="h-6 w-6 text-primary" />
+            <span className="inline-block font-bold">Matthew AI</span>
+          </Link>
 
-        <div className="flex items-center gap-2">
-          {/* Theme Toggle */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Toggle theme</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setTheme('light')}>Light</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('dark')}>Dark</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('system')}>System</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                  <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                  <span className="sr-only">Toggle theme</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setTheme('light')}>Light</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>Dark</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('system')}>System</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          {/* Bible/Language Settings */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <BookOpenText className="h-5 w-5" />
-                <span className="sr-only">Open Settings</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end">
-              <DropdownMenuLabel>Language</DropdownMenuLabel>
-              <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Language)}>
-                <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="fr">French</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="zh">Chinese</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Bible Translation</DropdownMenuLabel>
-              <DropdownMenuRadioGroup value={bibleTranslation} onValueChange={(value) => setBibleTranslation(value as BibleTranslation)}>
-                <DropdownMenuRadioItem value="KJV">KJV</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="NIV">NIV</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="NRSV">NRSV</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="ESV">ESV</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            {/* Bible/Language Settings */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <BookOpenText className="h-5 w-5" />
+                  <span className="sr-only">Open Settings</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuLabel>Language</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Language)}>
+                  <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="fr">French</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="zh">Chinese</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Bible Translation</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={bibleTranslation} onValueChange={(value) => setBibleTranslation(value as BibleTranslation)}>
+                  <DropdownMenuRadioItem value="KJV">KJV</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="NIV">NIV</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="NRSV">NRSV</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="ESV">ESV</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          {/* User Profile / Login */}
-          <UserProfile />
+            {/* User Profile / Login */}
+            <UserProfile />
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <Dialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+              <AuthForm mode={authMode} onModeChange={setAuthMode} onAuthSuccess={() => setIsAuthDialogOpen(false)}/>
+          </DialogContent>
+      </Dialog>
+    </>
   );
 }

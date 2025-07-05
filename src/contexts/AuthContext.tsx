@@ -1,19 +1,11 @@
+
 'use client';
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, type User, type Auth } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, type User, type Auth } from 'firebase/auth';
 import { auth, isConfigured } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: () => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // A self-contained, helpful component to display when Firebase is not configured.
 const FirebaseNotConfigured = () => (
@@ -40,25 +32,28 @@ const FirebaseNotConfigured = () => (
   </div>
 );
 
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  signUp: (name: string, email: string, pass: string) => Promise<any>;
+  logIn: (email: string, pass: string) => Promise<any>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // If Firebase is not configured, we show the guide and stop rendering the rest of the app.
-  // This is the main guard that prevents any crashes.
   if (!isConfigured) {
     return <FirebaseNotConfigured />;
   }
-
-  // If configured, we can safely render the component that uses Firebase.
   return <AuthComponent>{children}</AuthComponent>;
 }
 
-// This component ONLY renders when `isConfigured` is true.
 function AuthComponent({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Because this component only renders when isConfigured is true, `auth` is guaranteed to be a valid Auth instance.
     const unsubscribe = onAuthStateChanged(auth as Auth, (user) => {
       setUser(user);
       setLoading(false);
@@ -66,18 +61,21 @@ function AuthComponent({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const login = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      // `auth` is non-null here as well.
-      await signInWithPopup(auth as Auth, provider);
-    } catch (error) {
-      console.error("Error during sign-in:", error);
+  const signUp = async (name: string, email: string, pass: string) => {
+    const userCredential = await createUserWithEmailAndPassword(auth as Auth, email, pass);
+    if (userCredential.user) {
+        await updateProfile(userCredential.user, { displayName: name });
     }
+    // Manually set user to re-render consumers immediately
+    setUser(userCredential.user);
+    return userCredential;
+  };
+
+  const logIn = async (email: string, pass: string) => {
+    return signInWithEmailAndPassword(auth as Auth, email, pass);
   };
 
   const logout = async () => {
-    // `auth` is non-null here as well.
     await signOut(auth as Auth);
   };
   
@@ -89,7 +87,7 @@ function AuthComponent({ children }: { children: ReactNode }) {
     );
   }
   
-  const value = { user, loading, login, logout };
+  const value = { user, loading, signUp, logIn, logout };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -97,12 +95,11 @@ function AuthComponent({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    // This case will be hit if a component tries to useAuth without being a child of a configured AuthProvider.
-    // We return a safe, "logged-out" default state.
     return {
       user: null,
       loading: false,
-      login: async () => console.error("Login call failed: Firebase is not configured."),
+      signUp: async () => console.error("Auth call failed: Firebase is not configured."),
+      logIn: async () => console.error("Auth call failed: Firebase is not configured."),
       logout: async () => {},
     };
   }

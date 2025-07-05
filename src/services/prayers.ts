@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, Firestore } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, query, where, Firestore } from 'firebase/firestore';
 import type { Comment, Reactions } from './testimonies'; // Reuse comment/reaction types
 
 export interface Prayer {
@@ -10,9 +10,10 @@ export interface Prayer {
   category: string;
   comments: Comment[];
   reactions: Reactions;
+  userId: string;
 }
 
-export type NewPrayer = Omit<Prayer, 'id' | 'comments' | 'reactions'>;
+export type NewPrayer = Omit<Prayer, 'id' | 'comments' | 'reactions' | 'userId'>;
 
 function checkDb() {
     if (!db) {
@@ -21,12 +22,13 @@ function checkDb() {
     return db as Firestore;
 }
 
-export async function addPrayer(prayer: NewPrayer): Promise<void> {
+export async function addPrayer(prayer: NewPrayer, userId: string): Promise<void> {
   try {
     const firestore = checkDb();
     const prayersCol = collection(firestore, 'prayers');
     await addDoc(prayersCol, {
         ...prayer,
+        userId,
         comments: [],
         reactions: { like: 0, pray: 0, claps: 0, downlike: 0 },
         createdAt: Timestamp.now(),
@@ -78,14 +80,15 @@ export async function addReactionToPrayer(prayerId: string, reactionType: keyof 
   }
 }
 
-export async function getPrayers(): Promise<Prayer[]> {
+export async function getPrayers(userId: string): Promise<Prayer[]> {
   try {
     const firestore = checkDb();
     const prayersCol = collection(firestore, 'prayers');
-    const prayerSnapshot = await getDocs(prayersCol);
+    const q = query(prayersCol, where("userId", "==", userId));
+    const prayerSnapshot = await getDocs(q);
     
     if (prayerSnapshot.empty) {
-        console.log('No matching documents in "prayers" collection.');
+        console.log('No matching documents in "prayers" collection for this user.');
         return [];
     }
 
@@ -103,6 +106,7 @@ export async function getPrayers(): Promise<Prayer[]> {
         category: data.category || 'Prayer',
         reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
         comments: comments,
+        userId: data.userId,
       } as Prayer;
     });
 
@@ -110,7 +114,7 @@ export async function getPrayers(): Promise<Prayer[]> {
   } catch (error: any) {
     console.error("Error fetching prayers: ", error);
     if (error.code === 'permission-denied') {
-        throw new Error("Permission Denied: Your security rules are not set up to allow reading prayers. Please update your Firestore rules to allow 'read' access to the 'prayers' collection.");
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading prayers. Please update your Firestore rules to allow 'read' access to the 'prayers' collection for authenticated users.");
     }
     throw new Error(`Failed to fetch prayers. Please check your network connection. Original error: ${error.code || error.message}`);
   }

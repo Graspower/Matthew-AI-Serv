@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, Firestore } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, arrayUnion, increment, Timestamp, query, where, Firestore } from 'firebase/firestore';
 import type { Comment, Reactions } from './testimonies'; // Reuse comment/reaction types
 
 export interface Teaching {
@@ -10,9 +10,10 @@ export interface Teaching {
   category: string;
   comments: Comment[];
   reactions: Reactions;
+  userId: string;
 }
 
-export type NewTeaching = Omit<Teaching, 'id' | 'comments' | 'reactions'>;
+export type NewTeaching = Omit<Teaching, 'id' | 'comments' | 'reactions' | 'userId'>;
 
 function checkDb() {
     if (!db) {
@@ -21,12 +22,13 @@ function checkDb() {
     return db as Firestore;
 }
 
-export async function addTeaching(teaching: NewTeaching): Promise<void> {
+export async function addTeaching(teaching: NewTeaching, userId: string): Promise<void> {
   try {
     const firestore = checkDb();
     const teachingsCol = collection(firestore, 'Teachings');
     await addDoc(teachingsCol, {
         ...teaching,
+        userId,
         comments: [],
         reactions: { like: 0, pray: 0, claps: 0, downlike: 0 },
         createdAt: Timestamp.now(),
@@ -78,14 +80,15 @@ export async function addReactionToTeaching(teachingId: string, reactionType: ke
   }
 }
 
-export async function getTeachings(): Promise<Teaching[]> {
+export async function getTeachings(userId: string): Promise<Teaching[]> {
   try {
     const firestore = checkDb();
     const teachingsCol = collection(firestore, 'Teachings');
-    const teachingSnapshot = await getDocs(teachingsCol);
+    const q = query(teachingsCol, where("userId", "==", userId));
+    const teachingSnapshot = await getDocs(q);
     
     if (teachingSnapshot.empty) {
-        console.log('No matching documents in "Teaching" collection.');
+        console.log('No matching documents in "Teachings" collection for this user.');
         return [];
     }
 
@@ -103,6 +106,7 @@ export async function getTeachings(): Promise<Teaching[]> {
         category: data.category || 'Teachings',
         reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
         comments: comments,
+        userId: data.userId,
       } as Teaching;
     });
 
@@ -110,7 +114,7 @@ export async function getTeachings(): Promise<Teaching[]> {
   } catch (error: any) {
     console.error("Error fetching teachings: ", error);
     if (error.code === 'permission-denied') {
-        throw new Error("Permission Denied: Your security rules are not set up to allow reading teachings. Please update your Firestore rules to allow 'read' access to the 'Teaching' collection.");
+        throw new Error("Permission Denied: Your security rules are not set up to allow reading teachings. Please update your Firestore rules to allow 'read' access to the 'Teachings' collection for authenticated users.");
     }
     throw new Error(`Failed to fetch teachings. Please check your network connection. Original error: ${error.code || error.message}`);
   }

@@ -22,6 +22,7 @@ import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTeachings, addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching, type NewTeaching, type Comment, type Reactions } from '@/services/teachings';
+import { useAuth } from '@/contexts/AuthContext';
 
 const teachingFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -113,6 +114,7 @@ export function TeachingsSection() {
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   
   const teachingForm = useForm<TeachingFormData>({
     resolver: zodResolver(teachingFormSchema),
@@ -127,8 +129,13 @@ export function TeachingsSection() {
   const fetchTeachings = useCallback(async () => {
     setIsLoadingTeachings(true);
     setTeachingsError(null);
+    if (!user) {
+        setTeachings([]);
+        setIsLoadingTeachings(false);
+        return;
+    }
     try {
-      const data = await getTeachings();
+      const data = await getTeachings(user.uid);
       setTeachings(data);
     } catch (error: any) {
       console.error(error);
@@ -137,15 +144,19 @@ export function TeachingsSection() {
     } finally {
       setIsLoadingTeachings(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchTeachings();
   }, [fetchTeachings]);
   
   async function handleAddTeaching(data: TeachingFormData) {
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to add a teaching.', variant: 'destructive' });
+        return;
+    }
     try {
-      await addTeaching(data);
+      await addTeaching(data, user.uid);
       toast({ title: 'Success!', description: 'Teaching added successfully.' });
       setIsAddTeachingDialogOpen(false);
       fetchTeachings();
@@ -156,6 +167,10 @@ export function TeachingsSection() {
   }
 
   async function handleReaction(teachingId: string, reactionType: keyof Reactions) {
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
+        return;
+    }
     setTeachings(prev => prev.map(t => {
         if (t.id === teachingId) {
             return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
@@ -166,7 +181,6 @@ export function TeachingsSection() {
 
     try {
         await addReactionToTeaching(teachingId, reactionType);
-        await fetchTeachings();
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
         await fetchTeachings();
@@ -175,7 +189,10 @@ export function TeachingsSection() {
 
   async function handleAddComment(data: CommentFormData) {
     if (!commentsModal.teaching) return;
-
+    if (!user) {
+        toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
+        return;
+    }
     const newComment: Comment = {
       id: uuidv4(),
       author: data.author,
@@ -273,8 +290,8 @@ export function TeachingsSection() {
            teachings.map((item) => <TeachingContentCard key={item.id} item={item} />)
         ) : (
           <div className="col-span-full text-center text-muted-foreground mt-8">
-            <p>No teachings have been added yet.</p>
-            <p>You can add one by clicking the "Add Teaching" button.</p>
+            <p>{user ? 'You have not added any teachings yet.' : 'Please log in to see your teachings.'}</p>
+            {user && <p>You can add one by clicking the "Add Teaching" button.</p>}
           </div>
         )}
         </div>
