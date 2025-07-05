@@ -96,3 +96,8 @@ body {
     scrollbar-width: none;  /* Firefox */
   }
 }
+
+/* Hide main app header when Bible Reader is active */
+body.bible-reader-active header {
+  display: none;
+}

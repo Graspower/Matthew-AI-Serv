@@ -133,13 +133,32 @@ function findBook(translationData: BibleJson, bookName: string): { key: string, 
 }
 
 export async function getBooks(translation: BibleTranslation): Promise<BibleBook[]> {
+  const cacheKey = `bible-books-${translation}`;
+  if (typeof window !== 'undefined') {
+    const cachedBooks = localStorage.getItem(cacheKey);
+    if (cachedBooks) {
+      try {
+        return JSON.parse(cachedBooks);
+      } catch (e) {
+        console.error("Failed to parse cached books", e);
+        localStorage.removeItem(cacheKey);
+      }
+    }
+  }
+
   try {
     const translationData = await getTranslationData(translation);
-    return Object.keys(translationData).map(bookName => ({
+    const books = Object.keys(translationData).map(bookName => ({
       id: bookName,
       name: bookName,
       chapterCount: Object.keys(translationData[bookName]).length,
     }));
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(cacheKey, JSON.stringify(books));
+    }
+
+    return books;
   } catch (error: any) {
      console.error(`Error getting books for ${translation}:`, error);
      throw error;

@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getChapterText, getBooks, getChaptersForBook, type BibleBook, type BibleChapter, type Verse } from '@/services/bible';
-import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight, ArrowUp } from 'lucide-react';
+import { Loader2, Search, Baseline, Type, ChevronLeft, ChevronRight, ArrowUp, Book } from 'lucide-react';
 import { useSettings, type BibleTranslation } from '@/contexts/SettingsContext';
 import { SearchForm } from '@/components/SearchForm';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 const oldTestamentBooks = [
   'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy', 'Joshua', 'Judges', 'Ruth',
   '1 Samuel', '2 Samuel', '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles', 'Ezra',
-  'Nehemiah', 'Esther', 'Job', 'Psalms', 'Proverbs', 'Ecclesiastes', 'Song of Solomon',
+  'Nehemiah', 'Esther', 'Job', 'Psalms', 'Proverbs', 'Ecclesiastes', 'Song of Solomon', 'Song of Songs',
   'Isaiah', 'Jeremiah', 'Lamentations', 'Ezekiel', 'Daniel', 'Hosea', 'Joel', 'Amos',
   'Obadiah', 'Jonah', 'Micah', 'Nahum', 'Habakkuk', 'Zephaniah', 'Haggai', 'Zechariah', 'Malachi'
 ];
@@ -60,6 +60,8 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
   const [bookSearchTerm, setBookSearchTerm] = useState('');
   const [fontSizeIndex, setFontSizeIndex] = useState(1); // 'text-base'
   const [fontFamilyIndex, setFontFamilyIndex] = useState(0); // 'font-sans'
+  const [isScrolled, setIsScrolled] = useState(false);
+
 
   const chapterScrollAreaRef = useRef<HTMLDivElement>(null);
   const touchStart = useRef<{ x: number, y: number } | null>(null);
@@ -139,6 +141,23 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     }
   }, [chapterText, highlightedVerse]);
   
+  useEffect(() => {
+    const viewport = chapterScrollAreaRef.current?.querySelector<HTMLElement>('[data-radix-scroll-area-viewport]');
+    const handleScroll = (e: Event) => {
+        if (e.target instanceof HTMLElement) {
+            setIsScrolled(e.target.scrollTop > 100);
+        }
+    };
+    if (viewport) {
+        viewport.addEventListener('scroll', handleScroll);
+    }
+    return () => {
+        if (viewport) {
+            viewport.removeEventListener('scroll', handleScroll);
+        }
+    };
+}, [chapterScrollAreaRef]);
+
   // --- UI Handlers ---
 
   const handleBookSelect = (bookId: string) => {
@@ -181,7 +200,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
   const canGoToPrevChapter = useMemo(() => {
     if (!selectedBook || selectedChapter === null || chapters.length === 0) return false;
     return selectedChapter > 1;
-  }, [selectedBook, selectedChapter]);
+  }, [selectedBook, selectedChapter, chapters.length]);
 
   const canGoToNextChapter = useMemo(() => {
     if (!selectedBook || selectedChapter === null || chapters.length === 0) return false;
@@ -231,10 +250,11 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
     <div className="w-full h-full flex flex-col gap-2 relative">
       {/* Header Bar */}
       <div className="flex items-center gap-2 p-2 border-b sticky top-0 bg-background z-10">
+        <Button variant="outline" onClick={() => { setIsBookSelectorOpen(true); setBookSearchTerm(''); }}>Books</Button>
         <Button 
           variant="outline" 
-          className="flex-1 justify-start text-left"
-          onClick={() => { setIsBookSelectorOpen(true); setBookSearchTerm(''); }}
+          className="flex-1 justify-start text-left truncate"
+          onClick={() => { if (selectedBook) setIsChapterSelectorOpen(true); }}
         >
           {selectedBook && selectedChapter ? `${selectedBook} ${selectedChapter}` : 'Select Book'}
         </Button>
@@ -317,7 +337,7 @@ export function BibleReaderPage({ verseToRead, onReadComplete }: BibleReaderPage
             <ChevronLeft className="h-5 w-5 md:mr-2" />
             <span className="hidden md:inline">Previous</span>
           </Button>
-          <Button onClick={handleScrollToTop} variant="secondary" size="icon" className="shadow-lg">
+          <Button onClick={handleScrollToTop} variant="secondary" size="icon" className={cn("shadow-lg transition-opacity", isScrolled ? "opacity-100" : "opacity-0 pointer-events-none")}>
             <ArrowUp className="h-5 w-5" />
           </Button>
           <Button onClick={handleNextChapter} disabled={!canGoToNextChapter} variant="secondary" className="shadow-lg">

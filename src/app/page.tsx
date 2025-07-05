@@ -62,6 +62,19 @@ export default function Home() {
   const { language, bibleTranslation } = useSettings();
 
   useEffect(() => {
+    if (activeTab === 'bibleReader') {
+      document.body.classList.add('bible-reader-active');
+    } else {
+      document.body.classList.remove('bible-reader-active');
+    }
+
+    // Cleanup function to remove the class when the component unmounts
+    return () => {
+      document.body.classList.remove('bible-reader-active');
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
     // Restore the last search state on initial load
     try {
       const cachedData = localStorage.getItem(LAST_SEARCH_CACHE_KEY);
