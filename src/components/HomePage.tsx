@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
+import { getInspirationalVerses } from '@/services/inspirations';
 
 interface Verse {
   book: string;
@@ -24,7 +25,7 @@ interface DailyVerse {
   explanation: string;
 }
 
-const inspirationalVerses: Verse[] = [
+const fallbackInspirationalVerses: Verse[] = [
   { book: 'Psalm', chapter: 103, verse: 1, text: 'Bless the LORD, O my soul, and all that is within me, bless his holy name!' },
   { book: 'Psalm', chapter: 103, verse: 2, text: 'Bless the LORD, O my soul, and forget not all his benefits.' },
   { book: 'Psalm', chapter: 145, verse: 1, text: 'I will extol thee, my God, O king; and I will bless thy name for ever and ever.' },
@@ -179,8 +180,22 @@ export function HomePage() {
     setError(null);
     stopSpeaking();
 
+    let versesToUse: Verse[] = [];
+
     try {
-      const selectedVerses = pickRandomItems(inspirationalVerses, 3);
+      try {
+        const remoteVerses = await getInspirationalVerses();
+        if (remoteVerses && remoteVerses.length >= 3) {
+          versesToUse = remoteVerses;
+        } else {
+          throw new Error("Not enough remote verses.");
+        }
+      } catch (fetchError) {
+        console.warn("Could not fetch remote inspirational verses, using fallback list:", fetchError);
+        versesToUse = fallbackInspirationalVerses;
+      }
+      
+      const selectedVerses = pickRandomItems(versesToUse, 3);
       
       const explanationPromises = selectedVerses.map(verse => 
         generateVerseExplanation({
@@ -204,8 +219,8 @@ export function HomePage() {
       setDailyVerses(newDailyVerses);
 
     } catch (err: any) {
-      console.error('Failed to generate daily verses or explanations:', err);
-      const errorMessage = `Failed to load daily inspiration. ${err.message || 'Please try again.'}`;
+      console.error('Failed to generate daily inspiration:', err);
+      const errorMessage = `Failed to generate daily inspiration. ${err.message || 'Please try again.'}`;
       setError(errorMessage);
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
       setDailyVerses([]);
@@ -266,8 +281,12 @@ export function HomePage() {
         {isLoading ? (
           <CardSkeleton />
         ) : error ? (
-          <Card className="w-full max-w-sm shadow-lg rounded-xl">
-            <CardContent className="p-6 text-center"> <p className="text-destructive">{error}</p> </CardContent>
+          <Card className="w-full max-w-sm shadow-lg rounded-xl flex flex-col items-center justify-center p-6">
+            <CardContent className="text-center">
+              <p className="text-destructive font-semibold">An Error Occurred</p>
+              <p className="text-sm text-muted-foreground mt-2">{error}</p>
+              <Button onClick={generateAndStoreVerses} className="mt-4">Retry</Button>
+            </CardContent>
           </Card>
         ) : dailyVerses.length > 0 ? (
             dailyVerses.map((item, index) => (
@@ -310,7 +329,7 @@ export function HomePage() {
         )}
       </div>
 
-       {dailyVerses.length > 0 && !isLoading && (
+       {dailyVerses.length > 0 && !isLoading && !error && (
             <div className="flex items-center gap-4 mt-4 z-20">
                 <Button variant="outline" size="icon" onClick={handlePrev} aria-label="Previous Inspiration">
                     <ChevronLeft className="h-6 w-6" />
@@ -353,4 +372,5 @@ export function HomePage() {
       )}
     </div>
   );
-}
+
+    
