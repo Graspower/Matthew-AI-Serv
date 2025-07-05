@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -52,7 +53,7 @@ export default function Home() {
   const [teachingText, setTeachingText] = useState<string | null>(null);
   const [isTeachingLoading, setIsTeachingLoading] = useState(false);
   const [teachingError, setTeachingError] = useState<string | null>(null);
-  const [teachingLength, setTeachingLength] = useState<'brief' | 'medium'>('medium');
+  const [teachingLength, setTeachingLength] = useState<'brief' | 'detailed'>('detailed');
   const [activeTab, setActiveTab] = useState('home');
   const [verseToRead, setVerseToRead] = useState<Verse | null>(null);
   const [activeHomeSection, setActiveHomeSection] = useState<HomeSection>('testimonies');
@@ -167,7 +168,7 @@ export default function Home() {
         </div>
         <TabsList className="w-full max-w-lg mx-auto h-auto rounded-full bg-muted p-1.5 flex">
           <TabsTrigger value="home" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Home</TabsTrigger>
-          <TabsTrigger value="matthewAI" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">AI Study</TabsTrigger>
+          <TabsTrigger value="matthewAI" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Ask Matthew</TabsTrigger>
           <TabsTrigger value="bibleReader" className="flex-1 rounded-full px-5 py-2 text-sm sm:text-base transition-colors duration-200 data-[state=inactive]:hover:bg-background/50">Bible Reader</TabsTrigger>
         </TabsList>
 
@@ -215,7 +216,7 @@ export default function Home() {
               <Label className="text-md font-semibold mb-3 block text-center md:text-left">Teaching Length</Label>
               <RadioGroup
                 value={teachingLength}
-                onValueChange={(value) => setTeachingLength(value as 'brief' | 'medium')}
+                onValueChange={(value) => setTeachingLength(value as 'brief' | 'detailed')}
                 className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 justify-center md:justify-start"
               >
                 <div className="flex items-center space-x-2">
@@ -223,8 +224,8 @@ export default function Home() {
                   <Label htmlFor="r-brief" className="cursor-pointer">Brief</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="medium" id="r-medium" />
-                  <Label htmlFor="r-medium" className="cursor-pointer">Medium</Label>
+                  <RadioGroupItem value="detailed" id="r-detailed" />
+                  <Label htmlFor="r-detailed" className="cursor-pointer">Detailed</Label>
                 </div>
               </RadioGroup>
             </div>

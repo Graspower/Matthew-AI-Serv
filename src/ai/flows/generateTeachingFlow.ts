@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Generates a teaching or sermonette based on a user's query and relevant Bible verses, considering language and translation.
@@ -21,9 +22,9 @@ const GenerateTeachingInputSchema = z.object({
       text: z.string().describe('The text of the verse (expected to be from the selected translation).'),
     })
   ).describe('A list of relevant Bible verses related to the query.'),
-  lengthPreference: z.enum(['brief', 'medium'])
-    .default('medium')
-    .describe('The desired length of the teaching: brief (approx. 3 sentences), medium (approx. 1-3 paragraphs).'),
+  lengthPreference: z.enum(['brief', 'detailed'])
+    .default('detailed')
+    .describe('The desired length of the teaching: brief (intro and sentences, ~80 tokens), detailed (single paragraph, ~100-112 tokens).'),
   language: z.string().default('en').describe("The language for the teaching (e.g., 'en', 'fr', 'zh')."),
   bibleTranslation: z.string().default('KJV').describe("The Bible translation the provided verses are based on (e.g., 'KJV', 'NIV')."),
 });
@@ -60,9 +61,11 @@ const teachingPrompt = ai.definePrompt({
   output: {schema: GenerateTeachingOutputSchema},
   prompt: `You are an insightful Bible teacher, skilled at making scripture come alive. The user is exploring the topic: '{{query}}'.
 Based on this topic and the following relevant Bible verses you've identified (which are from the **{{bibleTranslation}}** translation), please craft an engaging and uplifting teaching in **{{language}}**.
+
+This teaching should be concise, offer clear spiritual revelation, and provide practical insights related to the user's query. Seamlessly integrate the essence of these verses into your message.
+
+Follow these length and format instructions precisely:
 {{lengthInstruction}}
-This teaching should offer clear spiritual revelation and practical insights related to the user's query.
-Seamlessly integrate the essence of these verses into your message.
 
 User's Query/Topic: '{{query}}'
 Language for Teaching: {{language}}
@@ -90,9 +93,9 @@ const generateTeachingFlow = ai.defineFlow(
       return { teaching: noVerseMessage };
     }
 
-    let lengthInstructionText = "This teaching should be approximately 1-3 paragraphs.";
+    let lengthInstructionText = "The teaching should be a single, insightful, medium-length paragraph. The total length should be between 100 and 112 tokens.";
     if (input.lengthPreference === 'brief') {
-      lengthInstructionText = "This teaching should be very concise, aiming for approximately three sentences.";
+      lengthInstructionText = "The teaching should be very concise, consisting of a short introductory paragraph followed by a bulleted or numbered list of key sentences. The total response should be approximately 80 tokens.";
     }
     
     try {
