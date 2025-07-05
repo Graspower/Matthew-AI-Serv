@@ -25,7 +25,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { MessageSquare, Settings, Sun, Moon, BookOpenText, LogOut, Loader2 } from 'lucide-react';
+import { Settings, Sun, Moon, BookOpenText, LogOut, Loader2, MessageSquare } from 'lucide-react';
 import { AuthForm } from './AuthForm';
 
 type AuthMode = 'login' | 'signup';
@@ -105,7 +105,7 @@ export function Header() {
       <header className="sticky top-0 z-40 w-full border-b bg-background">
         <div className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
-            <MessageSquare className="h-6 w-6 text-primary" />
+            <BookOpenText className="h-6 w-6 text-primary" />
             <span className="inline-block font-bold">Matthew AI</span>
           </Link>
 
@@ -130,7 +130,7 @@ export function Header() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
-                  <BookOpenText className="h-5 w-5" />
+                  <Settings className="h-5 w-5" />
                   <span className="sr-only">Open Settings</span>
                 </Button>
               </DropdownMenuTrigger>
