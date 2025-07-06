@@ -9,8 +9,9 @@ import { Volume2, VolumeX, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
-import { motion } from 'framer-motion';
 import { getInspirationalVerses } from '@/services/inspirations';
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
 
 interface Verse {
   book: string;
@@ -72,7 +73,7 @@ function CardSkeleton() {
 }
 
 
-function InspirationCard({ item, onSpeakClick, isSpeaking }: { item: DailyVerse; onSpeakClick: (e: React.MouseEvent) => void; isSpeaking: boolean }) {
+function InspirationCard({ item, onSpeakClick, isSpeaking, onClick }: { item: DailyVerse; onSpeakClick: (e: React.MouseEvent) => void; isSpeaking: boolean; onClick: () => void; }) {
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text;
     const truncated = text.slice(0, maxLength);
@@ -80,7 +81,7 @@ function InspirationCard({ item, onSpeakClick, isSpeaking }: { item: DailyVerse;
   };
   
   return (
-      <Card className="w-full h-full shadow-2xl rounded-xl flex flex-col cursor-pointer overflow-hidden transform-gpu transition-transform duration-300 hover:scale-105">
+      <Card onClick={onClick} className="w-full h-full shadow-2xl rounded-xl flex flex-col cursor-pointer overflow-hidden transform-gpu transition-transform duration-300 hover:scale-105">
         <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
           <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
@@ -128,6 +129,8 @@ export function HomePage() {
 
   const synth = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
+  const container = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -258,6 +261,25 @@ export function HomePage() {
       else setActiveIndex(2);
   }, []);
 
+  useGSAP(() => {
+    if (!container.current || dailyVerses.length === 0 || isLoading) return;
+
+    const cards = gsap.utils.toArray('.inspiration-card');
+    cards.forEach((card, index) => {
+      gsap.to(card as HTMLElement, {
+        x: (index - activeIndex) * 50,
+        scale: 1 - Math.abs(index - activeIndex) * 0.15,
+        rotateY: (index - activeIndex) * -20,
+        zIndex: dailyVerses.length - Math.abs(index - activeIndex),
+        opacity: Math.abs(index - activeIndex) > 1.5 ? 0 : 1,
+        duration: 0.75,
+        ease: 'power3.out',
+      });
+    });
+
+  }, { scope: container, dependencies: [activeIndex, dailyVerses, isLoading] });
+
+
   const handleCardClick = (item: DailyVerse, index: number) => {
     if (index === activeIndex) {
         setSelectedInspiration(item);
@@ -277,7 +299,7 @@ export function HomePage() {
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
       </div>
 
-      <div className="relative w-full h-[520px] flex items-center justify-center [perspective:1200px] mt-2">
+      <div ref={container} className="relative w-full h-[520px] flex items-center justify-center [perspective:1200px] mt-2">
         {isLoading ? (
           <CardSkeleton />
         ) : error ? (
@@ -290,35 +312,21 @@ export function HomePage() {
           </Card>
         ) : dailyVerses.length > 0 ? (
             dailyVerses.map((item, index) => (
-                <motion.div
+                <div
                     key={item.timeOfDay}
-                    className="absolute w-full max-w-xs sm:max-w-sm h-[480px]"
-                    animate={{
-                        x: (index - activeIndex) * 50,
-                        scale: 1 - Math.abs(index - activeIndex) * 0.15,
-                        rotateY: (index - activeIndex) * -20,
-                        zIndex: dailyVerses.length - Math.abs(index - activeIndex),
-                        opacity: Math.abs(index - activeIndex) > 1 ? 0 : 1,
-                    }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                    drag={index === activeIndex ? "x" : false}
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.3}
-                    onDragEnd={(e, { offset }) => {
-                        if (offset.x > 100) handlePrev();
-                        else if (offset.x < -100) handleNext();
-                    }}
-                    onClick={() => handleCardClick(item, index)}
+                    className="inspiration-card absolute w-full max-w-xs sm:max-w-sm h-[480px]"
+                    style={{ opacity: 0 }} // Initially hide cards, GSAP will show them
                 >
                     <InspirationCard 
                         item={item} 
                         isSpeaking={isSpeaking && activeIndex === index}
+                        onClick={() => handleCardClick(item, index)}
                         onSpeakClick={(e) => {
                             e.stopPropagation();
                             speakInspiration(item);
                         }}
                     />
-                </motion.div>
+                </div>
             ))
         ) : (
           <Card className="w-full max-w-sm shadow-lg rounded-xl">
@@ -373,4 +381,4 @@ export function HomePage() {
     </div>
   );
 
-    
+}
