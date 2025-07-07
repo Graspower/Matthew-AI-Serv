@@ -1,12 +1,14 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { formatDistanceToNow } from 'date-fns';
+import { onSnapshot, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
@@ -21,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getTestimonies, addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony, type NewTestimony } from '@/services/testimonies';
+import { addTestimony, addCommentToTestimony, addReactionToTestimony, type Testimony } from '@/services/testimonies';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Comment, Reactions } from '@/types';
 
@@ -39,20 +41,6 @@ const commentFormSchema = z.object({
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const testimonyCategories = ['Salvation', 'Business Breakthrough', 'Marriage Success', 'Job', 'Health', 'Baby', 'Healing', 'Deliverance', 'Financial Provision', 'Academic Success'];
-
-const TESTIMONIES_CACHE_KEY = 'matthew-ai-testimonies';
-
-const getTestimoniesFromCache = (): Testimony[] | null => {
-  if (typeof window === 'undefined') return null;
-  const cached = localStorage.getItem(TESTIMONIES_CACHE_KEY);
-  return cached ? JSON.parse(cached) : null;
-};
-
-const setTestimoniesInCache = (data: Testimony[]) => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(TESTIMONIES_CACHE_KEY, JSON.stringify(data));
-};
-
 
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
@@ -143,42 +131,91 @@ export function TestimoniesSection() {
     defaultValues: { author: '', text: '' },
   });
 
+  // Pre-fill forms with user's name when dialogs open
   useEffect(() => {
-    if (user?.displayName && (commentsModal.isOpen || detailsModal.isOpen)) {
+    if (user?.displayName && isAddTestimonyDialogOpen) {
+        testimonyForm.setValue('name', user.displayName);
+    }
+  }, [user, testimonyForm, isAddTestimonyDialogOpen]);
+  
+  useEffect(() => {
+    if (user?.displayName && commentsModal.isOpen) {
         commentForm.setValue('author', user.displayName);
     }
-  }, [user, commentForm, commentsModal.isOpen, detailsModal.isOpen]);
+  }, [user, commentForm, commentsModal.isOpen]);
 
 
-  const fetchTestimonies = useCallback(async (forceRefresh = false) => {
-    setIsLoadingTestimonies(true);
-    setTestimoniesError(null);
-
-    if (!forceRefresh) {
-        const cachedTestimonies = getTestimoniesFromCache();
-        if (cachedTestimonies) {
-            setTestimonies(cachedTestimonies);
-            setIsLoadingTestimonies(false);
-            return;
-        }
-    }
-
-    try {
-      const data = await getTestimonies();
-      setTestimonies(data);
-      setTestimoniesInCache(data);
-    } catch (error: any) {
-      console.error(error);
-      setTestimoniesError(error.message || "Failed to load testimonies. Please check your connection and try again.");
-      setTestimonies([]);
-    } finally {
+  // Real-time listener for testimonies
+  useEffect(() => {
+    if (!db) {
+      setTestimoniesError("Firebase is not configured.");
       setIsLoadingTestimonies(false);
+      return;
     }
+
+    setIsLoadingTestimonies(true);
+    const testimoniesCol = collection(db, 'testimonies');
+    
+    const unsubscribe = onSnapshot(testimoniesCol, (querySnapshot) => {
+      const testimonyList = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        const comments = (data.comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
+        }));
+        return {
+          id: doc.id,
+          name: data.name || 'Anonymous',
+          description: data.description || '',
+          category: data.category || 'Testimony',
+          reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
+          comments: comments,
+          userId: data.userId,
+        } as Testimony;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
+      setTestimonies(testimonyList);
+      setTestimoniesError(null);
+      setIsLoadingTestimonies(false);
+    }, (error) => {
+      console.error("Error fetching testimonies in real-time: ", error);
+      if (error.code === 'permission-denied') {
+        setTestimoniesError("Permission Denied: Your security rules are not set up to allow reading testimonies.");
+      } else {
+        setTestimoniesError(error.message || "Failed to load testimonies.");
+      }
+      setIsLoadingTestimonies(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
+  // Keep modals in sync with the real-time testimonies list
   useEffect(() => {
-    fetchTestimonies();
-  }, [fetchTestimonies]);
+    if (detailsModal.isOpen && detailsModal.testimony) {
+      const updatedTestimony = testimonies.find(p => p.id === detailsModal.testimony!.id);
+      if (updatedTestimony) {
+        if (JSON.stringify(updatedTestimony) !== JSON.stringify(detailsModal.testimony)) {
+          setDetailsModal({ isOpen: true, testimony: updatedTestimony });
+        }
+      } else {
+        setDetailsModal({ isOpen: false, testimony: null });
+      }
+    }
+  }, [testimonies, detailsModal]);
+
+  useEffect(() => {
+    if (commentsModal.isOpen && commentsModal.testimony) {
+      const updatedTestimony = testimonies.find(p => p.id === commentsModal.testimony!.id);
+      if (updatedTestimony) {
+        if (JSON.stringify(updatedTestimony) !== JSON.stringify(commentsModal.testimony)) {
+          setCommentsModal({ isOpen: true, testimony: updatedTestimony });
+        }
+      } else {
+        setCommentsModal({ isOpen: false, testimony: null });
+      }
+    }
+  }, [testimonies, commentsModal]);
   
   async function handleAddTestimony(data: TestimonyFormData) {
     if (!user) {
@@ -189,8 +226,7 @@ export function TestimoniesSection() {
       await addTestimony(data, user.uid);
       toast({ title: 'Success!', description: 'Testimony added successfully.' });
       setIsAddTestimonyDialogOpen(false);
-      fetchTestimonies(true);
-      testimonyForm.reset();
+      testimonyForm.reset({name: user.displayName || '', description: '', category: ''});
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add testimony.', variant: 'destructive' });
     }
@@ -201,29 +237,10 @@ export function TestimoniesSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
         return;
     }
-    const originalTestimonies = [...testimonies];
-    const updatedTestimonies = testimonies.map(t => {
-        if (t.id === testimonyId) {
-            return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
-        }
-        return t;
-    });
-    setTestimonies(updatedTestimonies);
-    setDetailsModal(prev => {
-        const updatedTestimony = updatedTestimonies.find(t => t.id === prev.testimony?.id);
-        return updatedTestimony ? { ...prev, testimony: updatedTestimony } : prev;
-    });
-    
     try {
         await addReactionToTestimony(testimonyId, reactionType);
-        setTestimoniesInCache(updatedTestimonies);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        setTestimonies(originalTestimonies);
-         setDetailsModal(prev => {
-            const originalTestimony = originalTestimonies.find(t => t.id === prev.testimony?.id);
-            return originalTestimony ? { ...prev, testimony: originalTestimony } : prev;
-        });
     }
   }
 
@@ -233,6 +250,7 @@ export function TestimoniesSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
         return;
     }
+
     const newComment: Comment = {
       id: uuidv4(),
       author: data.author,
@@ -240,31 +258,11 @@ export function TestimoniesSection() {
       createdAt: new Date().toISOString(),
     };
     
-    const originalTestimonies = [...testimonies];
-    const originalTestimonyInModal = commentsModal.testimony;
-
-    const updatedTestimony = {
-        ...commentsModal.testimony,
-        comments: [...(commentsModal.testimony.comments || []), newComment],
-    };
-
-    setCommentsModal({ isOpen: true, testimony: updatedTestimony });
-    setDetailsModal(prev => prev.testimony?.id === updatedTestimony.id ? { isOpen: true, testimony: updatedTestimony } : prev);
-    setTestimonies(prevTestimonies => {
-        const newTestimonies = prevTestimonies.map(t => t.id === updatedTestimony.id ? updatedTestimony : t);
-        setTestimoniesInCache(newTestimonies);
-        return newTestimonies;
-    });
-    
     try {
       await addCommentToTestimony(commentsModal.testimony.id, newComment);
       commentForm.reset({ author: user?.displayName || '', text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      setTestimonies(originalTestimonies);
-      setCommentsModal({ isOpen: true, testimony: originalTestimonyInModal });
-      setDetailsModal(prev => prev.testimony?.id === originalTestimonyInModal.id ? { isOpen: true, testimony: originalTestimonyInModal } : prev);
-      setTestimoniesInCache(originalTestimonies);
     }
   }
 
@@ -322,7 +320,7 @@ export function TestimoniesSection() {
                     <DialogHeader> <DialogTitle>Add a New Testimony</DialogTitle> <DialogDescription>Share a testimony to encourage others.</DialogDescription> </DialogHeader>
                     <Form {...testimonyForm}>
                         <form onSubmit={testimonyForm.handleSubmit(handleAddTestimony)} className="space-y-4">
-                            <FormField control={testimonyForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Abraham" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={testimonyForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Abraham" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={testimonyForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Testimony</FormLabel> <FormControl><Textarea placeholder="A detailed description of the testimony" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={testimonyForm.control} name="category" render={({ field }) => (
                                 <FormItem> 

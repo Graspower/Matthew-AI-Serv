@@ -1,12 +1,14 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { formatDistanceToNow } from 'date-fns';
+import { onSnapshot, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
@@ -21,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getPrayers, addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer, type NewPrayer } from '@/services/prayers';
+import { addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer } from '@/services/prayers';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Comment, Reactions } from '@/types';
 
@@ -39,20 +41,6 @@ const commentFormSchema = z.object({
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const prayerCategories = ['Health & Healing', 'Family', 'Guidance', 'Finances', 'Protection', 'Thanksgiving', 'Spiritual Growth', 'World & Leaders', 'Loss & Grief', 'Salvation'];
-
-const PRAYERS_CACHE_KEY = 'matthew-ai-prayers';
-
-const getPrayersFromCache = (): Prayer[] | null => {
-  if (typeof window === 'undefined') return null;
-  const cached = localStorage.getItem(PRAYERS_CACHE_KEY);
-  return cached ? JSON.parse(cached) : null;
-};
-
-const setPrayersInCache = (data: Prayer[]) => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(PRAYERS_CACHE_KEY, JSON.stringify(data));
-};
-
 
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
@@ -143,42 +131,91 @@ export function PrayersSection() {
     defaultValues: { author: '', text: '' },
   });
 
+  // Pre-fill forms with user's name when dialogs open
   useEffect(() => {
-    if (user?.displayName && (commentsModal.isOpen || detailsModal.isOpen)) {
+    if (user?.displayName && isAddPrayerDialogOpen) {
+        prayerForm.setValue('name', user.displayName);
+    }
+  }, [user, prayerForm, isAddPrayerDialogOpen]);
+  
+  useEffect(() => {
+    if (user?.displayName && commentsModal.isOpen) {
         commentForm.setValue('author', user.displayName);
     }
-  }, [user, commentForm, commentsModal.isOpen, detailsModal.isOpen]);
+  }, [user, commentForm, commentsModal.isOpen]);
 
-
-  const fetchPrayers = useCallback(async (forceRefresh = false) => {
-    setIsLoadingPrayers(true);
-    setPrayersError(null);
-
-    if (!forceRefresh) {
-        const cachedPrayers = getPrayersFromCache();
-        if (cachedPrayers) {
-          setPrayers(cachedPrayers);
-          setIsLoadingPrayers(false);
-          return;
-        }
-    }
-
-    try {
-      const data = await getPrayers();
-      setPrayers(data);
-      setPrayersInCache(data);
-    } catch (error: any) {
-      console.error(error);
-      setPrayersError(error.message || "Failed to load prayers. Please check your connection and try again.");
-      setPrayers([]);
-    } finally {
+  // Real-time listener for prayers
+  useEffect(() => {
+    if (!db) {
+      setPrayersError("Firebase is not configured.");
       setIsLoadingPrayers(false);
+      return;
     }
+
+    setIsLoadingPrayers(true);
+    const prayersCol = collection(db, 'prayers');
+    
+    const unsubscribe = onSnapshot(prayersCol, (querySnapshot) => {
+      const prayerList = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        const comments = (data.comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
+        }));
+        return {
+          id: doc.id,
+          name: data.name || 'Anonymous',
+          description: data.description || '',
+          category: data.category || 'Prayer',
+          reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
+          comments: comments,
+          userId: data.userId,
+        } as Prayer;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
+      setPrayers(prayerList);
+      setPrayersError(null);
+      setIsLoadingPrayers(false);
+    }, (error) => {
+      console.error("Error fetching prayers in real-time: ", error);
+      if (error.code === 'permission-denied') {
+        setPrayersError("Permission Denied: Your security rules are not set up to allow reading prayers.");
+      } else {
+        setPrayersError(error.message || "Failed to load prayers.");
+      }
+      setIsLoadingPrayers(false);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
+  // Keep modals in sync with the real-time prayers list
   useEffect(() => {
-    fetchPrayers();
-  }, [fetchPrayers]);
+    if (detailsModal.isOpen && detailsModal.prayer) {
+      const updatedPrayer = prayers.find(p => p.id === detailsModal.prayer!.id);
+      if (updatedPrayer) {
+        if (JSON.stringify(updatedPrayer) !== JSON.stringify(detailsModal.prayer)) {
+          setDetailsModal({ isOpen: true, prayer: updatedPrayer });
+        }
+      } else {
+        setDetailsModal({ isOpen: false, prayer: null });
+      }
+    }
+  }, [prayers, detailsModal]);
+
+  useEffect(() => {
+    if (commentsModal.isOpen && commentsModal.prayer) {
+      const updatedPrayer = prayers.find(p => p.id === commentsModal.prayer!.id);
+      if (updatedPrayer) {
+        if (JSON.stringify(updatedPrayer) !== JSON.stringify(commentsModal.prayer)) {
+          setCommentsModal({ isOpen: true, prayer: updatedPrayer });
+        }
+      } else {
+        setCommentsModal({ isOpen: false, prayer: null });
+      }
+    }
+  }, [prayers, commentsModal]);
   
   async function handleAddPrayer(data: PrayerFormData) {
     if (!user) {
@@ -189,8 +226,7 @@ export function PrayersSection() {
       await addPrayer(data, user.uid);
       toast({ title: 'Success!', description: 'Prayer added successfully.' });
       setIsAddPrayerDialogOpen(false);
-      fetchPrayers(true);
-      prayerForm.reset();
+      prayerForm.reset({name: user.displayName || '', description: '', category: ''});
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add prayer.', variant: 'destructive' });
     }
@@ -201,30 +237,10 @@ export function PrayersSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
         return;
     }
-    const originalPrayers = [...prayers];
-    const updatedPrayers = prayers.map(p => {
-        if (p.id === prayerId) {
-            return { ...p, reactions: { ...p.reactions, [reactionType]: (p.reactions[reactionType] || 0) + 1 } };
-        }
-        return p;
-    });
-
-    setPrayers(updatedPrayers);
-    setDetailsModal(prev => {
-        const updatedPrayer = updatedPrayers.find(p => p.id === prev.prayer?.id);
-        return updatedPrayer ? { ...prev, prayer: updatedPrayer } : prev;
-    });
-
     try {
         await addReactionToPrayer(prayerId, reactionType);
-        setPrayersInCache(updatedPrayers);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        setPrayers(originalPrayers);
-        setDetailsModal(prev => {
-            const originalPrayer = originalPrayers.find(p => p.id === prev.prayer?.id);
-            return originalPrayer ? { ...prev, prayer: originalPrayer } : prev;
-        });
     }
   }
 
@@ -242,31 +258,11 @@ export function PrayersSection() {
       createdAt: new Date().toISOString(),
     };
 
-    const originalPrayers = [...prayers];
-    const originalPrayerInModal = commentsModal.prayer;
-
-    const updatedPrayer = {
-        ...commentsModal.prayer,
-        comments: [...(commentsModal.prayer.comments || []), newComment],
-    };
-
-    setCommentsModal({ isOpen: true, prayer: updatedPrayer });
-    setDetailsModal(prev => prev.prayer?.id === updatedPrayer.id ? { isOpen: true, prayer: updatedPrayer } : prev);
-    setPrayers(prevPrayers => {
-        const newPrayers = prevPrayers.map(p => p.id === updatedPrayer.id ? updatedPrayer : p);
-        setPrayersInCache(newPrayers);
-        return newPrayers;
-    });
-
     try {
       await addCommentToPrayer(commentsModal.prayer.id, newComment);
       commentForm.reset({ author: user?.displayName || '', text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      setPrayers(originalPrayers);
-      setCommentsModal({ isOpen: true, prayer: originalPrayerInModal });
-      setDetailsModal(prev => prev.prayer?.id === originalPrayerInModal.id ? { isOpen: true, prayer: originalPrayerInModal } : prev);
-      setPrayersInCache(originalPrayers);
     }
   }
 
@@ -324,7 +320,7 @@ export function PrayersSection() {
                     <DialogHeader> <DialogTitle>Add a New Prayer</DialogTitle> <DialogDescription>Share a prayer request or praise.</DialogDescription> </DialogHeader>
                     <Form {...prayerForm}>
                         <form onSubmit={prayerForm.handleSubmit(handleAddPrayer)} className="space-y-4">
-                            <FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={prayerForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Prayer Request</FormLabel> <FormControl><Textarea placeholder="A detailed description of your prayer" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={prayerForm.control} name="category" render={({ field }) => ( 
                                 <FormItem> 

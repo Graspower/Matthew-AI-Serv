@@ -1,12 +1,14 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { formatDistanceToNow } from 'date-fns';
+import { onSnapshot, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
@@ -21,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getTeachings, addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching, type NewTeaching } from '@/services/teachings';
+import { addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching } from '@/services/teachings';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Comment, Reactions } from '@/types';
 
@@ -39,20 +41,6 @@ const commentFormSchema = z.object({
 type CommentFormData = z.infer<typeof commentFormSchema>;
 
 const teachingCategories = ['Faith', 'Love', 'Forgiveness', 'Parables', 'Discipleship', 'End Times', 'The Law', 'Grace', 'Prayer', 'Serving Others'];
-
-const TEACHINGS_CACHE_KEY = 'matthew-ai-teachings';
-
-const getTeachingsFromCache = (): Teaching[] | null => {
-  if (typeof window === 'undefined') return null;
-  const cached = localStorage.getItem(TEACHINGS_CACHE_KEY);
-  return cached ? JSON.parse(cached) : null;
-};
-
-const setTeachingsInCache = (data: Teaching[]) => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(TEACHINGS_CACHE_KEY, JSON.stringify(data));
-};
-
 
 const truncateText = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
@@ -143,41 +131,90 @@ export function TeachingsSection() {
     defaultValues: { author: '', text: '' },
   });
 
+  // Pre-fill forms with user's name when dialogs open
   useEffect(() => {
-    if (user?.displayName && (commentsModal.isOpen || detailsModal.isOpen)) {
+    if (user?.displayName && isAddTeachingDialogOpen) {
+        teachingForm.setValue('name', user.displayName);
+    }
+  }, [user, teachingForm, isAddTeachingDialogOpen]);
+  
+  useEffect(() => {
+    if (user?.displayName && commentsModal.isOpen) {
         commentForm.setValue('author', user.displayName);
     }
-  }, [user, commentForm, commentsModal.isOpen, detailsModal.isOpen]);
+  }, [user, commentForm, commentsModal.isOpen]);
 
-  const fetchTeachings = useCallback(async (forceRefresh = false) => {
-    setIsLoadingTeachings(true);
-    setTeachingsError(null);
-
-    if (!forceRefresh) {
-        const cachedTeachings = getTeachingsFromCache();
-        if (cachedTeachings) {
-            setTeachings(cachedTeachings);
-            setIsLoadingTeachings(false);
-            return;
-        }
-    }
-    
-    try {
-      const data = await getTeachings();
-      setTeachings(data);
-      setTeachingsInCache(data);
-    } catch (error: any) {
-      console.error(error);
-      setTeachingsError(error.message || "Failed to load teachings. Please check your connection and try again.");
-      setTeachings([]);
-    } finally {
+  // Real-time listener for teachings
+  useEffect(() => {
+    if (!db) {
+      setTeachingsError("Firebase is not configured.");
       setIsLoadingTeachings(false);
+      return;
     }
+
+    setIsLoadingTeachings(true);
+    const teachingsCol = collection(db, 'Teachings');
+    
+    const unsubscribe = onSnapshot(teachingsCol, (querySnapshot) => {
+      const teachingList = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        const comments = (data.comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
+        }));
+        return {
+          id: doc.id,
+          name: data.name || 'Anonymous',
+          description: data.description || '',
+          category: data.category || 'Teaching',
+          reactions: data.reactions || { like: 0, pray: 0, claps: 0, downlike: 0 },
+          comments: comments,
+          userId: data.userId,
+        } as Teaching;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
+      setTeachings(teachingList);
+      setTeachingsError(null);
+      setIsLoadingTeachings(false);
+    }, (error) => {
+      console.error("Error fetching teachings in real-time: ", error);
+      if (error.code === 'permission-denied') {
+        setTeachingsError("Permission Denied: Your security rules are not set up to allow reading teachings.");
+      } else {
+        setTeachingsError(error.message || "Failed to load teachings.");
+      }
+      setIsLoadingTeachings(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
+  // Keep modals in sync with the real-time teachings list
   useEffect(() => {
-    fetchTeachings();
-  }, [fetchTeachings]);
+    if (detailsModal.isOpen && detailsModal.teaching) {
+      const updatedTeaching = teachings.find(p => p.id === detailsModal.teaching!.id);
+      if (updatedTeaching) {
+        if (JSON.stringify(updatedTeaching) !== JSON.stringify(detailsModal.teaching)) {
+          setDetailsModal({ isOpen: true, teaching: updatedTeaching });
+        }
+      } else {
+        setDetailsModal({ isOpen: false, teaching: null });
+      }
+    }
+  }, [teachings, detailsModal]);
+
+  useEffect(() => {
+    if (commentsModal.isOpen && commentsModal.teaching) {
+      const updatedTeaching = teachings.find(p => p.id === commentsModal.teaching!.id);
+      if (updatedTeaching) {
+        if (JSON.stringify(updatedTeaching) !== JSON.stringify(commentsModal.teaching)) {
+          setCommentsModal({ isOpen: true, teaching: updatedTeaching });
+        }
+      } else {
+        setCommentsModal({ isOpen: false, teaching: null });
+      }
+    }
+  }, [teachings, commentsModal]);
   
   async function handleAddTeaching(data: TeachingFormData) {
     if (!user) {
@@ -188,8 +225,7 @@ export function TeachingsSection() {
       await addTeaching(data, user.uid);
       toast({ title: 'Success!', description: 'Teaching added successfully.' });
       setIsAddTeachingDialogOpen(false);
-      fetchTeachings(true);
-      teachingForm.reset();
+      teachingForm.reset({name: user.displayName || '', description: '', category: ''});
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add teaching.', variant: 'destructive' });
     }
@@ -200,31 +236,10 @@ export function TeachingsSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to react.', variant: 'destructive' });
         return;
     }
-
-    const originalTeachings = [...teachings];
-    const updatedTeachings = teachings.map(t => {
-        if (t.id === teachingId) {
-            return { ...t, reactions: { ...t.reactions, [reactionType]: (t.reactions[reactionType] || 0) + 1 } };
-        }
-        return t;
-    });
-
-    setTeachings(updatedTeachings);
-    setDetailsModal(prev => {
-        const updatedTeaching = updatedTeachings.find(t => t.id === prev.teaching?.id);
-        return updatedTeaching ? { ...prev, teaching: updatedTeaching } : prev;
-    });
-
     try {
         await addReactionToTeaching(teachingId, reactionType);
-        setTeachingsInCache(updatedTeachings);
     } catch (error: any) {
         toast({ title: "Reaction Error", description: error.message || "Could not save reaction.", variant: "destructive" });
-        setTeachings(originalTeachings);
-        setDetailsModal(prev => {
-            const originalTeaching = originalTeachings.find(t => t.id === prev.teaching?.id);
-            return originalTeaching ? { ...prev, teaching: originalTeaching } : prev;
-        });
     }
   }
 
@@ -234,6 +249,7 @@ export function TeachingsSection() {
         toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
         return;
     }
+
     const newComment: Comment = {
       id: uuidv4(),
       author: data.author,
@@ -241,31 +257,11 @@ export function TeachingsSection() {
       createdAt: new Date().toISOString(),
     };
     
-    const originalTeachings = [...teachings];
-    const originalTeachingInModal = commentsModal.teaching;
-    
-    const updatedTeaching = {
-        ...commentsModal.teaching,
-        comments: [...(commentsModal.teaching.comments || []), newComment],
-    };
-
-    setCommentsModal({ isOpen: true, teaching: updatedTeaching });
-    setDetailsModal(prev => prev.teaching?.id === updatedTeaching.id ? { isOpen: true, teaching: updatedTeaching } : prev);
-    setTeachings(prevTeachings => {
-        const newTeachings = prevTeachings.map(t => t.id === updatedTeaching.id ? updatedTeaching : t);
-        setTeachingsInCache(newTeachings);
-        return newTeachings;
-    });
-    
     try {
       await addCommentToTeaching(commentsModal.teaching.id, newComment);
       commentForm.reset({ author: user?.displayName || '', text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
-      setTeachings(originalTeachings);
-      setCommentsModal({ isOpen: true, teaching: originalTeachingInModal });
-      setDetailsModal(prev => prev.teaching?.id === originalTeachingInModal.id ? { isOpen: true, teaching: originalTeachingInModal } : prev);
-      setTeachingsInCache(originalTeachings);
     }
   }
 
@@ -323,7 +319,7 @@ export function TeachingsSection() {
                     <DialogHeader> <DialogTitle>Add a New Teaching</DialogTitle> <DialogDescription>Share a teaching to edify others.</DialogDescription> </DialogHeader>
                     <Form {...teachingForm}>
                         <form onSubmit={teachingForm.handleSubmit(handleAddTeaching)} className="space-y-4">
-                            <FormField control={teachingForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Source/Speaker</FormLabel> <FormControl><Input placeholder="e.g., Jesus" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField control={teachingForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Source/Speaker</FormLabel> <FormControl><Input placeholder="e.g., Jesus" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={teachingForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Teaching</FormLabel> <FormControl><Textarea placeholder="A detailed summary of the teaching" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={teachingForm.control} name="category" render={({ field }) => ( 
                                 <FormItem> 
