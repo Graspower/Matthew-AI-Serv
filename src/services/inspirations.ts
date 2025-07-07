@@ -4,12 +4,14 @@
 import { db } from '@/lib/firebase';
 import { collection, getDocs, Firestore } from 'firebase/firestore';
 
-export interface InspirationVerse {
+export interface DailyInspiration {
   id: string;
   book: string;
   chapter: number;
   verse: number;
   text: string;
+  explanation: string;
+  timeOfDay: 'Morning' | 'Afternoon' | 'Evening';
 }
 
 function checkDb() {
@@ -22,9 +24,9 @@ function checkDb() {
 
 /**
  * Fetches the list of inspirational verses from the 'inspirations' collection in Firestore.
- * @returns A promise that resolves to an array of InspirationVerse objects.
+ * @returns A promise that resolves to an array of DailyInspiration objects.
  */
-export async function getInspirationalVerses(): Promise<InspirationVerse[]> {
+export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
   try {
     const firestore = checkDb();
     const inspirationsCol = collection(firestore, 'inspirations');
@@ -43,7 +45,9 @@ export async function getInspirationalVerses(): Promise<InspirationVerse[]> {
         chapter: data.chapter || 0,
         verse: data.verse || 0,
         text: data.text || '',
-      } as InspirationVerse;
+        explanation: data.explanation || '',
+        timeOfDay: data.timeOfDay || 'Morning',
+      } as DailyInspiration;
     });
     return verses;
   } catch (error: any) {

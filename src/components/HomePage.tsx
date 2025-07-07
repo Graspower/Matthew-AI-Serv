@@ -4,51 +4,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Volume2, VolumeX, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { generateVerseExplanation } from '@/ai/flows/generateVerseExplanationFlow';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getInspirationalVerses } from '@/services/inspirations';
+import { getInspirationalVerses, type DailyInspiration } from '@/services/inspirations';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 
-interface Verse {
-  book: string;
-  chapter: number;
-  verse: number;
-  text: string;
-}
-
-interface DailyVerse {
-  timeOfDay: 'Morning' | 'Afternoon' | 'Evening';
-  verse: Verse;
-  explanation: string;
-}
-
-const fallbackInspirationalVerses: Verse[] = [
-  { book: 'Psalm', chapter: 103, verse: 1, text: 'Bless the LORD, O my soul, and all that is within me, bless his holy name!' },
-  { book: 'Psalm', chapter: 103, verse: 2, text: 'Bless the LORD, O my soul, and forget not all his benefits.' },
-  { book: 'Psalm', chapter: 145, verse: 1, text: 'I will extol thee, my God, O king; and I will bless thy name for ever and ever.' },
-  { book: 'Psalm', chapter: 145, verse: 2, text: 'Every day will I bless thee; and I will praise thy name for ever and ever.' },
-  { book: 'Ephesians', chapter: 1, verse: 3, text: 'Blessed be the God and Father of our Lord Jesus Christ, who hath blessed us with all spiritual blessings in heavenly places in Christ.' },
-  { book: '1 Chronicles', chapter: 16, verse: 8, text: 'Give thanks unto the LORD, call upon his name, make known his deeds among the people.' },
-  { book: '1 Chronicles', chapter: 16, verse: 34, text: 'O give thanks unto the LORD; for he is good; for his mercy endureth for ever.' },
-  { book: 'Psalm', chapter: 95, verse: 2, text: 'Let us come before his presence with thanksgiving, and make a joyful noise unto him with psalms.' },
-  { book: 'Psalm', chapter: 107, verse: 1, text: 'O give thanks unto the LORD, for he is good: for his mercy endureth for ever.' },
-  { book: 'Colossians', chapter: 3, verse: 17, text: 'And whatsoever ye do in word or deed, do all in the name of the Lord Jesus, giving thanks to God and the Father by him.' },
-  { book: '1 Thessalonians', chapter: 5, verse: 18, text: 'In every thing give thanks: for this is the will of God in Christ Jesus concerning you.' },
-  { book: 'Hebrews', chapter: 13, verse: 15, text: 'By him therefore let us offer the sacrifice of praise to God continually, that is, the fruit of our lips giving thanks to his name.' },
-  { book: 'Psalm', chapter: 34, verse: 1, text: 'I will bless the LORD at all times: his praise shall continually be in my mouth.' },
-  { book: 'Jude', chapter: 1, verse: 25, text: 'To the only wise God our Saviour, be glory and majesty, dominion and power, both now and ever. Amen.'},
-  { book: 'Revelation', chapter: 4, verse: 11, text: 'Thou art worthy, O Lord, to receive glory and honour and power: for thou hast created all things, and for thy pleasure they are and were created.'},
-];
-
-// Helper to shuffle array and pick N items
-function pickRandomItems<T>(arr: T[], num: number): T[] {
-  const shuffled = [...arr].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, num);
-}
+// The new data structure for a daily verse, fetched directly from Firestore.
+interface DailyVerse extends DailyInspiration {}
 
 function CardSkeleton() {
     return (
@@ -85,7 +50,7 @@ function InspirationCard({ item, onSpeakClick, isSpeaking, onClick }: { item: Da
         <CardHeader className="p-4 relative">
           <CardTitle className="text-xl font-semibold text-center">{item.timeOfDay} Inspiration</CardTitle>
           <CardDescription className="text-primary font-semibold text-lg text-center pt-2">
-            {`${item.verse.book} ${item.verse.chapter}:${item.verse.verse}`}
+            {`${item.book} ${item.chapter}:${item.verse}`}
           </CardDescription>
            <Button 
             variant="ghost" 
@@ -100,7 +65,7 @@ function InspirationCard({ item, onSpeakClick, isSpeaking, onClick }: { item: Da
         <CardContent className="flex-grow flex flex-col gap-4 justify-center p-4 pt-0">
           <div className="text-center">
             <p className="text-2xl font-bold text-foreground leading-relaxed">
-              "{item.verse.text}"
+              "{item.text}"
             </p>
           </div>
           <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
@@ -162,7 +127,7 @@ export function HomePage() {
       synth.current.cancel();
     }
   
-    const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.verse.book} chapter ${item.verse.chapter}, verse ${item.verse.verse}. ${item.verse.text}. Adoration: ${item.explanation}`;
+    const textToSpeak = `${item.timeOfDay} Inspiration. Verse from ${item.book} chapter ${item.chapter}, verse ${item.verse}. ${item.text}. Adoration: ${item.explanation}`;
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.pitch = 1.0;
     utterance.rate = 0.9;
@@ -178,42 +143,27 @@ export function HomePage() {
     synth.current.speak(utterance);
   }, [isSpeaking, stopSpeaking, toast]);
 
-  const generateAndStoreVerses = useCallback(async () => {
+  const fetchAndStoreVerses = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     stopSpeaking();
 
-    let versesToUse: Verse[] = [];
-
     try {
-      try {
-        const remoteVerses = await getInspirationalVerses();
-        if (remoteVerses && remoteVerses.length >= 3) {
-          versesToUse = remoteVerses;
-        } else {
-          throw new Error("Not enough remote verses.");
-        }
-      } catch (fetchError) {
-        console.warn("Could not fetch remote inspirational verses, using fallback list:", fetchError);
-        versesToUse = fallbackInspirationalVerses;
+      const fetchedInspirations = await getInspirationalVerses();
+
+      if (!fetchedInspirations || fetchedInspirations.length === 0) {
+        throw new Error("No inspirational verses found in the database.");
       }
       
-      const selectedVerses = pickRandomItems(versesToUse, 3);
-      
-      const explanationPromises = selectedVerses.map(verse => 
-        generateVerseExplanation({
-          verseReference: `${verse.book} ${verse.chapter}:${verse.verse}`,
-          verseText: verse.text,
-        })
-      );
-      
-      const explanations = await Promise.all(explanationPromises);
+      const morning = fetchedInspirations.find(v => v.timeOfDay === 'Morning');
+      const afternoon = fetchedInspirations.find(v => v.timeOfDay === 'Afternoon');
+      const evening = fetchedInspirations.find(v => v.timeOfDay === 'Evening');
 
-      const newDailyVerses: DailyVerse[] = [
-        { timeOfDay: 'Morning', verse: selectedVerses[0], explanation: explanations[0].explanation },
-        { timeOfDay: 'Afternoon', verse: selectedVerses[1], explanation: explanations[1].explanation },
-        { timeOfDay: 'Evening', verse: selectedVerses[2], explanation: explanations[2].explanation },
-      ];
+      if (!morning || !afternoon || !evening) {
+        throw new Error("Incomplete daily verses. Ensure the 'inspirations' collection has a document for Morning, Afternoon, and Evening.");
+      }
+
+      const newDailyVerses = [morning, afternoon, evening];
 
       if (typeof window !== 'undefined') {
           const today = new Date().toISOString().split('T')[0];
@@ -222,8 +172,8 @@ export function HomePage() {
       setDailyVerses(newDailyVerses);
 
     } catch (err: any) {
-      console.error('Failed to generate daily inspiration:', err);
-      const errorMessage = `Failed to generate daily inspiration. ${err.message || 'Please try again.'}`;
+      console.error('Failed to fetch daily inspiration:', err);
+      const errorMessage = `Failed to fetch daily inspiration. ${err.message || 'Please try again.'}`;
       setError(errorMessage);
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
       setDailyVerses([]);
@@ -251,8 +201,8 @@ export function HomePage() {
         }
       } catch (e) { console.error("Failed to parse daily inspiration", e); }
     }
-    generateAndStoreVerses();
-  }, [generateAndStoreVerses]);
+    fetchAndStoreVerses();
+  }, [fetchAndStoreVerses]);
 
   useEffect(() => {
       const hour = new Date().getHours();
@@ -307,7 +257,7 @@ export function HomePage() {
             <CardContent className="text-center">
               <p className="text-destructive font-semibold">An Error Occurred</p>
               <p className="text-sm text-muted-foreground mt-2">{error}</p>
-              <Button onClick={generateAndStoreVerses} className="mt-4">Retry</Button>
+              <Button onClick={fetchAndStoreVerses} className="mt-4">Retry</Button>
             </CardContent>
           </Card>
         ) : dailyVerses.length > 0 ? (
@@ -362,12 +312,12 @@ export function HomePage() {
             <DialogHeader className="p-6 pb-4 border-b">
               <DialogTitle>{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
               <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
-                {`${selectedInspiration.verse.book} ${selectedInspiration.verse.chapter}:${selectedInspiration.verse.verse}`}
+                {`${selectedInspiration.book} ${selectedInspiration.chapter}:${selectedInspiration.verse}`}
               </DialogDescription>
             </DialogHeader>
             <div className="flex-grow overflow-y-auto p-6">
               <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
-                "{selectedInspiration.verse.text}"
+                "{selectedInspiration.text}"
               </p>
               <div className="mt-4 p-4 bg-muted/20 rounded-md border-l-4 border-primary">
                 <p className="text-lg font-normal text-muted-foreground text-left leading-relaxed">
