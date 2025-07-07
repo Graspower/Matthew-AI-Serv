@@ -39,16 +39,25 @@ export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
 
     const verses = snapshot.docs.map(doc => {
       const data = doc.data();
+      const timeOfDay = doc.id;
+      
+      // Use document ID for timeOfDay, and validate it's one of the expected values.
+      if (timeOfDay !== 'Morning' && timeOfDay !== 'Afternoon' && timeOfDay !== 'Evening') {
+          console.warn(`Unexpected document ID in 'inspirations' collection: ${doc.id}. Skipping.`);
+          return null;
+      }
+
       return {
         id: doc.id,
         book: data.book || '',
         chapter: data.chapter || 0,
         verse: data.verse || 0,
         text: data.text || '',
-        explanation: data.explanation || '',
-        timeOfDay: data.timeOfDay || 'Morning',
+        explanation: data.explanation || '', // Assumes adoration text is in a field named 'explanation'
+        timeOfDay: timeOfDay,
       } as DailyInspiration;
-    });
+    }).filter((v): v is DailyInspiration => v !== null); // Filter out any nulls from invalid doc IDs
+
     return verses;
   } catch (error: any) {
     console.error("Error fetching inspirational verses: ", error);
