@@ -62,7 +62,7 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
     setIsLoading(true);
     try {
       await signUp(data.name, data.email, data.password);
-      toast({ title: 'Success!', description: 'Your account has been created.' });
+      toast({ title: `Welcome, ${data.name}!`, description: 'Your account has been created.' });
       onAuthSuccess();
     } catch (error) {
       handleAuthError(error, 'signup');
@@ -74,8 +74,8 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await logIn(data.email, data.password);
-      toast({ title: 'Welcome back!' });
+      const userCredential = await logIn(data.email, data.password);
+      toast({ title: `Welcome back, ${userCredential.user.displayName || 'friend'}!` });
       onAuthSuccess();
     } catch (error) {
       handleAuthError(error, 'login');

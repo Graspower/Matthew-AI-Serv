@@ -72,12 +72,14 @@ function CommentArea({
   handleAddComment: (data: CommentFormData) => void;
   user: any;
 }) {
+  const sortedComments = (teaching.comments || []).slice().sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
   return (
     <>
       <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
         <div className="space-y-4">
-          {teaching.comments && teaching.comments.length > 0 ? (
-            teaching.comments.map(comment => (
+          {sortedComments.length > 0 ? (
+            sortedComments.map(comment => (
               <div key={comment.id} className="flex gap-3">
                 <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{(comment.author || 'A').charAt(0)}</div>
                 <div>
@@ -97,7 +99,9 @@ function CommentArea({
       <div className="mt-auto pt-4 border-t">
         <Form {...commentForm}>
           <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
+            {!user && (
+              <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            )}
             <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <div className="text-right">
                 <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
@@ -254,7 +258,7 @@ export function TeachingsSection() {
 
     const newComment: Comment = {
       id: uuidv4(),
-      author: data.author,
+      author: user.displayName || data.author,
       text: data.text,
       createdAt: new Date().toISOString(),
     };
@@ -321,7 +325,9 @@ export function TeachingsSection() {
                     <DialogHeader> <DialogTitle>Add a New Teaching</DialogTitle> <DialogDescription>Share a teaching to edify others.</DialogDescription> </DialogHeader>
                     <Form {...teachingForm}>
                         <form onSubmit={teachingForm.handleSubmit(handleAddTeaching)} className="space-y-4">
-                            <FormField control={teachingForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Source/Speaker</FormLabel> <FormControl><Input placeholder="e.g., Jesus" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
+                             {!user && (
+                                <FormField control={teachingForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Source/Speaker</FormLabel> <FormControl><Input placeholder="e.g., Jesus" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            )}
                             <FormField control={teachingForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Teaching</FormLabel> <FormControl><Textarea placeholder="A detailed summary of the teaching" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={teachingForm.control} name="category" render={({ field }) => ( 
                                 <FormItem> 
@@ -412,7 +418,7 @@ export function TeachingsSection() {
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>
-          <SheetContent side="bottom" className="max-h-[80vh] flex flex-col">
+          <SheetContent side="bottom" className="max-h-[90vh] flex flex-col">
             <SheetHeader className="text-left">
               <SheetTitle>Comments on "{commentsModal.teaching?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
@@ -434,5 +440,3 @@ export function TeachingsSection() {
     </div>
   );
 }
-
-    

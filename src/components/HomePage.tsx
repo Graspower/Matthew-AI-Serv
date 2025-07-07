@@ -208,9 +208,16 @@ export function HomePage() {
   }, []);
 
   useGSAP(() => {
-    if (!container.current || dailyVerses.length === 0 || isLoading) return;
+    if (!container.current || isLoading || dailyVerses.length === 0) return;
 
     const cards = gsap.utils.toArray('.inspiration-card');
+    
+    gsap.set(cards, { opacity: 0,
+        x: (i) => (i - activeIndex) * 50,
+        rotateY: (i) => (i - activeIndex) * -20,
+        transformOrigin: "50% 50%"
+    });
+
     cards.forEach((card, index) => {
       gsap.to(card as HTMLElement, {
         x: (index - activeIndex) * 50,
@@ -238,52 +245,53 @@ export function HomePage() {
   const handlePrev = () => setActiveIndex((prev) => (prev - 1 + dailyVerses.length) % dailyVerses.length);
   const handleNext = () => setActiveIndex((prev) => (prev + 1) % dailyVerses.length);
 
-  return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col items-center justify-center p-4 min-w-0">
-      <div className="w-full max-w-4xl text-center mb-4">
-        <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
-        <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
-      </div>
+  const renderContent = () => {
+    if (error) {
+        return (
+            <div className="w-full h-[580px] flex items-center justify-center">
+                <Card className="w-full max-w-sm shadow-lg rounded-xl flex flex-col items-center justify-center p-6">
+                    <CardContent className="text-center">
+                    <p className="text-destructive font-semibold">An Error Occurred</p>
+                    <p className="text-sm text-muted-foreground mt-2">{error}</p>
+                    <Button onClick={fetchAndStoreVerses} className="mt-4">Retry</Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
-      <div ref={container} className="relative w-full h-[520px] flex items-center justify-center [perspective:1200px] mt-2">
-        {isLoading ? (
-          <CardSkeleton />
-        ) : error ? (
-          <Card className="w-full max-w-sm shadow-lg rounded-xl flex flex-col items-center justify-center p-6">
-            <CardContent className="text-center">
-              <p className="text-destructive font-semibold">An Error Occurred</p>
-              <p className="text-sm text-muted-foreground mt-2">{error}</p>
-              <Button onClick={fetchAndStoreVerses} className="mt-4">Retry</Button>
-            </CardContent>
-          </Card>
-        ) : dailyVerses.length > 0 ? (
-            dailyVerses.map((item, index) => (
-                <div
-                    key={item.id || `inspiration-${index}`}
-                    className="inspiration-card absolute w-full max-w-xs sm:max-w-sm h-[480px]"
-                    style={{ opacity: 0 }} // Initially hide cards, GSAP will show them
-                >
-                    <InspirationCard 
-                        item={item} 
-                        isSpeaking={isSpeaking && activeIndex === index}
-                        onClick={() => handleCardClick(item, index)}
-                        onSpeakClick={(e) => {
-                            e.stopPropagation();
-                            speakInspiration(item);
-                        }}
-                    />
-                </div>
-            ))
-        ) : (
-          <Card className="w-full max-w-sm shadow-lg rounded-xl">
-            <CardContent className="p-6 text-center">
-              <p className="text-muted-foreground">Your daily inspiration is being prepared.</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+    if (dailyVerses.length === 0) {
+        return (
+            <div className="w-full h-[580px] flex items-center justify-center">
+                <Card className="w-full max-w-sm shadow-lg rounded-xl">
+                    <CardContent className="p-6 text-center">
+                    <p className="text-muted-foreground">Your daily inspiration is being prepared.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
-       {dailyVerses.length > 0 && !isLoading && !error && (
+    return (
+        <>
+            <div ref={container} className="relative w-full h-[520px] flex items-center justify-center [perspective:1200px] mt-2">
+                {dailyVerses.map((item, index) => (
+                    <div
+                        key={item.id || `inspiration-${index}`}
+                        className="inspiration-card absolute w-full max-w-xs sm:max-w-sm h-[480px]"
+                    >
+                        <InspirationCard 
+                            item={item} 
+                            isSpeaking={isSpeaking && activeIndex === index}
+                            onClick={() => handleCardClick(item, index)}
+                            onSpeakClick={(e) => {
+                                e.stopPropagation();
+                                speakInspiration(item);
+                            }}
+                        />
+                    </div>
+                ))}
+            </div>
             <div className="flex items-center gap-4 mt-4 z-20">
                 <Button variant="outline" size="icon" onClick={handlePrev} aria-label="Previous Inspiration">
                     <ChevronLeft className="h-6 w-6" />
@@ -297,7 +305,22 @@ export function HomePage() {
                     <ChevronRight className="h-6 w-6" />
                 </Button>
             </div>
-        )}
+        </>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-7xl mx-auto flex flex-col items-center justify-center p-4 min-w-0">
+      <div className="w-full max-w-4xl text-center mb-4">
+        <h2 className="text-2xl font-bold">Daily Divine Inspiration</h2>
+        <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
+      </div>
+
+      {isLoading ? (
+        <div className="w-full h-[580px] flex items-center justify-center">
+            <CardSkeleton />
+        </div>
+      ) : renderContent()}
       
       {selectedInspiration && (
         <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {

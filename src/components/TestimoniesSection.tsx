@@ -72,12 +72,14 @@ function CommentArea({
   handleAddComment: (data: CommentFormData) => void;
   user: any;
 }) {
+  const sortedComments = (testimony.comments || []).slice().sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
   return (
     <>
       <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
         <div className="space-y-4">
-          {testimony.comments && testimony.comments.length > 0 ? (
-            testimony.comments.map(comment => (
+          {sortedComments.length > 0 ? (
+            sortedComments.map(comment => (
               <div key={comment.id} className="flex gap-3">
                 <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{(comment.author || 'A').charAt(0)}</div>
                 <div>
@@ -97,7 +99,9 @@ function CommentArea({
       <div className="mt-auto pt-4 border-t">
         <Form {...commentForm}>
           <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
+            {!user && (
+              <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            )}
             <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <div className="text-right">
                 <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
@@ -133,13 +137,13 @@ export function TestimoniesSection() {
 
   // Pre-fill forms with user's name when dialogs open
   useEffect(() => {
-    if (user?.displayName && isAddTestimonyDialogOpen) {
+    if (user?.displayName) {
         testimonyForm.setValue('name', user.displayName);
     }
   }, [user, testimonyForm, isAddTestimonyDialogOpen]);
   
   useEffect(() => {
-    if (user?.displayName && commentsModal.isOpen) {
+    if (user?.displayName) {
         commentForm.setValue('author', user.displayName);
     }
   }, [user, commentForm, commentsModal.isOpen]);
@@ -225,7 +229,8 @@ export function TestimoniesSection() {
         return;
     }
     try {
-      await addTestimony(data, user.uid);
+      const payload = { ...data, name: user.displayName || data.name };
+      await addTestimony(payload, user.uid);
       toast({ title: 'Success!', description: 'Testimony added successfully.' });
       setIsAddTestimonyDialogOpen(false);
       testimonyForm.reset({name: user.displayName || '', description: '', category: ''});
@@ -255,7 +260,7 @@ export function TestimoniesSection() {
 
     const newComment: Comment = {
       id: uuidv4(),
-      author: data.author,
+      author: user.displayName || data.author,
       text: data.text,
       createdAt: new Date().toISOString(),
     };
@@ -322,7 +327,9 @@ export function TestimoniesSection() {
                     <DialogHeader> <DialogTitle>Add a New Testimony</DialogTitle> <DialogDescription>Share a testimony to encourage others.</DialogDescription> </DialogHeader>
                     <Form {...testimonyForm}>
                         <form onSubmit={testimonyForm.handleSubmit(handleAddTestimony)} className="space-y-4">
-                            <FormField control={testimonyForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Abraham" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            {!user && (
+                                <FormField control={testimonyForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Abraham" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            )}
                             <FormField control={testimonyForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Testimony</FormLabel> <FormControl><Textarea placeholder="A detailed description of the testimony" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={testimonyForm.control} name="category" render={({ field }) => (
                                 <FormItem> 
@@ -413,7 +420,7 @@ export function TestimoniesSection() {
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, testimony: null })}>
-          <SheetContent side="bottom" className="max-h-[80vh] flex flex-col">
+          <SheetContent side="bottom" className="max-h-[90vh] flex flex-col">
             <SheetHeader className="text-left">
               <SheetTitle>Comments on "{commentsModal.testimony?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
@@ -435,5 +442,3 @@ export function TestimoniesSection() {
     </div>
   );
 }
-
-    

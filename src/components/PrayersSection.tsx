@@ -72,12 +72,14 @@ function CommentArea({
   handleAddComment: (data: CommentFormData) => void;
   user: any;
 }) {
+  const sortedComments = (prayer.comments || []).slice().sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
   return (
     <>
       <ScrollArea className="flex-grow pr-6 -mr-6 my-4">
         <div className="space-y-4">
-          {prayer.comments && prayer.comments.length > 0 ? (
-            prayer.comments.map(comment => (
+          {sortedComments.length > 0 ? (
+            sortedComments.map(comment => (
               <div key={comment.id} className="flex gap-3">
                 <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{(comment.author || 'A').charAt(0)}</div>
                 <div>
@@ -97,7 +99,9 @@ function CommentArea({
       <div className="mt-auto pt-4 border-t">
         <Form {...commentForm}>
           <form onSubmit={commentForm.handleSubmit(handleAddComment)} className="space-y-4">
-            <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
+            {!user && (
+              <FormField control={commentForm.control} name="author" render={({ field }) => ( <FormItem> <FormLabel>Your Name</FormLabel> <FormControl><Input placeholder="Your name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            )}
             <FormField control={commentForm.control} name="text" render={({ field }) => ( <FormItem> <FormLabel>Your Comment</FormLabel> <FormControl><Textarea placeholder="Write a comment..." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <div className="text-right">
                 <Button type="submit" disabled={commentForm.formState.isSubmitting}>{commentForm.formState.isSubmitting ? 'Posting...' : 'Post Comment'}</Button>
@@ -255,7 +259,7 @@ export function PrayersSection() {
 
     const newComment: Comment = {
       id: uuidv4(),
-      author: data.author,
+      author: user.displayName || data.author,
       text: data.text,
       createdAt: new Date().toISOString(),
     };
@@ -322,7 +326,9 @@ export function PrayersSection() {
                     <DialogHeader> <DialogTitle>Add a New Prayer</DialogTitle> <DialogDescription>Share a prayer request or praise.</DialogDescription> </DialogHeader>
                     <Form {...prayerForm}>
                         <form onSubmit={prayerForm.handleSubmit(handleAddPrayer)} className="space-y-4">
-                            <FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} disabled={!!user} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            {!user && (
+                                <FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            )}
                             <FormField control={prayerForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Prayer Request</FormLabel> <FormControl><Textarea placeholder="A detailed description of your prayer" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                             <FormField control={prayerForm.control} name="category" render={({ field }) => ( 
                                 <FormItem> 
@@ -413,7 +419,7 @@ export function PrayersSection() {
 
       {isMobile ? (
         <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
-          <SheetContent side="bottom" className="max-h-[80vh] flex flex-col">
+          <SheetContent side="bottom" className="max-h-[90vh] flex flex-col">
             <SheetHeader className="text-left">
               <SheetTitle>Comments on "{commentsModal.prayer?.category}"</SheetTitle>
               <SheetDescription>Read what others are saying.</SheetDescription>
@@ -435,5 +441,3 @@ export function PrayersSection() {
     </div>
   );
 }
-
-    
