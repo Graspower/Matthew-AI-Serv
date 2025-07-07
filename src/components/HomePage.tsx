@@ -152,24 +152,14 @@ export function HomePage() {
       const fetchedInspirations = await getInspirationalVerses();
 
       if (!fetchedInspirations || fetchedInspirations.length === 0) {
-        throw new Error("No inspirational verses found in the database.");
+        throw new Error("No inspirational verses found. Please add documents to the 'inspirations' collection in Firestore.");
       }
-      
-      const morning = fetchedInspirations.find(v => v.timeOfDay === 'Morning');
-      const afternoon = fetchedInspirations.find(v => v.timeOfDay === 'Afternoon');
-      const evening = fetchedInspirations.find(v => v.timeOfDay === 'Evening');
-
-      if (!morning || !afternoon || !evening) {
-        throw new Error("Incomplete daily verses. Ensure the 'inspirations' collection has a document for Morning, Afternoon, and Evening.");
-      }
-
-      const newDailyVerses = [morning, afternoon, evening];
 
       if (typeof window !== 'undefined') {
           const today = new Date().toISOString().split('T')[0];
-          localStorage.setItem('dailyInspiration', JSON.stringify({ date: today, verses: newDailyVerses }));
+          localStorage.setItem('dailyInspiration', JSON.stringify({ date: today, verses: fetchedInspirations }));
       }
-      setDailyVerses(newDailyVerses);
+      setDailyVerses(fetchedInspirations);
 
     } catch (err: any) {
       console.error('Failed to fetch daily inspiration:', err);
@@ -194,7 +184,7 @@ export function HomePage() {
     if (storedData) {
       try {
         const { date, verses } = JSON.parse(storedData);
-        if (date === today && Array.isArray(verses) && verses.length === 3) {
+        if (date === today && Array.isArray(verses) && verses.length > 0) {
           setDailyVerses(verses);
           setIsLoading(false);
           return;
@@ -263,7 +253,7 @@ export function HomePage() {
         ) : dailyVerses.length > 0 ? (
             dailyVerses.map((item, index) => (
                 <div
-                    key={item.timeOfDay}
+                    key={item.id}
                     className="inspiration-card absolute w-full max-w-xs sm:max-w-sm h-[480px]"
                     style={{ opacity: 0 }} // Initially hide cards, GSAP will show them
                 >

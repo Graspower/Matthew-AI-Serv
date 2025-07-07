@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, Firestore } from 'firebase/firestore';
+import { collection, getDocs, Firestore, query, limit } from 'firebase/firestore';
 
 export interface DailyInspiration {
   id: string;
@@ -30,33 +30,29 @@ export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
   try {
     const firestore = checkDb();
     const inspirationsCol = collection(firestore, 'inspirations');
-    const snapshot = await getDocs(inspirationsCol);
+    // Fetch up to 3 documents. For more specific verses, you might order by a timestamp.
+    const snapshot = await getDocs(query(inspirationsCol, limit(3)));
 
     if (snapshot.empty) {
       console.warn('No documents found in "inspirations" collection.');
       return [];
     }
+    
+    const timeOfDayMap: ('Morning' | 'Afternoon' | 'Evening')[] = ['Morning', 'Afternoon', 'Evening'];
 
-    const verses = snapshot.docs.map(doc => {
+    const verses = snapshot.docs.map((doc, index) => {
       const data = doc.data();
-      const timeOfDay = doc.id;
       
-      // Use document ID for timeOfDay, and validate it's one of the expected values.
-      if (timeOfDay !== 'Morning' && timeOfDay !== 'Afternoon' && timeOfDay !== 'Evening') {
-          console.warn(`Unexpected document ID in 'inspirations' collection: ${doc.id}. Skipping.`);
-          return null;
-      }
-
       return {
         id: doc.id,
         book: data.book || '',
         chapter: data.chapter || 0,
         verse: data.verse || 0,
         text: data.text || '',
-        explanation: data.explanation || '', // Assumes adoration text is in a field named 'explanation'
-        timeOfDay: timeOfDay,
+        explanation: data.adoration || '', // Map 'adoration' field from Firestore
+        timeOfDay: timeOfDayMap[index] || 'Evening', // Assign based on fetch order
       } as DailyInspiration;
-    }).filter((v): v is DailyInspiration => v !== null); // Filter out any nulls from invalid doc IDs
+    }).filter((v): v is DailyInspiration => v !== null);
 
     return verses;
   } catch (error: any) {
