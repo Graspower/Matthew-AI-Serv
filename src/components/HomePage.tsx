@@ -253,7 +253,7 @@ export function HomePage() {
         ) : dailyVerses.length > 0 ? (
             dailyVerses.map((item, index) => (
                 <div
-                    key={item.id}
+                    key={item.id || `inspiration-${index}`}
                     className="inspiration-card absolute w-full max-w-xs sm:max-w-sm h-[480px]"
                     style={{ opacity: 0 }} // Initially hide cards, GSAP will show them
                 >
