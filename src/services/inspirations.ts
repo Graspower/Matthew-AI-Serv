@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, Firestore, query, limit } from 'firebase/firestore';
+import { collection, getDocs, Firestore, query } from 'firebase/firestore';
 
 export interface DailyInspiration {
   id: string;
@@ -10,7 +10,7 @@ export interface DailyInspiration {
   chapter: number;
   verse: number;
   text: string;
-  explanation: string;
+  explanation: string; // This is the 'adoration' field from firestore
   timeOfDay: 'Morning' | 'Afternoon' | 'Evening';
 }
 
@@ -23,26 +23,25 @@ function checkDb() {
 
 
 /**
- * Fetches the list of inspirational verses from the 'inspirations' collection in Firestore.
+ * Fetches 3 random inspirational verses from the 'inspirations' collection in Firestore.
  * @returns A promise that resolves to an array of DailyInspiration objects.
  */
 export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
   try {
     const firestore = checkDb();
     const inspirationsCol = collection(firestore, 'inspirations');
-    // Fetch up to 3 documents. For more specific verses, you might order by a timestamp.
-    const snapshot = await getDocs(query(inspirationsCol, limit(3)));
+    // Note: For large collections, fetching all documents is inefficient.
+    // This implementation assumes a relatively small number of total inspirations.
+    // For scaling, a different strategy (like adding a random field to documents) would be needed.
+    const snapshot = await getDocs(query(inspirationsCol));
 
     if (snapshot.empty) {
       console.warn('No documents found in "inspirations" collection.');
       return [];
     }
-    
-    const timeOfDayMap: ('Morning' | 'Afternoon' | 'Evening')[] = ['Morning', 'Afternoon', 'Evening'];
 
-    const verses = snapshot.docs.map((doc, index) => {
+    const allVerses = snapshot.docs.map(doc => {
       const data = doc.data();
-      
       return {
         id: doc.id,
         book: data.book || '',
@@ -50,11 +49,28 @@ export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
         verse: data.verse || 0,
         text: data.text || '',
         explanation: data.adoration || '', // Map 'adoration' field from Firestore
-        timeOfDay: timeOfDayMap[index] || 'Evening', // Assign based on fetch order
-      } as DailyInspiration;
-    }).filter((v): v is DailyInspiration => v !== null);
+      };
+    });
 
-    return verses;
+    // Shuffle the array and take the first 3
+    const shuffled = allVerses.sort(() => 0.5 - Math.random());
+    const selectedVerses = shuffled.slice(0, 3);
+    
+    if (selectedVerses.length < 3) {
+      console.warn(`Only found ${selectedVerses.length} documents in "inspirations" collection. Expected 3.`);
+    }
+
+    const timeOfDayMap: ('Morning' | 'Afternoon' | 'Evening')[] = ['Morning', 'Afternoon', 'Evening'];
+
+    const versesWithTimeOfDay = selectedVerses.map((verse, index) => {
+        return {
+            ...verse,
+            timeOfDay: timeOfDayMap[index] || 'Evening',
+        } as DailyInspiration;
+    });
+
+    return versesWithTimeOfDay;
+
   } catch (error: any) {
     console.error("Error fetching inspirational verses: ", error);
     if (error.code === 'permission-denied') {

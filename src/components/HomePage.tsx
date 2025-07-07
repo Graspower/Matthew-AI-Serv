@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getInspirationalVerses, type DailyInspiration } from '@/services/inspirations';
+import { getInspirationalVerses } from '@/services/inspirations';
+import type { DailyInspiration } from '@/services/inspirations';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 
@@ -63,15 +64,15 @@ function InspirationCard({ item, onSpeakClick, isSpeaking, onClick }: { item: Da
           </Button>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4 justify-center p-4 pt-0">
-          <div className="text-center">
+          <blockquote className="text-center p-4 border-l-4 border-primary bg-muted/20 rounded-r-md">
             <p className="text-2xl font-bold text-foreground leading-relaxed">
               "{item.text}"
             </p>
-          </div>
-          <div className="p-4 bg-muted/20 rounded-md border-l-4 border-primary">
+          </blockquote>
+          <div className="p-4">
              <p className="text-base font-normal text-muted-foreground text-left leading-relaxed">
               {truncateText(item.explanation, 120)}...
-              <span className="text-primary font-semibold ml-1">
+              <span className="text-primary font-semibold ml-1 cursor-pointer">
                 Read More
               </span>
             </p>
