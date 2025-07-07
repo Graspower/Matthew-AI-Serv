@@ -30,9 +30,6 @@ export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
   try {
     const firestore = checkDb();
     const inspirationsCol = collection(firestore, 'inspirations');
-    // Note: For large collections, fetching all documents is inefficient.
-    // This implementation assumes a relatively small number of total inspirations.
-    // For scaling, a different strategy (like adding a random field to documents) would be needed.
     const snapshot = await getDocs(query(inspirationsCol));
 
     if (snapshot.empty) {
@@ -48,7 +45,7 @@ export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
         chapter: data.chapter || 0,
         verse: data.verse || 0,
         text: data.text || '',
-        explanation: data.adoration || '', // Map 'adoration' field from Firestore
+        explanation: data.adoration || '',
       };
     });
 
@@ -62,11 +59,17 @@ export async function getInspirationalVerses(): Promise<DailyInspiration[]> {
 
     const timeOfDayMap: ('Morning' | 'Afternoon' | 'Evening')[] = ['Morning', 'Afternoon', 'Evening'];
 
-    const versesWithTimeOfDay = selectedVerses.map((verse, index) => {
-        return {
-            ...verse,
+    const versesWithTimeOfDay: DailyInspiration[] = selectedVerses.map((verse, index) => {
+        const dailyVerse: DailyInspiration = {
+            id: verse.id,
+            book: verse.book,
+            chapter: verse.chapter,
+            verse: verse.verse,
+            text: verse.text,
+            explanation: verse.explanation,
             timeOfDay: timeOfDayMap[index] || 'Evening',
-        } as DailyInspiration;
+        };
+        return dailyVerse;
     });
 
     return versesWithTimeOfDay;

@@ -185,12 +185,17 @@ export function HomePage() {
     if (storedData) {
       try {
         const { date, verses } = JSON.parse(storedData);
-        if (date === today && Array.isArray(verses) && verses.length > 0) {
+        // Validate the structure of the cached data before using it.
+        if (date === today && Array.isArray(verses) && verses.length > 0 && verses[0].book && typeof verses[0].text !== 'undefined') {
           setDailyVerses(verses);
           setIsLoading(false);
           return;
         }
-      } catch (e) { console.error("Failed to parse daily inspiration", e); }
+      } catch (e) { 
+        console.error("Failed to parse or validate daily inspiration cache, fetching new data.", e);
+        // Clear broken cache
+        localStorage.removeItem('dailyInspiration');
+      }
     }
     fetchAndStoreVerses();
   }, [fetchAndStoreVerses]);
