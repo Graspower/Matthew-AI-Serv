@@ -79,10 +79,10 @@ function CommentArea({
           {testimony.comments && testimony.comments.length > 0 ? (
             testimony.comments.map(comment => (
               <div key={comment.id} className="flex gap-3">
-                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{comment.author.charAt(0)}</div>
+                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold">{(comment.author || 'A').charAt(0)}</div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold">{comment.author}</p>
+                    <p className="font-semibold">{comment.author || 'Anonymous'}</p>
                     <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</p>
                   </div>
                   <p className="text-sm text-foreground/90">{comment.text}</p>
@@ -160,7 +160,9 @@ export function TestimoniesSection() {
       const testimonyList = querySnapshot.docs.map(doc => {
         const data = doc.data();
         const comments = (data.comments || []).map((c: any) => ({
-          ...c,
+          id: c.id || uuidv4(),
+          author: c.author || 'Anonymous',
+          text: c.text || '',
           createdAt: c.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
         }));
         return {
@@ -377,12 +379,12 @@ export function TestimoniesSection() {
               <div className="flex items-center ml-auto">
                 <Popover>
                   <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Heart className="h-4 w-4 text-red-500" />
                           <span className="text-xs">{(detailsModal.testimony.reactions?.like || 0) + (detailsModal.testimony.reactions?.pray || 0) + (detailsModal.testimony.reactions?.claps || 0)}</span>
                       </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-1">
+                  <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.testimony!.id, 'like')}>
                               <Heart className="h-4 w-4" />
@@ -399,7 +401,7 @@ export function TestimoniesSection() {
                       </div>
                   </PopoverContent>
                 </Popover>
-                <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={() => setCommentsModal({ isOpen: true, testimony: detailsModal.testimony })}>
+                <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => { e.stopPropagation(); setDetailsModal({isOpen: false, testimony: null}); setCommentsModal({ isOpen: true, testimony: detailsModal.testimony }); }}>
                   <MessageSquare className="h-4 w-4" />
                   <span className="text-xs">{detailsModal.testimony.comments?.length || 0}</span>
                 </Button>
@@ -433,3 +435,5 @@ export function TestimoniesSection() {
     </div>
   );
 }
+
+    
