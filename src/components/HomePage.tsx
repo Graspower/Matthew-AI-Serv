@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +13,7 @@ import { getInspirationalVerses } from '@/services/inspirations';
 import type { DailyInspiration } from '@/services/inspirations';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // The new data structure for a daily verse, fetched directly from Firestore.
 interface DailyVerse extends DailyInspiration {}
@@ -96,6 +98,7 @@ export function HomePage() {
   const synth = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
   const container = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
 
   useEffect(() => {
@@ -155,9 +158,9 @@ export function HomePage() {
       if (!fetchedInspirations || fetchedInspirations.length === 0) {
         throw new Error("No inspirational verses found. Please add documents to the 'inspirations' collection in Firestore.");
       }
-
+      
+      const today = new Date().toISOString().split('T')[0];
       if (typeof window !== 'undefined') {
-          const today = new Date().toISOString().split('T')[0];
           localStorage.setItem('dailyInspiration', JSON.stringify({ date: today, verses: fetchedInspirations }));
       }
       setDailyVerses(fetchedInspirations);
@@ -185,7 +188,6 @@ export function HomePage() {
     if (storedData) {
       try {
         const { date, verses } = JSON.parse(storedData);
-        // Validate the structure of the cached data before using it.
         if (date === today && Array.isArray(verses) && verses.length > 0 && verses[0].book && typeof verses[0].text !== 'undefined') {
           setDailyVerses(verses);
           setIsLoading(false);
@@ -193,7 +195,6 @@ export function HomePage() {
         }
       } catch (e) { 
         console.error("Failed to parse or validate daily inspiration cache, fetching new data.", e);
-        // Clear broken cache
         localStorage.removeItem('dailyInspiration');
       }
     }
@@ -245,6 +246,27 @@ export function HomePage() {
   const handlePrev = () => setActiveIndex((prev) => (prev - 1 + dailyVerses.length) % dailyVerses.length);
   const handleNext = () => setActiveIndex((prev) => (prev + 1) % dailyVerses.length);
 
+  const InspirationDialogContent = ({ inspiration }: { inspiration: DailyVerse }) => (
+    <>
+      <DialogHeader className="p-6 pb-4 border-b">
+        <DialogTitle>{inspiration.timeOfDay} Inspiration</DialogTitle>
+        <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
+          {`${inspiration.book} ${inspiration.chapter}:${inspiration.verse}`}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="flex-grow overflow-y-auto p-6">
+        <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
+          "{inspiration.text}"
+        </p>
+        <div className="mt-4 p-4 bg-muted/20 rounded-md border-l-4 border-primary">
+          <p className="text-lg font-normal text-muted-foreground text-left leading-relaxed">
+            {inspiration.explanation}
+          </p>
+        </div>
+      </div>
+    </>
+  );
+
   const renderContent = () => {
     if (error) {
         return (
@@ -260,51 +282,52 @@ export function HomePage() {
         );
     }
 
-    if (dailyVerses.length === 0) {
-        return (
-            <div className="w-full h-[580px] flex items-center justify-center">
-                <Card className="w-full max-w-sm shadow-lg rounded-xl">
-                    <CardContent className="p-6 text-center">
-                    <p className="text-muted-foreground">Your daily inspiration is being prepared.</p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
     return (
         <>
             <div ref={container} className="relative w-full h-[520px] flex items-center justify-center [perspective:1200px] mt-2">
-                {dailyVerses.map((item, index) => (
-                    <div
-                        key={item.id || `inspiration-${index}`}
-                        className="inspiration-card absolute w-full max-w-xs sm:max-w-sm h-[480px]"
-                    >
-                        <InspirationCard 
-                            item={item} 
-                            isSpeaking={isSpeaking && activeIndex === index}
-                            onClick={() => handleCardClick(item, index)}
-                            onSpeakClick={(e) => {
-                                e.stopPropagation();
-                                speakInspiration(item);
-                            }}
-                        />
+                {isLoading ? (
+                    <div className="absolute w-full max-w-xs sm:max-w-sm h-[480px]">
+                        <CardSkeleton />
                     </div>
-                ))}
+                ) : (
+                    dailyVerses.map((item, index) => (
+                        <div
+                            key={item.id || `inspiration-${index}`}
+                            className="inspiration-card absolute w-full max-w-xs sm:max-w-sm h-[480px]"
+                        >
+                            <InspirationCard 
+                                item={item} 
+                                isSpeaking={isSpeaking && activeIndex === index}
+                                onClick={() => handleCardClick(item, index)}
+                                onSpeakClick={(e) => {
+                                    e.stopPropagation();
+                                    speakInspiration(item);
+                                }}
+                            />
+                        </div>
+                    ))
+                )}
             </div>
-            <div className="flex items-center gap-4 mt-4 z-20">
-                <Button variant="outline" size="icon" onClick={handlePrev} aria-label="Previous Inspiration">
-                    <ChevronLeft className="h-6 w-6" />
-                </Button>
-                <div className="flex items-center gap-2">
-                    {dailyVerses.map((_, index) => (
-                        <button key={index} onClick={() => setActiveIndex(index)} className={`h-2.5 w-2.5 rounded-full transition-colors ${activeIndex === index ? 'bg-primary' : 'bg-muted'}`} aria-label={`Go to slide ${index + 1}`}></button>
-                    ))}
+            {!isLoading && dailyVerses.length > 0 && (
+                <div className="flex items-center gap-4 mt-4 z-20">
+                    <Button variant="outline" size="icon" onClick={handlePrev} aria-label="Previous Inspiration">
+                        <ChevronLeft className="h-6 w-6" />
+                    </Button>
+                    <div className="flex items-center gap-2">
+                        {dailyVerses.map((_, index) => (
+                            <button key={index} onClick={() => setActiveIndex(index)} className={`h-2.5 w-2.5 rounded-full transition-colors ${activeIndex === index ? 'bg-primary' : 'bg-muted'}`} aria-label={`Go to slide ${index + 1}`}></button>
+                        ))}
+                    </div>
+                    <Button variant="outline" size="icon" onClick={handleNext} aria-label="Next Inspiration">
+                        <ChevronRight className="h-6 w-6" />
+                    </Button>
                 </div>
-                <Button variant="outline" size="icon" onClick={handleNext} aria-label="Next Inspiration">
-                    <ChevronRight className="h-6 w-6" />
-                </Button>
-            </div>
+            )}
+            {isLoading && (
+              <div className="w-full flex items-center justify-center h-12 mt-4">
+                <Skeleton className="h-10 w-48" />
+              </div>
+            )}
         </>
     );
   }
@@ -316,38 +339,30 @@ export function HomePage() {
         <p className="text-muted-foreground">Verses of Blessing, Adoration, and Thanksgiving</p>
       </div>
 
-      {isLoading ? (
-        <div className="w-full h-[580px] flex items-center justify-center">
-            <CardSkeleton />
-        </div>
-      ) : renderContent()}
+      {renderContent()}
       
       {selectedInspiration && (
-        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) stopSpeaking();
-          setIsDialogOpen(isOpen);
-        }}>
-          <DialogContent className="max-w-2xl w-[95vw] sm:w-[90vw] max-h-[85vh] flex flex-col p-0">
-            <DialogHeader className="p-6 pb-4 border-b">
-              <DialogTitle>{selectedInspiration.timeOfDay} Inspiration</DialogTitle>
-              <DialogDescription className="text-primary font-semibold text-lg pt-2 text-center">
-                {`${selectedInspiration.book} ${selectedInspiration.chapter}:${selectedInspiration.verse}`}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-grow overflow-y-auto p-6">
-              <p className="text-center text-3xl font-bold text-foreground leading-relaxed">
-                "{selectedInspiration.text}"
-              </p>
-              <div className="mt-4 p-4 bg-muted/20 rounded-md border-l-4 border-primary">
-                <p className="text-lg font-normal text-muted-foreground text-left leading-relaxed">
-                  {selectedInspiration.explanation}
-                </p>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        isMobile ? (
+          <Sheet open={isDialogOpen} onOpenChange={(isOpen) => {
+            if (!isOpen) stopSpeaking();
+            setIsDialogOpen(isOpen);
+          }}>
+            <SheetContent side="bottom" className="w-full rounded-t-2xl border max-h-[90vh] flex flex-col p-0">
+              <div className="mx-auto mt-4 h-2 w-20 flex-shrink-0 rounded-full bg-muted" />
+              <InspirationDialogContent inspiration={selectedInspiration} />
+            </SheetContent>
+          </Sheet>
+        ) : (
+          <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+            if (!isOpen) stopSpeaking();
+            setIsDialogOpen(isOpen);
+          }}>
+            <DialogContent className="max-w-2xl w-[95vw] sm:w-[90vw] max-h-[85vh] flex flex-col p-0 rounded-xl border">
+              <InspirationDialogContent inspiration={selectedInspiration} />
+            </DialogContent>
+          </Dialog>
+        )
       )}
     </div>
   );
-
 }

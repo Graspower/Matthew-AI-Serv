@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { addPrayer, addCommentToPrayer, addReactionToPrayer, type Prayer } from '@/services/prayers';
@@ -28,14 +28,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Comment, Reactions } from '@/types';
 
 const prayerFormSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }).optional(),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
   category: z.string().min(2, { message: 'A category is required.' }).max(40, { message: 'Category must be 40 characters or less.' }),
 });
 type PrayerFormData = z.infer<typeof prayerFormSchema>;
 
 const commentFormSchema = z.object({
-  author: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  author: z.string().min(2, { message: 'Name must be at least 2 characters.' }).optional(),
   text: z.string().min(1, { message: 'Comment cannot be empty.' }).max(500, { message: 'Comment must be 500 characters or less.'}),
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
@@ -127,38 +127,27 @@ export function PrayersSection() {
   
   const prayerForm = useForm<PrayerFormData>({
     resolver: zodResolver(prayerFormSchema),
-    defaultValues: { name: '', description: '', category: '' },
+    defaultValues: { description: '', category: '' },
   });
 
   const commentForm = useForm<CommentFormData>({
     resolver: zodResolver(commentFormSchema),
-    defaultValues: { author: '', text: '' },
+    defaultValues: { text: '' },
+  });
+  
+  const quickCommentForm = useForm<CommentFormData>({
+    resolver: zodResolver(commentFormSchema),
+    defaultValues: { text: '' },
   });
 
-  // Pre-fill forms with user's name when dialogs open
-  useEffect(() => {
-    if (user?.displayName && isAddPrayerDialogOpen) {
-        prayerForm.setValue('name', user.displayName);
-    }
-  }, [user, prayerForm, isAddPrayerDialogOpen]);
-  
-  useEffect(() => {
-    if (user?.displayName && commentsModal.isOpen) {
-        commentForm.setValue('author', user.displayName);
-    }
-  }, [user, commentForm, commentsModal.isOpen]);
-
-  // Real-time listener for prayers
   useEffect(() => {
     if (!db) {
       setPrayersError("Firebase is not configured.");
       setIsLoadingPrayers(false);
       return;
     }
-
     setIsLoadingPrayers(true);
     const prayersCol = collection(db, 'prayers');
-    
     const unsubscribe = onSnapshot(prayersCol, (querySnapshot) => {
       const prayerList = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -184,19 +173,12 @@ export function PrayersSection() {
       setIsLoadingPrayers(false);
     }, (error) => {
       console.error("Error fetching prayers in real-time: ", error);
-      if (error.code === 'permission-denied') {
-        setPrayersError("Permission Denied: Your security rules are not set up to allow reading prayers.");
-      } else {
-        setPrayersError(error.message || "Failed to load prayers.");
-      }
+      setPrayersError(error.message || "Failed to load prayers.");
       setIsLoadingPrayers(false);
     });
-
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 
-  // Keep modals in sync with the real-time prayers list
   useEffect(() => {
     if (detailsModal.isOpen && detailsModal.prayer) {
       const updatedPrayer = prayers.find(p => p.id === detailsModal.prayer!.id);
@@ -229,10 +211,10 @@ export function PrayersSection() {
         return;
     }
     try {
-      await addPrayer(data, user.uid);
+      await addPrayer({ ...data, name: user.displayName || 'Anonymous' }, user.uid);
       toast({ title: 'Success!', description: 'Prayer added successfully.' });
       setIsAddPrayerDialogOpen(false);
-      prayerForm.reset({name: user.displayName || '', description: '', category: ''});
+      prayerForm.reset({description: '', category: ''});
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add prayer.', variant: 'destructive' });
     }
@@ -250,193 +232,112 @@ export function PrayersSection() {
     }
   }
 
-  async function handleAddComment(data: CommentFormData) {
-    if (!commentsModal.prayer) return;
+  async function handleAddComment(data: CommentFormData, prayerId: string, formToReset: UseFormReturn<CommentFormData>) {
     if (!user) {
         toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
         return;
     }
-
     const newComment: Comment = {
       id: uuidv4(),
-      author: user.displayName || data.author,
+      author: user.displayName || data.author || 'Anonymous',
       text: data.text,
       createdAt: new Date().toISOString(),
     };
-
     try {
-      await addCommentToPrayer(commentsModal.prayer.id, newComment);
-      commentForm.reset({ author: user?.displayName || '', text: '' });
+      await addCommentToPrayer(prayerId, newComment);
+      formToReset.reset({ text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
     }
   }
 
-  const PrayerContentCard = ({ item }: { item: Prayer }) => {
-    return (
-      <Card 
-        className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer transition-transform duration-300 hover:scale-105 hover:shadow-xl"
-        onClick={() => setDetailsModal({isOpen: true, prayer: item})}
-      >
-        <CardContent className="flex-grow flex flex-col p-6 justify-center items-center text-center">
-            <h3 className="font-serif font-semibold text-xl text-primary/90 capitalize [text-shadow:0_1px_2px_hsl(var(--primary)/0.2)]">
-                {item.category}
-            </h3>
-            <div className="mt-4">
-                <p className="font-semibold text-lg">{item.name}</p>
-                <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
-            </div>
-        </CardContent>
-         <CardFooter className="p-2 border-t justify-end flex items-center gap-1">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>
-                  <Heart className="h-4 w-4" />
-                  <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}><Heart className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}><Hand className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-            <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); setCommentsModal({isOpen: true, prayer: item}); }}>
-                <MessageSquare className="h-4 w-4" />
-                <span>{item.comments?.length || 0}</span>
-            </Button>
-        </CardFooter>
-      </Card>
-    );
-  };
+  const PrayerContentCard = ({ item }: { item: Prayer }) => (
+    <Card 
+      className="w-full flex flex-col shadow-lg rounded-xl overflow-hidden min-h-[300px] bg-card cursor-pointer transition-transform duration-300 hover:scale-105 hover:shadow-xl"
+      onClick={() => setDetailsModal({isOpen: true, prayer: item})}
+    >
+      <CardContent className="flex-grow flex flex-col p-6 justify-center items-center text-center">
+          <h3 className="font-serif font-semibold text-xl text-primary/90 capitalize [text-shadow:0_1px_2px_hsl(var(--primary)/0.2)]">{item.category}</h3>
+          <div className="mt-4">
+              <p className="font-semibold text-lg">{item.name}</p>
+              <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
+          </div>
+      </CardContent>
+       <CardFooter className="p-2 border-t justify-end flex items-center gap-1">
+          <Popover>
+            <PopoverTrigger asChild><Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}><Heart className="h-4 w-4" /><span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span></Button></PopoverTrigger>
+            <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}><div className="flex gap-1"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}><Heart className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}><Hand className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button></div></PopoverContent>
+          </Popover>
+          <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); setCommentsModal({isOpen: true, prayer: item}); }}><MessageSquare className="h-4 w-4" /><span>{item.comments?.length || 0}</span></Button>
+      </CardFooter>
+    </Card>
+  );
 
   return (
     <div className="w-full text-center">
         <div className="flex justify-between items-center mb-6">
-            <div>
-                <h2 className="text-2xl font-bold text-left">Prayers</h2>
-                <p className="text-muted-foreground text-left">Community prayer requests and praises.</p>
-            </div>
-            <Dialog open={isAddPrayerDialogOpen} onOpenChange={setIsAddPrayerDialogOpen}>
-                <DialogTrigger asChild><Button>Add Prayer</Button></DialogTrigger>
-                <DialogContent>
-                    <DialogHeader> <DialogTitle>Add a New Prayer</DialogTitle> <DialogDescription>Share a prayer request or praise.</DialogDescription> </DialogHeader>
-                    <Form {...prayerForm}>
-                        <form onSubmit={prayerForm.handleSubmit(handleAddPrayer)} className="space-y-4">
-                            {!user && (
-                                <FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            )}
-                            <FormField control={prayerForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Prayer Request</FormLabel> <FormControl><Textarea placeholder="A detailed description of your prayer" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={prayerForm.control} name="category" render={({ field }) => ( 
-                                <FormItem> 
-                                    <FormLabel>Prayer Category</FormLabel> 
-                                    <FormControl><Input placeholder="e.g., For Healing" {...field} /></FormControl> 
-                                     <div className="flex flex-wrap gap-2 pt-2">
-                                        {prayerCategories.map(cat => (
-                                            <Button key={cat} type="button" variant="outline" size="sm" onClick={() => prayerForm.setValue('category', cat, { shouldValidate: true })}>{cat}</Button>
-                                        ))}
-                                    </div>
-                                    <FormMessage /> 
-                                </FormItem> 
-                            )}/>
-                            <Button type="submit" disabled={prayerForm.formState.isSubmitting}>{prayerForm.formState.isSubmitting ? 'Submitting...' : 'Submit Prayer'}</Button>
-                        </form>
-                    </Form>
+            <div><h2 className="text-2xl font-bold text-left">Prayers</h2><p className="text-muted-foreground text-left">Community prayer requests and praises.</p></div>
+            <Dialog open={isAddPrayerDialogOpen} onOpenChange={setIsAddPrayerDialogOpen}><DialogTrigger asChild><Button>Add Prayer</Button></DialogTrigger>
+                <DialogContent className="rounded-xl border"><DialogHeader> <DialogTitle>Add a New Prayer</DialogTitle> <DialogDescription>Share a prayer request or praise.</DialogDescription> </DialogHeader>
+                    <Form {...prayerForm}><form onSubmit={prayerForm.handleSubmit(handleAddPrayer)} className="space-y-4">
+                        {!user && (<FormField control={prayerForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Name</FormLabel> <FormControl><Input placeholder="e.g., Jane D." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>)}
+                        <FormField control={prayerForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Prayer Request</FormLabel> <FormControl><Textarea placeholder="A detailed description of your prayer" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                        <FormField control={prayerForm.control} name="category" render={({ field }) => ( <FormItem> <FormLabel>Prayer Category</FormLabel> <FormControl><Input placeholder="e.g., For Healing" {...field} /></FormControl> <div className="flex flex-wrap gap-2 pt-2">{prayerCategories.map(cat => (<Button key={cat} type="button" variant="outline" size="sm" onClick={() => prayerForm.setValue('category', cat, { shouldValidate: true })}>{cat}</Button>))}</div><FormMessage /> </FormItem> )}/>
+                        <Button type="submit" disabled={prayerForm.formState.isSubmitting}>{prayerForm.formState.isSubmitting ? 'Submitting...' : 'Submit Prayer'}</Button>
+                    </form></Form>
                 </DialogContent>
             </Dialog>
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoadingPrayers ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
-          : prayersError ? (
-              <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                  <CardContent className="p-6">
-                      <h3 className="text-destructive font-bold">Error Loading Prayers</h3>
-                      <p>The application encountered an error while trying to fetch data.</p>
-                      <p className="font-semibold mt-2">Error Details:</p>
-                      <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{prayersError}</p>
-                  </CardContent>
-              </Card>
-          ) : prayers.length > 0 ? (
-            prayers.map((item) => <PrayerContentCard key={item.id} item={item} />)
-          ) : (
-            <div className="col-span-full text-center text-muted-foreground mt-8">
-              <p>No prayers have been shared yet.</p>
-              {user && <p>Be the first to share one by clicking the "Add Prayer" button!</p>}
-            </div>
-          )}
+          : prayersError ? (<Card className="col-span-full bg-destructive/10 border-destructive/50 text-left"><CardContent className="p-6"><h3 className="text-destructive font-bold">Error Loading Prayers</h3><p>The application encountered an error while trying to fetch data.</p><p className="font-semibold mt-2">Error Details:</p><p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{prayersError}</p></CardContent></Card>) 
+          : prayers.length > 0 ? (prayers.map((item) => <PrayerContentCard key={item.id} item={item} />)) 
+          : (<div className="col-span-full text-center text-muted-foreground mt-8"><p>No prayers have been shared yet.</p>{user && <p>Be the first to share one by clicking the "Add Prayer" button!</p>}</div>)}
         </div>
-      
       {detailsModal.prayer && (
         <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, prayer: null })}>
-          <DialogContent className="max-w-2xl w-[90vw]">
-            <DialogHeader>
-              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.prayer.category}</DialogTitle>
-              <DialogDescription className="pt-2 text-lg">By: {detailsModal.prayer.name}</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[50vh] pr-4">
-              <p className="py-4 text-foreground/90 whitespace-pre-wrap">{detailsModal.prayer.description}</p>
-            </ScrollArea>
-            <div className="pt-4 border-t flex items-center">
-              <span className="text-sm text-muted-foreground">React or Comment:</span>
-              <div className="flex items-center ml-auto">
-                <Popover>
-                  <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Heart className="h-4 w-4 text-red-500" />
-                          <span className="text-xs">{(detailsModal.prayer.reactions?.like || 0) + (detailsModal.prayer.reactions?.pray || 0) + (detailsModal.prayer.reactions?.claps || 0)}</span>
-                      </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'like')}>
-                              <Heart className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'pray')}>
-                              <Hand className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'claps')}>
-                              <ThumbsUp className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'downlike')}>
-                              <ThumbsDown className="h-4 w-4" />
-                          </Button>
-                      </div>
-                  </PopoverContent>
-                </Popover>
-                <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => { e.stopPropagation(); setDetailsModal({isOpen: false, prayer: null}); setCommentsModal({ isOpen: true, prayer: detailsModal.prayer }); }}>
-                  <MessageSquare className="h-4 w-4" />
-                  <span className="text-xs">{detailsModal.prayer.comments?.length || 0}</span>
-                </Button>
-              </div>
+          <DialogContent className="max-w-2xl w-[90vw] rounded-xl border">
+            <DialogHeader><DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.prayer.category}</DialogTitle><DialogDescription className="pt-2 text-lg">By: {detailsModal.prayer.name}</DialogDescription></DialogHeader>
+            <ScrollArea className="max-h-[50vh] pr-4"><p className="py-4 text-foreground/90 whitespace-pre-wrap">{detailsModal.prayer.description}</p></ScrollArea>
+            <div className="pt-4 border-t flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => { setDetailsModal({isOpen: false, prayer: null}); setCommentsModal({ isOpen: true, prayer: detailsModal.prayer }); }}>View all {detailsModal.prayer.comments?.length || 0} comments</Button>
+                    <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}><Heart className="h-4 w-4 text-red-500" /> <span className="text-xs">{(detailsModal.prayer.reactions?.like || 0) + (detailsModal.prayer.reactions?.pray || 0) + (detailsModal.prayer.reactions?.claps || 0)}</span></Button></PopoverTrigger>
+                        <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'like')}><Heart className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'pray')}><Hand className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.prayer!.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <Form {...quickCommentForm}><form onSubmit={quickCommentForm.handleSubmit((data) => handleAddComment(data, detailsModal.prayer!.id, quickCommentForm))} className="flex items-start gap-2">
+                    <FormField control={quickCommentForm.control} name="text" render={({ field }) => (<FormItem className="flex-grow"><FormControl><Textarea placeholder="Add a comment..." className="min-h-[40px] max-h-[100px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                    <Button type="submit" size="icon" disabled={quickCommentForm.formState.isSubmitting}><Send className="h-4 w-4" /></Button>
+                </form></Form>
             </div>
           </DialogContent>
         </Dialog>
       )}
-
-      {isMobile ? (
-        <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
-          <SheetContent side="bottom" className="max-h-[90vh] flex flex-col">
-            <SheetHeader className="text-left">
-              <SheetTitle>Comments on "{commentsModal.prayer?.category}"</SheetTitle>
-              <SheetDescription>Read what others are saying.</SheetDescription>
-            </SheetHeader>
-            {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
-          <DialogContent className="max-w-2xl w-[90vw] max-h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Comments on "{commentsModal.prayer?.category}"</DialogTitle>
-              <DialogDescription>Read what others are saying.</DialogDescription>
-            </DialogHeader>
-             {commentsModal.prayer && <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
-          </DialogContent>
-        </Dialog>
+      {commentsModal.prayer && (
+          isMobile ? (
+            <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
+              <SheetContent side="bottom" className="h-[90%] flex flex-col rounded-t-2xl border">
+                <div className="mx-auto mt-2 mb-4 h-2 w-20 flex-shrink-0 rounded-full bg-muted" />
+                <SheetHeader className="text-left"><SheetTitle>Comments on "{commentsModal.prayer?.category}"</SheetTitle><SheetDescription>Read what others are saying.</SheetDescription></SheetHeader>
+                <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={(data) => handleAddComment(data, commentsModal.prayer!.id, commentForm)} user={user} />
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, prayer: null })}>
+              <DialogContent className="max-w-2xl w-[90vw] max-h-[80vh] flex flex-col rounded-xl border">
+                <DialogHeader><DialogTitle>Comments on "{commentsModal.prayer?.category}"</DialogTitle><DialogDescription>Read what others are saying.</DialogDescription></DialogHeader>
+                 <CommentArea prayer={commentsModal.prayer} commentForm={commentForm} handleAddComment={(data) => handleAddComment(data, commentsModal.prayer!.id, commentForm)} user={user} />
+              </DialogContent>
+            </Dialog>
+          )
       )}
     </div>
   );

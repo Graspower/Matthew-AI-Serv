@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Hand, Heart, MessageSquare, ThumbsDown, ThumbsUp, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { addTeaching, addCommentToTeaching, addReactionToTeaching, type Teaching } from '@/services/teachings';
@@ -28,14 +28,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Comment, Reactions } from '@/types';
 
 const teachingFormSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }).optional(),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
   category: z.string().min(2, { message: 'A category is required.' }).max(40, { message: 'Category must be 40 characters or less.' }),
 });
 type TeachingFormData = z.infer<typeof teachingFormSchema>;
 
 const commentFormSchema = z.object({
-  author: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  author: z.string().min(2, { message: 'Name must be at least 2 characters.' }).optional(),
   text: z.string().min(1, { message: 'Comment cannot be empty.' }).max(500, { message: 'Comment must be 500 characters or less.'}),
 });
 type CommentFormData = z.infer<typeof commentFormSchema>;
@@ -127,38 +127,27 @@ export function TeachingsSection() {
   
   const teachingForm = useForm<TeachingFormData>({
     resolver: zodResolver(teachingFormSchema),
-    defaultValues: { name: '', description: '', category: '' },
+    defaultValues: { description: '', category: '' },
   });
 
   const commentForm = useForm<CommentFormData>({
     resolver: zodResolver(commentFormSchema),
-    defaultValues: { author: '', text: '' },
+    defaultValues: { text: '' },
   });
 
-  // Pre-fill forms with user's name when dialogs open
-  useEffect(() => {
-    if (user?.displayName && isAddTeachingDialogOpen) {
-        teachingForm.setValue('name', user.displayName);
-    }
-  }, [user, teachingForm, isAddTeachingDialogOpen]);
-  
-  useEffect(() => {
-    if (user?.displayName && commentsModal.isOpen) {
-        commentForm.setValue('author', user.displayName);
-    }
-  }, [user, commentForm, commentsModal.isOpen]);
+  const quickCommentForm = useForm<CommentFormData>({
+    resolver: zodResolver(commentFormSchema),
+    defaultValues: { text: '' },
+  });
 
-  // Real-time listener for teachings
   useEffect(() => {
     if (!db) {
       setTeachingsError("Firebase is not configured.");
       setIsLoadingTeachings(false);
       return;
     }
-
     setIsLoadingTeachings(true);
     const teachingsCol = collection(db, 'Teachings');
-    
     const unsubscribe = onSnapshot(teachingsCol, (querySnapshot) => {
       const teachingList = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -178,24 +167,17 @@ export function TeachingsSection() {
           userId: data.userId,
         } as Teaching;
       }).sort((a, b) => a.name.localeCompare(b.name));
-
       setTeachings(teachingList);
       setTeachingsError(null);
       setIsLoadingTeachings(false);
     }, (error) => {
       console.error("Error fetching teachings in real-time: ", error);
-      if (error.code === 'permission-denied') {
-        setTeachingsError("Permission Denied: Your security rules are not set up to allow reading teachings.");
-      } else {
-        setTeachingsError(error.message || "Failed to load teachings.");
-      }
+      setTeachingsError(error.message || "Failed to load teachings.");
       setIsLoadingTeachings(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Keep modals in sync with the real-time teachings list
   useEffect(() => {
     if (detailsModal.isOpen && detailsModal.teaching) {
       const updatedTeaching = teachings.find(p => p.id === detailsModal.teaching!.id);
@@ -228,10 +210,10 @@ export function TeachingsSection() {
         return;
     }
     try {
-      await addTeaching(data, user.uid);
+      await addTeaching({ ...data, name: user.displayName || 'Anonymous' }, user.uid);
       toast({ title: 'Success!', description: 'Teaching added successfully.' });
       setIsAddTeachingDialogOpen(false);
-      teachingForm.reset({name: user.displayName || '', description: '', category: ''});
+      teachingForm.reset({ description: '', category: ''});
     } catch (error: any) {
       toast({ title: 'Submission Error', description: error.message || 'Failed to add teaching.', variant: 'destructive' });
     }
@@ -249,23 +231,20 @@ export function TeachingsSection() {
     }
   }
 
-  async function handleAddComment(data: CommentFormData) {
-    if (!commentsModal.teaching) return;
+  async function handleAddComment(data: CommentFormData, teachingId: string, formToReset: UseFormReturn<CommentFormData>) {
     if (!user) {
         toast({ title: 'Authentication Required', description: 'Please log in to comment.', variant: 'destructive' });
         return;
     }
-
     const newComment: Comment = {
       id: uuidv4(),
-      author: user.displayName || data.author,
+      author: user.displayName || data.author || 'Anonymous',
       text: data.text,
       createdAt: new Date().toISOString(),
     };
-    
     try {
-      await addCommentToTeaching(commentsModal.teaching.id, newComment);
-      commentForm.reset({ author: user?.displayName || '', text: '' });
+      await addCommentToTeaching(teachingId, newComment);
+      formToReset.reset({ text: '' });
     } catch(error: any) {
       toast({ title: 'Comment Error', description: error.message || 'Failed to add comment.', variant: 'destructive' });
     }
@@ -278,35 +257,15 @@ export function TeachingsSection() {
         onClick={() => setDetailsModal({isOpen: true, teaching: item})}
       >
         <CardContent className="flex-grow flex flex-col p-6 justify-center items-center text-center">
-            <h3 className="font-serif font-semibold text-xl text-primary/90 capitalize [text-shadow:0_1px_2px_hsl(var(--primary)/0.2)]">
-                {item.category}
-            </h3>
-            <div className="mt-4">
-                <p className="font-semibold text-lg">{item.name}</p>
-                <p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p>
-            </div>
+            <h3 className="font-serif font-semibold text-xl text-primary/90 capitalize [text-shadow:0_1px_2px_hsl(var(--primary)/0.2)]">{item.category}</h3>
+            <div className="mt-4"><p className="font-semibold text-lg">{item.name}</p><p className="text-sm text-muted-foreground font-bold">{truncateText(item.description, 100)}{item.description.length > 100 ? '...' : ''}</p></div>
         </CardContent>
          <CardFooter className="p-2 border-t justify-end flex items-center gap-1">
             <Popover>
-              <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>
-                    <Heart className="h-4 w-4" />
-                    <span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span>
-                  </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
-                <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}><Heart className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}><Hand className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button>
-                </div>
-              </PopoverContent>
+              <PopoverTrigger asChild><Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}><Heart className="h-4 w-4" /><span>{(item.reactions?.like || 0) + (item.reactions?.pray || 0) + (item.reactions?.claps || 0)}</span></Button></PopoverTrigger>
+              <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}><div className="flex gap-1"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'like')}><Heart className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'pray')}><Hand className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(item.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button></div></PopoverContent>
             </Popover>
-            <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); setCommentsModal({ isOpen: true, teaching: item }); }}>
-                <MessageSquare className="h-4 w-4" />
-                <span>{item.comments?.length || 0}</span>
-            </Button>
+            <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); setCommentsModal({ isOpen: true, teaching: item }); }}><MessageSquare className="h-4 w-4" /><span>{item.comments?.length || 0}</span></Button>
         </CardFooter>
       </Card>
     );
@@ -315,127 +274,69 @@ export function TeachingsSection() {
   return (
     <div className="w-full text-center">
         <div className="flex justify-between items-center mb-6">
-            <div>
-                <h2 className="text-2xl font-bold text-left">Teachings</h2>
-                <p className="text-muted-foreground text-left">Key lessons and parables.</p>
-            </div>
-            <Dialog open={isAddTeachingDialogOpen} onOpenChange={setIsAddTeachingDialogOpen}>
-                <DialogTrigger asChild><Button>Add Teaching</Button></DialogTrigger>
-                <DialogContent>
+            <div><h2 className="text-2xl font-bold text-left">Teachings</h2><p className="text-muted-foreground text-left">Key lessons and parables.</p></div>
+            <Dialog open={isAddTeachingDialogOpen} onOpenChange={setIsAddTeachingDialogOpen}><DialogTrigger asChild><Button>Add Teaching</Button></DialogTrigger>
+                <DialogContent className="rounded-xl border">
                     <DialogHeader> <DialogTitle>Add a New Teaching</DialogTitle> <DialogDescription>Share a teaching to edify others.</DialogDescription> </DialogHeader>
-                    <Form {...teachingForm}>
-                        <form onSubmit={teachingForm.handleSubmit(handleAddTeaching)} className="space-y-4">
-                             {!user && (
-                                <FormField control={teachingForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Source/Speaker</FormLabel> <FormControl><Input placeholder="e.g., Jesus" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            )}
-                            <FormField control={teachingForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Teaching</FormLabel> <FormControl><Textarea placeholder="A detailed summary of the teaching" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                            <FormField control={teachingForm.control} name="category" render={({ field }) => ( 
-                                <FormItem> 
-                                    <FormLabel>Teaching Category</FormLabel> 
-                                    <FormControl><Input placeholder="e.g., The Beatitudes" {...field} /></FormControl> 
-                                    <div className="flex flex-wrap gap-2 pt-2">
-                                        {teachingCategories.map(cat => (
-                                            <Button key={cat} type="button" variant="outline" size="sm" onClick={() => teachingForm.setValue('category', cat, { shouldValidate: true })}>{cat}</Button>
-                                        ))}
-                                    </div>
-                                    <FormMessage /> 
-                                </FormItem> 
-                            )}/>
-                            <Button type="submit" disabled={teachingForm.formState.isSubmitting}>{teachingForm.formState.isSubmitting ? 'Submitting...' : 'Submit Teaching'}</Button>
-                        </form>
-                    </Form>
+                    <Form {...teachingForm}><form onSubmit={teachingForm.handleSubmit(handleAddTeaching)} className="space-y-4">
+                         {!user && (<FormField control={teachingForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Source/Speaker</FormLabel> <FormControl><Input placeholder="e.g., Jesus" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>)}
+                        <FormField control={teachingForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Teaching</FormLabel> <FormControl><Textarea placeholder="A detailed summary of the teaching" rows={5} {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                        <FormField control={teachingForm.control} name="category" render={({ field }) => ( <FormItem> <FormLabel>Teaching Category</FormLabel> <FormControl><Input placeholder="e.g., The Beatitudes" {...field} /></FormControl> <div className="flex flex-wrap gap-2 pt-2">{teachingCategories.map(cat => (<Button key={cat} type="button" variant="outline" size="sm" onClick={() => teachingForm.setValue('category', cat, { shouldValidate: true })}>{cat}</Button>))}</div><FormMessage /> </FormItem> )}/>
+                        <Button type="submit" disabled={teachingForm.formState.isSubmitting}>{teachingForm.formState.isSubmitting ? 'Submitting...' : 'Submit Teaching'}</Button>
+                    </form></Form>
                 </DialogContent>
             </Dialog>
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoadingTeachings ? ([...Array(3)].map((_, i) => <ContentCardSkeleton key={i} />))
-          : teachingsError ? (
-              <Card className="col-span-full bg-destructive/10 border-destructive/50 text-left">
-                  <CardContent className="p-6">
-                      <h3 className="text-destructive font-bold">Error Loading Teachings</h3>
-                      <p>The application encountered an error while trying to fetch data.</p>
-                      <p className="font-semibold mt-2">Error Details:</p>
-                      <p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{teachingsError}</p>
-                  </CardContent>
-              </Card>
-          ) : teachings.length > 0 ? (
-            teachings.map((item) => <TeachingContentCard key={item.id} item={item} />)
-          ) : (
-            <div className="col-span-full text-center text-muted-foreground mt-8">
-              <p>No teachings have been shared yet.</p>
-              {user && <p>Be the first to share one by clicking the "Add Teaching" button!</p>}
-            </div>
-          )}
+          : teachingsError ? (<Card className="col-span-full bg-destructive/10 border-destructive/50 text-left"><CardContent className="p-6"><h3 className="text-destructive font-bold">Error Loading Teachings</h3><p>The application encountered an error while trying to fetch data.</p><p className="font-semibold mt-2">Error Details:</p><p className="mt-1 p-2 bg-black/20 rounded-md font-mono text-sm">{teachingsError}</p></CardContent></Card>)
+          : teachings.length > 0 ? (teachings.map((item) => <TeachingContentCard key={item.id} item={item} />))
+          : (<div className="col-span-full text-center text-muted-foreground mt-8"><p>No teachings have been shared yet.</p>{user && <p>Be the first to share one by clicking the "Add Teaching" button!</p>}</div>)}
         </div>
-
       {detailsModal.teaching && (
         <Dialog open={detailsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setDetailsModal({ isOpen: false, teaching: null })}>
-          <DialogContent className="max-w-2xl w-[90vw]">
-            <DialogHeader>
-              <DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.teaching.category}</DialogTitle>
-              <DialogDescription className="pt-2 text-lg">By: {detailsModal.teaching.name}</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[50vh] pr-4">
-              <p className="py-4 text-foreground/90 whitespace-pre-wrap">{detailsModal.teaching.description}</p>
-            </ScrollArea>
-            <div className="pt-4 border-t flex items-center">
-              <span className="text-sm text-muted-foreground">React or Comment:</span>
-              <div className="flex items-center ml-auto">
-                <Popover>
-                  <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Heart className="h-4 w-4 text-red-500" />
-                          <span className="text-xs">{(detailsModal.teaching.reactions?.like || 0) + (detailsModal.teaching.reactions?.pray || 0) + (detailsModal.teaching.reactions?.claps || 0)}</span>
-                      </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'like')}>
-                              <Heart className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'pray')}>
-                              <Hand className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'claps')}>
-                              <ThumbsUp className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'downlike')}>
-                              <ThumbsDown className="h-4 w-4" />
-                          </Button>
-                      </div>
-                  </PopoverContent>
-                </Popover>
-                <Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => { e.stopPropagation(); setDetailsModal({isOpen: false, teaching: null}); setCommentsModal({ isOpen: true, teaching: detailsModal.teaching }); }}>
-                  <MessageSquare className="h-4 w-4" />
-                  <span className="text-xs">{detailsModal.teaching.comments?.length || 0}</span>
-                </Button>
-              </div>
+          <DialogContent className="max-w-2xl w-[90vw] rounded-xl border">
+            <DialogHeader><DialogTitle className="text-3xl font-serif font-bold text-primary">{detailsModal.teaching.category}</DialogTitle><DialogDescription className="pt-2 text-lg">By: {detailsModal.teaching.name}</DialogDescription></DialogHeader>
+            <ScrollArea className="max-h-[50vh] pr-4"><p className="py-4 text-foreground/90 whitespace-pre-wrap">{detailsModal.teaching.description}</p></ScrollArea>
+            <div className="pt-4 border-t flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => { setDetailsModal({isOpen: false, teaching: null}); setCommentsModal({ isOpen: true, teaching: detailsModal.teaching }); }}>View all {detailsModal.teaching.comments?.length || 0} comments</Button>
+                    <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}><Heart className="h-4 w-4 text-red-500" /><span className="text-xs">{(detailsModal.teaching.reactions?.like || 0) + (detailsModal.teaching.reactions?.pray || 0) + (detailsModal.teaching.reactions?.claps || 0)}</span></Button></PopoverTrigger>
+                        <PopoverContent className="w-auto p-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'like')}><Heart className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'pray')}><Hand className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'claps')}><ThumbsUp className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReaction(detailsModal.teaching!.id, 'downlike')}><ThumbsDown className="h-4 w-4" /></Button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <Form {...quickCommentForm}><form onSubmit={quickCommentForm.handleSubmit((data) => handleAddComment(data, detailsModal.teaching!.id, quickCommentForm))} className="flex items-start gap-2">
+                    <FormField control={quickCommentForm.control} name="text" render={({ field }) => (<FormItem className="flex-grow"><FormControl><Textarea placeholder="Add a comment..." className="min-h-[40px] max-h-[100px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                    <Button type="submit" size="icon" disabled={quickCommentForm.formState.isSubmitting}><Send className="h-4 w-4" /></Button>
+                </form></Form>
             </div>
           </DialogContent>
         </Dialog>
       )}
-
-      {isMobile ? (
-        <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>
-          <SheetContent side="bottom" className="max-h-[90vh] flex flex-col">
-            <SheetHeader className="text-left">
-              <SheetTitle>Comments on "{commentsModal.teaching?.category}"</SheetTitle>
-              <SheetDescription>Read what others are saying.</SheetDescription>
-            </SheetHeader>
-            {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>
-          <DialogContent className="max-w-2xl w-[90vw] max-h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Comments on "{commentsModal.teaching?.category}"</DialogTitle>
-              <DialogDescription>Read what others are saying.</DialogDescription>
-            </DialogHeader>
-             {commentsModal.teaching && <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={handleAddComment} user={user} />}
-          </DialogContent>
-        </Dialog>
+      {commentsModal.teaching && (
+          isMobile ? (
+            <Sheet open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>
+              <SheetContent side="bottom" className="h-[90%] flex flex-col rounded-t-2xl border">
+                <div className="mx-auto mt-2 mb-4 h-2 w-20 flex-shrink-0 rounded-full bg-muted" />
+                <SheetHeader className="text-left"><SheetTitle>Comments on "{commentsModal.teaching?.category}"</SheetTitle><SheetDescription>Read what others are saying.</SheetDescription></SheetHeader>
+                <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={(data) => handleAddComment(data, commentsModal.teaching!.id, commentForm)} user={user} />
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <Dialog open={commentsModal.isOpen} onOpenChange={(isOpen) => !isOpen && setCommentsModal({ isOpen: false, teaching: null })}>
+              <DialogContent className="max-w-2xl w-[90vw] max-h-[80vh] flex flex-col rounded-xl border">
+                <DialogHeader><DialogTitle>Comments on "{commentsModal.teaching?.category}"</DialogTitle><DialogDescription>Read what others are saying.</DialogDescription></DialogHeader>
+                 <CommentArea teaching={commentsModal.teaching} commentForm={commentForm} handleAddComment={(data) => handleAddComment(data, commentsModal.teaching!.id, commentForm)} user={user} />
+              </DialogContent>
+            </Dialog>
+          )
       )}
     </div>
   );
